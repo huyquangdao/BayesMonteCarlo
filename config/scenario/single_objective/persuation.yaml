@@ -1,0 +1,8 @@
+name: "persuation"
+log_dir: "logs/persuation/"
+saved_dir: "checkpoints/persuation/"
+n: 10
+epsilon: 0.5
+max_horizon: 16
+objectives: [ "user_reward", "toxicity", "avg_turn" ]
+model_type: "llama3"

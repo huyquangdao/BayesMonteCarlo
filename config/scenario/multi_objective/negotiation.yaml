@@ -1,0 +1,8 @@
+name: "negotiation"
+log_dir: "logs/negotiation/"
+saved_dir: "checkpoints/negotiation/"
+n: 10
+epsilon: 1.0
+max_horizon: 10
+objectives: [ "sl_ratio", "fairness","sr"]
+model_type: "chatgpt"

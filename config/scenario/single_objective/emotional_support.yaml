@@ -1,0 +1,8 @@
+name: "emotional_support"
+log_dir: "logs/emotional_support/"
+saved_dir: "checkpoints/emotional_support/"
+n: 10
+epsilon: 0.5
+max_horizon: 16
+objectives: [ "user_reward", "toxicity", "avg_turn"]
+model_type: "llama3"

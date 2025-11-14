@@ -1,0 +1,26 @@
+dataset_name: durecdial
+train_data_path: data/rec_data/durecdial/data/en_train.txt
+dev_data_path: data/rec_data/durecdial/data/en_dev.txt
+test_data_path: data/rec_data/durecdial/data/en_test.txt
+n_goals: 13
+n_topics: 637
+log: true
+save_movie_goal_path: data/rec_data/durecdial/data/goal_movie.pkl
+save_movie_topic_path: data/rec_data/durecdial/data/topic_movie.pkl
+save_music_goal_path: data/rec_data/durecdial/data/goal_music.pkl
+save_music_topic_path: data/rec_data/durecdial/data/topic_music.pkl
+save_food_goal_path: data/rec_data/durecdial/data/goal_food.pkl
+save_food_topic_path: data/rec_data/durecdial/data/topic_food.pkl
+save_poi_goal_path: data/rec_data/durecdial/data/goal_poi.pkl
+save_poi_topic_path: data/rec_data/durecdial/data/topic_poi.pkl
+save_all_goal_path: data/rec_data/durecdial/data/goal_all.pkl
+save_all_topic_path: data/rec_data/durecdial/data/topic_all.pkl
+save_dev_simulator_path: data/rec_data/durecdial/data/dev_sim.pkl
+save_test_simulator_path: data/rec_data/durecdial/data/test_sim.pkl
+save_action: false
+load_action: true
+save_train_convs: true
+num_train_items: 471
+num_dev_items: 285
+num_test_items: 376
+terminated_action: "Say goodbye"

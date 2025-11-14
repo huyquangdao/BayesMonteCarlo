@@ -1,0 +1,20 @@
+dataset_name: craigslist_bargain
+train_data_path: data/neg_data/craigslist/cb-train.txt
+dev_data_path: data/neg_data/craigslist/cb-valid.txt
+test_data_path: data/neg_data/craigslist/cb-test.txt
+train_cached_data_path: data/neg_data/craigslist/train.pkl
+dev_cached_data_path: data/neg_data/craigslist/dev.pkl
+test_cached_data_path: data/neg_data/craigslist/test.pkl
+n_goals: 11
+n_topics: 5
+log: true
+save_goal_path: data/neg_data/craigslist/goal.pkl
+save_dev_simulator_path: data/neg_data/craigslist/dev_sim.pkl
+save_test_simulator_path: data/neg_data/craigslist/test_sim.pkl
+save_action: false
+load_action: true
+save_train_convs: true
+num_train_cases: 3290
+num_dev_cases: 188
+num_test_cases: 188
+terminated_action: "Say goodbye"
