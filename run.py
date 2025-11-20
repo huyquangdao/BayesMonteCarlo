@@ -236,19 +236,19 @@ if __name__ == '__main__':
                     )
                 
             # ablation study for prollm
-            if isinstance(model_config, ProLLMConfig):
-                model_config.set_params(
-                    {
-                        'ablation': args['ablation'],
-                        'ablation_mode': args['ablation_mode'], #
-                    }
-                )
+            # if isinstance(model_config, ProLLMConfig):
+            #     model_config.set_params(
+            #         {
+            #             'ablation': args['ablation'],
+            #             'ablation_mode': args['ablation_mode'], #
+            #         }
+            #     )
             
             # we only consider action-based models
             # for this we may rewrite the action instruction
             if isinstance(model_config, PPDPPConfig) or isinstance(model_config, TRIPConfig) \
-                 or isinstance(model_config, DPDPConfig) or isinstance(model_config, ProCOTConfig) or isinstance(model_config, ProactiveConfig) \
-                        or isinstance(model_config, ProLLMConfig) or isinstance(model_config, PromptRefinerConfig):
+                 or isinstance(model_config, DPDPConfig) or isinstance(model_config, ProCOTConfig) or isinstance(model_config, ProactiveConfig):
+                        # or isinstance(model_config, ProLLMConfig) or isinstance(model_config, PromptRefinerConfig):
                 model_config.set_params(
                     {
                         'rewrite_action': args['rewrite_action'],
@@ -258,20 +258,20 @@ if __name__ == '__main__':
             
             # for ablation study
             # if we are optimzing the meta prompt
-            if isinstance(model_config, PromptRefinerConfig):
-                model_config.set_params(
-                    {
-                        'is_ablation_prompt_optimization': args['is_ablation_prompt_optimization'],
-                        'is_ablation_prompt_distribution': args['is_ablation_prompt_distribution'],
-                        'num_meta_prompts': args['num_meta_prompts'] 
-                    }
-                )
+            # if isinstance(model_config, PromptRefinerConfig):
+            #     model_config.set_params(
+            #         {
+            #             'is_ablation_prompt_optimization': args['is_ablation_prompt_optimization'],
+            #             'is_ablation_prompt_distribution': args['is_ablation_prompt_distribution'],
+            #             'num_meta_prompts': args['num_meta_prompts'] 
+            #         }
+            #     )
             
             # we only consider the MODPL model
             if isinstance(model_config, PPDPPConfig) or isinstance(model_config, TRIPConfig) \
                 or isinstance(model_config, DDQLConfig) or isinstance(model_config, EnvelopeConfig) or isinstance(model_config, DPDPConfig) or \
-                    isinstance(model_config, SetMaxPADPPConfig) or isinstance(model_config, MinDistPADPPConfig) \
-                        or isinstance(model_config, ProLLMConfig) or isinstance(model_config, PromptRefinerConfig):
+                    isinstance(model_config, SetMaxPADPPConfig) or isinstance(model_config, MinDistPADPPConfig):
+                        # or isinstance(model_config, ProLLMConfig) or isinstance(model_config, PromptRefinerConfig):
                 
                 # For weight-specific inference
                 # Adaptability experiments
