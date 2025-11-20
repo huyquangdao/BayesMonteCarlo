@@ -7,10 +7,10 @@ from transformers.trainer_pt_utils import LabelSmoother
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
 import sys
-sys.path.insert(0, "/home/huyquangdao/ProLLM/pro_llm")
+# sys.path.insert(0, "/home/huyquangdao/ProLLM/pro_llm")
 
-from pro_llm.fastchat.model.model_adapter import get_model_adapter
-from pro_llm.fastchat.conversation import SeparatorStyle
+# from pro_llm.fastchat.model.model_adapter import get_model_adapter
+# from pro_llm.fastchat.conversation import SeparatorStyle
 
 
 def convert_list_to_str(knowledge):

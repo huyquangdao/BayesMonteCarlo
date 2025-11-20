@@ -27,8 +27,8 @@ from baselines.DPDP.config import DPDPConfig
 from baselines.PADPP_smp.config import SetMaxPADPPConfig
 from baselines.PADPP_min_dist.config import MinDistPADPPConfig
 
-from pro_llm.config import ProLLMConfig
-from prompt_refiner.config import PromptRefinerConfig
+# from pro_llm.config import ProLLMConfig
+# from prompt_refiner.config import PromptRefinerConfig
 from baselines.ProCOT.config import ProCOTConfig
 from baselines.Proactive.config import ProactiveConfig
 

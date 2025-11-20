@@ -220,10 +220,10 @@ ENVELOPE_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/ENVELOPE_NEG.yaml'
 ENVELOPE_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/ENVELOPE_ES.yaml'
 
 # Proactive Large Language Model
-PRO_LLM = "pro_llm"
-PRO_LLM_CONFIG_PATH_FOR_RECOMMENDATION = 'config/models/PRO_LLM_REC.yaml'
-PRO_LLM_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/PRO_LLM_NEG.yaml'
-PRO_LLM_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/PRO_LLM_ES.yaml'
+# PRO_LLM = "pro_llm"
+# PRO_LLM_CONFIG_PATH_FOR_RECOMMENDATION = 'config/models/PRO_LLM_REC.yaml'
+# PRO_LLM_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/PRO_LLM_NEG.yaml'
+# PRO_LLM_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/PRO_LLM_ES.yaml'
 
 # Prompt Refiner
 PROMPT_REFINER = "prompt_refiner"
