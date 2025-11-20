@@ -531,13 +531,13 @@ def get_model_by_names(scenario, model_names):
                 AnETrainer
             ],
             # Prompt Refiner for recommendation
-            PROMPT_REFINER: [
-                PROMPT_REFINER_CONFIG_PATH_FOR_RECOMMENDATION,
-                PromptRefinerConfigForRecommendation,
-                PromptRefinerModel,
-                PromptRefinerPipelineForRecommendation,
-                PromptRefinerTrainer
-            ]                 
+            # PROMPT_REFINER: [
+            #     PROMPT_REFINER_CONFIG_PATH_FOR_RECOMMENDATION,
+            #     PromptRefinerConfigForRecommendation,
+            #     PromptRefinerModel,
+            #     PromptRefinerPipelineForRecommendation,
+            #     PromptRefinerTrainer
+            # ]                 
         }
         # collect model packages
         models = []
@@ -664,20 +664,20 @@ def get_model_by_names(scenario, model_names):
                 GDPZeroTrainer
             ],
             # Pro LLM for negotiation
-            PRO_LLM: [
-                PRO_LLM_CONFIG_PATH_FOR_NEGOTIATION,
-                ProLLMConfigForNegotiation,
-                ProLLMModel,
-                ProLLMPipelineForNegotiation,
-                ProLLMTrainer
-            ],
-            PROMPT_REFINER: [
-                PROMPT_REFINER_CONFIG_PATH_FOR_NEGOTIATION,
-                PromptRefinerConfigForNegotiation,
-                PromptRefinerModel,
-                PromptRefinerPipelineForNegotiation,
-                PromptRefinerTrainer
-            ]     
+            # PRO_LLM: [
+            #     PRO_LLM_CONFIG_PATH_FOR_NEGOTIATION,
+            #     ProLLMConfigForNegotiation,
+            #     ProLLMModel,
+            #     ProLLMPipelineForNegotiation,
+            #     ProLLMTrainer
+            # ],
+            # PROMPT_REFINER: [
+            #     PROMPT_REFINER_CONFIG_PATH_FOR_NEGOTIATION,
+            #     PromptRefinerConfigForNegotiation,
+            #     PromptRefinerModel,
+            #     PromptRefinerPipelineForNegotiation,
+            #     PromptRefinerTrainer
+            # ]     
         }
 
         # collect model packages
@@ -755,21 +755,21 @@ def get_model_by_names(scenario, model_names):
 
             ],
             # Pro LLM for negotiation
-            PRO_LLM: [
-                PRO_LLM_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT,
-                ProLLMConfigForEmotionalSupport,
-                ProLLMModel,
-                ProLLMPipelineForEmotionalSupport,
-                ProLLMTrainer
-            ],
-            # prompt refiner
-            PROMPT_REFINER: [
-                PROMPT_REFINER_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT,
-                PromptRefinerConfigForEmotionalSupport,
-                PromptRefinerModel,
-                PromptRefinerPipelineForEmotionalSupport,
-                PromptRefinerTrainer
-            ],
+            # PRO_LLM: [
+            #     PRO_LLM_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT,
+            #     ProLLMConfigForEmotionalSupport,
+            #     ProLLMModel,
+            #     ProLLMPipelineForEmotionalSupport,
+            #     ProLLMTrainer
+            # ],
+            # # prompt refiner
+            # PROMPT_REFINER: [
+            #     PROMPT_REFINER_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT,
+            #     PromptRefinerConfigForEmotionalSupport,
+            #     PromptRefinerModel,
+            #     PromptRefinerPipelineForEmotionalSupport,
+            #     PromptRefinerTrainer
+            # ],
             # trip
             TRIP: [
                 TRIP_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT,
@@ -821,13 +821,13 @@ def get_model_by_names(scenario, model_names):
                 ProactiveTrainer
             ],
             # prompt refiner
-            PROMPT_REFINER: [
-                PROMPT_REFINER_CONFIG_PATH_FOR_PERSUATION,
-                PromptRefinerConfigForPersuation,
-                PromptRefinerModel,
-                PromptRefinerPipelineForPersuation,
-                PromptRefinerTrainer
-            ],
+            # PROMPT_REFINER: [
+            #     PROMPT_REFINER_CONFIG_PATH_FOR_PERSUATION,
+            #     PromptRefinerConfigForPersuation,
+            #     PromptRefinerModel,
+            #     PromptRefinerPipelineForPersuation,
+            #     PromptRefinerTrainer
+            # ],
             # trip
             TRIP: [
                 TRIP_CONFIG_PATH_FOR_PERSUATION,
