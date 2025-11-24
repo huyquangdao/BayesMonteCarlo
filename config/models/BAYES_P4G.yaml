@@ -39,8 +39,8 @@ max_prompt_length: 256
 fp16: true
 bf16: false
 gradient_checkpointing: true
-# Path to preference pairs (jsonl) used for DPO; dataset/loader should read this.
-preference_pairs_path: "data/preference_pairs_gpt-3.5-turbo.jsonl"
+# Path to preference pairs (jsonl) used for DPO; ensure it contains prompt/chosen/rejected.
+preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 # Special tokens for persuasion (same as TRIP/PPDPP PG)
 special_tokens_dict:

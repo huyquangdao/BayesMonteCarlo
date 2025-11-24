@@ -10,6 +10,7 @@ import math
 import os
 import random
 import warnings
+import json
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -421,6 +422,28 @@ class BayesAdaptiveLLMTrainer(Trainer):
             raise ImportError("trl is required for DPO training. Install it with `pip install trl`.")
 
         train_pref, dev_pref, _ = self.process_dataset(dataset)
+
+        def _has_pref_fields(ex: Any) -> bool:
+            if isinstance(ex, dict):
+                return all(k in ex for k in ("prompt", "chosen", "rejected"))
+            return all(hasattr(ex, k) for k in ("prompt", "chosen", "rejected"))
+
+        # If dataset is not already preference-formatted, try loading from jsonl.
+        if (not train_pref) or not _has_pref_fields(train_pref[0]):
+            pref_path = getattr(self.model_config, "preference_pairs_path", None)
+            if pref_path is None or not os.path.exists(pref_path):
+                raise ValueError(
+                    "Preference pairs are missing. Set model_config.preference_pairs_path to a jsonl file "
+                    "with prompt/chosen/rejected fields, or ensure dataset.train_instances contain them."
+                )
+            loguru_logger.info("Loading preference pairs from %s", pref_path)
+            with open(pref_path, "r", encoding="utf-8") as f:
+                pref_data = [json.loads(line) for line in f if line.strip()]
+            if not pref_data:
+                raise ValueError(f"No preference pairs loaded from {pref_path}.")
+            dataset.set_instances(pref_data, [], [])
+            train_pref, dev_pref, _ = self.process_dataset(dataset)
+
         train_dataset, eval_dataset = self.prepare_preference_datasets(train_pref, dev_pref)
 
         reference_model = self.prepare_reference_model()
