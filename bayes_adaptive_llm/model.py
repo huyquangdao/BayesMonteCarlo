@@ -50,3 +50,10 @@ class BayesAdaptiveLLMModel(Model):
         cls_token = self.drop_out(cls_token)
         logits = self.out_layer(cls_token)
         return logits
+
+    # Expose embedding accessors expected by TRL trainers.
+    def get_input_embeddings(self):
+        return self.plm.get_input_embeddings()
+
+    def set_input_embeddings(self, new_embeddings):
+        self.plm.set_input_embeddings(new_embeddings)
