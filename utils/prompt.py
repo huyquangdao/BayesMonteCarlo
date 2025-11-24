@@ -3,6 +3,7 @@ import copy
 
 from dotenv import load_dotenv
 import openai
+from typing import Tuple
 
 from googleapiclient import discovery
 import json
@@ -23,13 +24,41 @@ from config.constants import LLM_MODEL, LLAMA3, CHATGPT, LLAMA3_MODEL, QWEN_MODE
 load_dotenv()
 
 
+def _collect_openai_exceptions() -> Tuple[type, ...]:
+    """
+    Gather OpenAI exception classes in a backward/forward compatible way.
+    openai>=1.0 exposes exceptions at top-level (openai.APIError, ...),
+    older 0.x exposes them under openai.error.*
+    """
+    names = ["APIError", "APIConnectionError", "RateLimitError", "ServiceUnavailableError", "APITimeoutError", "Timeout"]
+    excs = []
+    for name in names:
+        exc = getattr(openai, name, None)
+        if exc is None and hasattr(openai, "error"):
+            exc = getattr(openai.error, name, None)
+        if exc:
+            excs.append(exc)
+    return tuple(excs)
+
+
+# Build a client for OpenAI v1+; fall back to legacy module-level calls if needed.
+_openai_client = None
+if hasattr(openai, "OpenAI"):
+    _openai_client = openai.OpenAI()
+
+
 @retry(
-    retry=retry_if_exception_type((openai.error.APIError, openai.error.APIConnectionError, openai.error.RateLimitError,
-                                   openai.error.ServiceUnavailableError, openai.error.Timeout)),
+    retry=retry_if_exception_type(_collect_openai_exceptions()),
     wait=wait_random_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(10)
 )
 def chat_completion_with_backoff(**kwargs):
+    """
+    Call OpenAI chat completion with retry/backoff.
+    Supports both legacy (0.x) and new (1.x) clients.
+    """
+    if _openai_client is not None:
+        return _openai_client.chat.completions.create(**kwargs)
     return openai.ChatCompletion.create(**kwargs)
 
 
@@ -39,7 +68,11 @@ load_dotenv()
 # The api key, llm model
 API_KEY = os.getenv("API_KEY")
 MODEL = LLM_MODEL
-openai.api_key = API_KEY
+# Configure client depending on OpenAI version.
+if _openai_client is not None:
+    _openai_client.api_key = API_KEY
+else:
+    openai.api_key = API_KEY
 
 # API for toxicity evaluation
 PERSPECTIVE_API_KEY = os.getenv('PERSPECTIVE_KEY')

@@ -21,7 +21,7 @@ loguru
 wandb
 dotenv
 tenacity
-openai==0.28.0
+openai==1.40.0
 trl
 sentence-transformers
 google-api-python-client
