@@ -11,6 +11,7 @@ import os
 import random
 import warnings
 import json
+import copy
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -327,7 +328,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
     def prepare_reference_model(self):
         reference_model = getattr(self.model_config, "reference_model", None)
         if reference_model is None:
-            raise ValueError("model_config.reference_model must be provided for DPO training.")
+            # Default to a frozen copy of the current model if none is provided.
+            loguru_logger.warning("reference_model not provided; cloning current model for DPO.")
+            reference_model = copy.deepcopy(self.model)
+            # cache on config so repeated calls reuse the same copy
+            setattr(self.model_config, "reference_model", reference_model)
         reference_model.requires_grad_(False)
         reference_model.eval()
         return reference_model
