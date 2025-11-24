@@ -58,3 +58,14 @@ class BayesAdaptiveLLMModel(Model):
 
     def set_input_embeddings(self, new_embeddings):
         self.plm.set_input_embeddings(new_embeddings)
+
+    # Expose gradient checkpointing toggles expected by HF trainers.
+    def gradient_checkpointing_enable(self, **kwargs):
+        if hasattr(self.plm, "gradient_checkpointing_enable"):
+            return self.plm.gradient_checkpointing_enable(**kwargs)
+        return None
+
+    def gradient_checkpointing_disable(self):
+        if hasattr(self.plm, "gradient_checkpointing_disable"):
+            return self.plm.gradient_checkpointing_disable()
+        return None
