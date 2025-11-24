@@ -481,7 +481,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             args=dpo_args,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
-            processing_class=self.tokenizer,
+            tokenizer=self.tokenizer,
         )
 
         dpo_trainer.train()
