@@ -174,6 +174,10 @@ TRIP_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/TRIP_NEG.yaml'
 TRIP_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/TRIP_ES.yaml'
 TRIP_CONFIG_PATH_FOR_PERSUATION = 'config/models/TRIP_PG.yaml'
 
+# Bayes-Adaptive LLM
+BAYES_ADAPTIVE = 'bayes_adaptive_llm'
+BAYES_CONFIG_PATH_FOR_PERSUATION = 'config/models/BAYES_P4G.yaml'
+
 # DPDP model
 DPDP = 'dpdp'
 DPDP_CONFIG_PATH_FOR_RECOMMENDATION = 'config/models/DPDP_REC.yaml'

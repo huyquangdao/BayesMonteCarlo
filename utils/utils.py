@@ -119,6 +119,13 @@ from baselines.Envelope.model import EnvelopeModel
 from baselines.Envelope.pipeline import EnvelopePipelineForRecommendation, EnvelopePipelineForNegotiation, \
     EnvelopePipelineForEmotionalSupport
 
+# Bayes-Adaptive LLM
+from bayes_adaptive_llm.config import BayesAdaptiveConfigForRecommendation, BayesAdaptiveConfigForNegotiation, \
+    BayesAdaptiveConfigForEmotionalSupport, BayesAdaptiveConfigForPersuation
+from bayes_adaptive_llm.model import BayesAdaptiveLLMModel
+from bayes_adaptive_llm.pipeline import BayesAdaptiveLLMPipeline
+from bayes_adaptive_llm.trainer import BayesAdaptiveLLMTrainer
+
 # Pro_active Chain-of-thought (ProCOT)
 from baselines.ProCOT.config import ProCOTConfigForNegotiation, ProCOTConfigForEmotionalSupport, ProCOTConfigForPersuation, ProCOTConfigForRecommendation
 from baselines.ProCOT.trainer import ProCOTTrainer
@@ -835,6 +842,13 @@ def get_model_by_names(scenario, model_names):
                 TRIPModel,
                 TRIPPipelineForPersuation,
                 TRIPTrainer
+            ],
+            BAYES_ADAPTIVE: [
+                BAYES_CONFIG_PATH_FOR_PERSUATION,
+                BayesAdaptiveConfigForPersuation,
+                BayesAdaptiveLLMModel,
+                BayesAdaptiveLLMPipeline,
+                BayesAdaptiveLLMTrainer
             ],
             PPDPP: [
                 PPDPP_CONFIG_PATH_FOR_PERSUATION,

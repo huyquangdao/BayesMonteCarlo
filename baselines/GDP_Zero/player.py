@@ -7,7 +7,7 @@ import re
 from utils.prompt import get_llm_based_assessment_for_negotiation, get_llm_based_assessment_for_recommendation, \
     get_llm_based_assessment_for_emotional_support
 
-from config.constants import EMOTIONAL_SUPPORT, NEGOTIATION, RECOMMENDATION, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, INSPIRED, USER_REWARD, ITEM_FREQ
+from config.constants import EMOTIONAL_SUPPORT, NEGOTIATION, RECOMMENDATION, PERSUATION, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, INSPIRED, USER_REWARD, ITEM_FREQ
 from utils.prompt import call_llm, get_user_sentiment_for_item_recommendation
 
 logger = logging.getLogger(__name__)
@@ -361,6 +361,9 @@ class LLMPlayer(DialogPlanner):
                 score = 0
             else:
                 score = sum(rewards) / len(rewards)
+        elif self.game_name == PERSUATION:
+            # Persuasion uses preference pairs; keep heuristic neutral to allow search to proceed.
+            score = 0.0
         else:
             raise Exception('Something is wrong here ....')
         return score
@@ -455,6 +458,28 @@ class LLMPlayer(DialogPlanner):
                             temp_action = "Ask about weather"
                     action = temp_action
                 processed_responses.append(action)
+
+        elif self.game_config.name == PERSUATION:
+            processed_responses = []
+            for res in responses:
+                # Expect goal/dialog-act tokens like [greeting] or raw labels; extract best guess.
+                actions = re.findall(r'\[([^\]]+)\]', res)
+                action = actions[0] if len(actions) > 0 else res.strip()
+                action = action.strip().lower()
+
+                matched = None
+                for k, v in self.model_config.action_mapping.items():
+                    if k.lower() == action or k.lower() in action:
+                        matched = v
+                        break
+                if matched is None:
+                    # heuristic default: pick a neutral/first action to keep search going
+                    matched = self.model_config.action_mapping.get("question", None)
+                    if matched is None and len(self.model_config.action_mapping) > 0:
+                        matched = list(self.model_config.action_mapping.values())[0]
+                processed_responses.append(matched)
+        else:
+            processed_responses = []
                 
         return processed_responses
 

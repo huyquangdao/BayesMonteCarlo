@@ -70,7 +70,10 @@ def call_llm_model(prompt, temperature=0.0, max_token=30, n_return_sequences=1, 
     :return:
     """
     if llm_pipeline is None or terminators is None:
-        raise Exception("Something is wrong here.")
+        # Fallback: return empty text when no pipeline is available (e.g., chatgpt mode without local pipeline)
+        if n_return_sequences > 1:
+            return ["" for _ in range(n_return_sequences)]
+        return ""
     
     response = llm_pipeline(
         prompt,

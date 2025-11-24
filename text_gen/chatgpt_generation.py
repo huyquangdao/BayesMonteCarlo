@@ -1,9 +1,12 @@
+from pathlib import Path
+
 from base.text_gen import LLMGeneration
 from config.config import GenerationConfig
 from utils.generation import construct_prompt_for_chat_gpt_response_generation_negotiation, \
     construct_prompt_for_chat_gpt_response_generation_emotional_support, \
     construct_prompt_for_chat_gpt_response_generation_recommendation, construct_prompt_for_chat_gpt_response_generation_persuation
 from utils.prompt import call_llm
+from utils.logging_utils import append_to_log
 
 from config.constants import EMOTIONAL_SUPPORT, RECOMMENDATION, NEGOTIATION, PERSUATION
 
@@ -34,6 +37,8 @@ class ChatGPTGeneration(LLMGeneration):
         :return:
         """
         dialogue_context = instance['dialogue_context']
+        dialog_id = instance.get("dialog_id", "unknown")
+        turn_id = instance.get("turn_id", -1)
 
         # the recommendation scenario
         if self.generation_config.scenario_name == RECOMMENDATION:
@@ -56,6 +61,20 @@ class ChatGPTGeneration(LLMGeneration):
         else:
             raise Exception("Invalid Scenario ...")
 
+        # Inject persona hint for persuasion if provided
+        persona_hint = instance.get("persona_hint")
+        if self.generation_config.scenario_name == PERSUATION and persona_hint:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Persuadee persona description:\n"
+                        f"{persona_hint}\n"
+                        "Adapt your persuasion tone, reasoning, and examples so they resonate with this persona."
+                    ),
+                }
+            )
+
         messages.extend(dialogue_context)
 
         # calling the llm for response generation
@@ -65,6 +84,19 @@ class ChatGPTGeneration(LLMGeneration):
             {'role': 'user', 'content': f"{goal_description}. "
                                         'Please reply with only one short and succinct sentence.'}
         )
+
+        # log prompt for debugging preference generation
+        log_dir = Path(__file__).resolve().parents[1] / "bayes_adaptive_llm" / "logs"
+        log_file = log_dir / "prompts.log"
+        header = f"===== Dialogue {dialog_id} =====" if turn_id == 0 else None
+        log_lines = []
+        if header:
+            log_lines.append(header)
+        log_lines.append(f"[Turn {turn_id}] SYSTEM prompt:")
+        for m in messages:
+            log_lines.append(f"{m.get('role')}: {m.get('content')}")
+        log_lines.append("===== End Turn =====")
+        append_to_log(log_file, log_lines)
 
         response = call_llm(messages,
                             n=1,
