@@ -84,3 +84,17 @@ def get_preference_pair(
     worst_pair = min(realization_dict.items(), key=lambda kv: kv[1])
 
     return target_idx, best_pair, worst_pair
+
+
+def coerce_to_float(value, default):
+    """
+    Convert common numeric representations (int/float/strings) to float, else return default.
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        s = value.strip()
+        import re
+        if re.fullmatch(r"[+-]?\\d*\\.?\\d+(e[+-]?\\d+)?", s, re.IGNORECASE):
+            return float(s)
+    return default

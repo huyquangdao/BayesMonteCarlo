@@ -42,6 +42,7 @@ from bayes_adaptive_llm.data_processor import (
     BayesTorchDatasetForPersuation,
     BayesTorchDatasetForRecommendation,
 )
+from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
 from config.constants import RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
     TOXICITY, ITEM_FREQ, USER_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
     P4G_GOAL2DESCRIPTION
@@ -474,6 +475,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         dpo_args = self.setup_dpo_config(do_eval=eval_dataset is not None,
                                          effective_max_length=effective_max_length,
                                          max_prompt_length=max_prompt_length)
+
+        # Ensure numeric hyperparameters (config may carry strings from CLI/yaml).
+        self.model_config.learning_rate = coerce_to_float(getattr(self.model_config, "learning_rate", 1e-5), 1e-5)
+        self.model_config.weight_decay = coerce_to_float(getattr(self.model_config, "weight_decay", 0.0), 0.0)
 
         dpo_trainer = DPOTrainer(
             self.model,

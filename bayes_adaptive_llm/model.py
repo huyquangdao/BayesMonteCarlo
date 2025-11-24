@@ -28,6 +28,7 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
         )
+        self.config = self.plm.config
 
         # extend vocabulary with task-specific tokens
         self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
