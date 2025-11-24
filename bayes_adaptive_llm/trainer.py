@@ -472,13 +472,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
         elif max_prompt_length is not None and effective_max_length is not None:
             max_prompt_length = min(max_prompt_length, effective_max_length)
 
+        # Ensure numeric hyperparameters before building DPO args.
+        self.model_config.learning_rate = coerce_to_float(getattr(self.model_config, "learning_rate", 1e-5), 1e-5)
+        self.model_config.weight_decay = coerce_to_float(getattr(self.model_config, "weight_decay", 0.0), 0.0)
+
         dpo_args = self.setup_dpo_config(do_eval=eval_dataset is not None,
                                          effective_max_length=effective_max_length,
                                          max_prompt_length=max_prompt_length)
-
-        # Ensure numeric hyperparameters (config may carry strings from CLI/yaml).
-        self.model_config.learning_rate = coerce_to_float(getattr(self.model_config, "learning_rate", 1e-5), 1e-5)
-        self.model_config.weight_decay = coerce_to_float(getattr(self.model_config, "weight_decay", 0.0), 0.0)
 
         dpo_trainer = DPOTrainer(
             self.model,
