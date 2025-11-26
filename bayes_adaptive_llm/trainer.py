@@ -94,8 +94,6 @@ class PreferenceDPODataset(Dataset):
             "chosen_attention_mask": chosen_enc["attention_mask"].squeeze(0),
             "rejected_input_ids": rejected_enc["input_ids"].squeeze(0),
             "rejected_attention_mask": rejected_enc["attention_mask"].squeeze(0),
-            "chosen_score": torch.tensor(item.get("chosen_score", 0.9), dtype=torch.float32),
-            "rejected_score": torch.tensor(item.get("rejected_score", 0.2), dtype=torch.float32),
         }
 
     def collate_fn(self, batch: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
@@ -112,8 +110,6 @@ class PreferenceDPODataset(Dataset):
         chosen_attention_mask = _pad_mask([item["chosen_attention_mask"] for item in batch])
         rejected_input_ids = _pad([item["rejected_input_ids"] for item in batch], pad_id)
         rejected_attention_mask = _pad_mask([item["rejected_attention_mask"] for item in batch])
-        chosen_score = torch.stack([item["chosen_score"] for item in batch])
-        rejected_score = torch.stack([item["rejected_score"] for item in batch])
 
         return {
             "prompt_input_ids": prompt_input_ids,
@@ -122,8 +118,6 @@ class PreferenceDPODataset(Dataset):
             "chosen_attention_mask": chosen_attention_mask,
             "rejected_input_ids": rejected_input_ids,
             "rejected_attention_mask": rejected_attention_mask,
-            "chosen_score": chosen_score,
-            "rejected_score": rejected_score,
         }
 
 
