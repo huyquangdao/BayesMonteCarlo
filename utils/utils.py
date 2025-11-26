@@ -1347,7 +1347,7 @@ def get_text_generation_model_by_name(scenario, names):
         }
         # a list contains generation packages
         generation_packages = []
-
+        
         # loop over text generation names
         for name in names:
             package = generation_dict[name]

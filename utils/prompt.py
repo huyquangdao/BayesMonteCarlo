@@ -95,7 +95,7 @@ def call_llm_model(prompt, temperature=0.0, max_token=30, n_return_sequences=1, 
         if n_return_sequences > 1:
             return ["" for _ in range(n_return_sequences)]
         return ""
-    
+        
     response = llm_pipeline(
         prompt,
         max_new_tokens=max_token,

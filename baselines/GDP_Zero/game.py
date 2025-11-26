@@ -7,7 +7,7 @@ from baselines.GDP_Zero.utils import update_state_for_open_loop_mcts
 
 
 class DialogGame(object):
-    def __init__(self, game, generation_method, user_simulator):
+    def __init__(self, game, generation_method, user_simulator, llm_pipeline = None, terminators = None):
         """
         constructor for class dialogue game used for the GDP zero model
         :param game: the instantiation of the game
@@ -16,6 +16,8 @@ class DialogGame(object):
         """
         self.generation_method = generation_method
         self.user_simulator = user_simulator
+        self.llm_pipeline = llm_pipeline
+        self.terminators = terminators
 
         # create a game
         self.game = game
@@ -36,10 +38,15 @@ class DialogGame(object):
         state['pred_goal'] = action
 
         # generate the system response
-        system_response = self.generation_method.generate_response(state)
+        system_response = self.generation_method.generate_response(state, llm_pipeline=self.llm_pipeline, terminators = self.terminators)
+
+        # print("system response: ", system_response)
+        # assert 1 == 0
 
         # generate user response with LLM
-        user_response = self.user_simulator.respond(state)
+        user_response = self.user_simulator.respond(state, llm_pipeline = llm_pipeline, terminators = self.terminators)
+        
+        print("user response: ", user_response)
 
         # update the next state
         next_state = update_state_for_open_loop_mcts(state=state,
@@ -67,10 +74,11 @@ class DialogGame(object):
             return -1
 
         # otherwise we compute llm-based assessment
-        _, done, _ = self.game.compute_reward(state,
+        reward, done, _ = self.game.compute_reward(state,
                                                    state['pred_goal'],
                                                    state['dialogue_context'][-2]['content'],
                                                    None
                                                    )
+                
         # no intermediate reward.
-        return done
+        return reward 

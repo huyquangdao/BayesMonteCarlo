@@ -85,7 +85,9 @@ class PersuationSimulator(Simulator):
             """
              }
         )
-                
+        
+        # print(messages)
+                        
         # messages.extend(dialogue_context)
         t = time.time()
 

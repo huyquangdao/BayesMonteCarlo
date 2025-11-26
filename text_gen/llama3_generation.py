@@ -67,7 +67,7 @@ class Llama3Generation(LLMGeneration):
             {'role': 'user', 'content': f"{goal_description}. "
                                         'Please reply with only one short and succinct sentence.'}
         )
-
+        
         # calling the llm for response generation
         t = time.time()
         response = call_llm(messages, 
@@ -77,7 +77,7 @@ class Llama3Generation(LLMGeneration):
                             model_type= self.generation_config.model_type,
                             **kwargs
                             )
-
+        
         print("Response Generation Time: ", time.time() - t)
         # returning the response
         return response[0]

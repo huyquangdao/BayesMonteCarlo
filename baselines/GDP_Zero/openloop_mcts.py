@@ -18,10 +18,12 @@ class MCTS():
         self.player = player
         self.configs = configs
         # U(s,a) = Q(s,a) + c * P(s,a) * (\sqrt{ \sum_{a'} N(s,a')}) / (1+N(s,a))
+        
         self.Ns: dict = {}  # saves compute
         self.Nsa: dict = {}
         self.Q: dict = {}
         self.P: dict = {}
+        
         # utility
         self.valid_moves: dict = {}
         self.terminals: dict = {}
@@ -102,7 +104,7 @@ class MCTS():
         # now we are single player, hence just v instead of -v
         return v
 
-    def get_action_prob(self, state):
+    def get_action_prob(self, state, epsilon = 1e-3):
         hashable_state = self._to_string_rep(state)
         if hashable_state not in self.Ns:
             # selected leaf node, expand
@@ -113,7 +115,9 @@ class MCTS():
         prob = np.zeros(self.player.get_valid_moves(state).shape)
         for a in self.valid_moves[hashable_state]:
             prob[a] = self.Nsa[hashable_state][a]
-        prob /= prob.sum()
+            # print(a, self.Nsa[hashable_state][a])
+        assert prob.sum() > 0
+        prob /= prob.sum() + epsilon
         return prob
 
 
@@ -198,6 +202,7 @@ class OpenLoopMCTS(MCTS):
 
         # otherwise, generate a new realization
         next_state = self.game.get_next_state(state, self.player.id2goal[best_action])
+        # print("next state: ", next_state)
         return next_state
 
     def _update_realizations_Vs(self, state, v: float):
@@ -215,6 +220,8 @@ class OpenLoopMCTS(MCTS):
         self.realizations_Ns[hashable_state][sys_utt] += 1
         self.realizations_Vs[hashable_state][sys_utt] += (v - self.realizations_Vs[hashable_state][sys_utt]) / \
                                                          self.realizations_Ns[hashable_state][sys_utt]
+                                                         
+        # print(self.realizations_Vs)                       
         return
 
     def search(self, state):
@@ -222,6 +229,7 @@ class OpenLoopMCTS(MCTS):
 
         # check everytime since state is stochastic, does not map to hashable_state
         terminated_v = self.game.get_dialog_ended(state)
+        # print("terminated_v: ", terminated_v)
 
         # check if it is terminal node
         # failed or successfully recommending the target item.
@@ -255,6 +263,7 @@ class OpenLoopMCTS(MCTS):
             if uct > best_uct:
                 best_uct = uct
                 best_action = a
+                
         # transition. For open loop, first sample from an existing realization
         state = self._sample_realization(hashable_state)
         next_state = self._get_next_state(state, best_action)
@@ -277,6 +286,7 @@ class OpenLoopMCTS(MCTS):
         # update v to realizations for NLG at inference
         self._update_realizations_Vs(next_state, v)
         # now we are single player, hence just v instead of -v
+        # print("value: ",v)
         return v
 
     def get_best_realization(self, state, action: int):

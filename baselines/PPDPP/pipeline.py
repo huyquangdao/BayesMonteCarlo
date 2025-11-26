@@ -175,8 +175,10 @@ class PPDPPPipelineForRecommendation(PPDPPPipeline):
                                                   random_state=self.game_config.seed)
 
         # split the simulators in the dev set into the training simulators and development simulators for rl training
-        train_simulators, dev_simulators = train_test_split(self.dev_simulators, test_size=dev_ratio,
-                                                            random_state=self.game_config.seed)
+        train_simulators, dev_simulators = train_test_split(self.dev_simulators, 
+                                                            test_size=dev_ratio,
+                                                            random_state=self.game_config.seed
+                                                            )
 
         # make sure the number of dev simulators is equal to the number of dev target items
         # this make sure a fair comparison between different models
