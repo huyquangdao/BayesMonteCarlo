@@ -12,9 +12,9 @@ dropout: 0.1
 combined_action: false
 
 # Training toggles
-run_preference_search: true   # MCTS preference search handled separately
-run_sft: false
-run_dpo: false
+run_preference_search: false   # MCTS preference search handled separately
+run_sft: true
+run_dpo: true
 run_offline_eval: false
 run_online_eval: false
 max_gen_length: 256
@@ -39,7 +39,9 @@ max_prompt_length: 256
 fp16: true
 bf16: false
 gradient_checkpointing: true
-# Path to preference pairs (jsonl) used for DPO; ensure it contains prompt/chosen/rejected.
+# Path to preference pairs (jsonl) used for DPO; each row should include
+# dialog_id, prompt, chosen, rejected, and an optional persona_hint with
+# personality/decision_making_style.
 preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 # Special tokens for persuasion (same as TRIP/PPDPP PG)

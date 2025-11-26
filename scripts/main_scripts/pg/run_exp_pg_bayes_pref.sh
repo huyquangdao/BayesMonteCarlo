@@ -16,8 +16,8 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch --main_process_port 8081 --gpu_ids 1 --
     --loggers terminal,file,wandb \
     --datasets p4g \
     --models bayes_adaptive_llm \
-    --gen_models chatgpt \
-    --model_type chatgpt \
+    --gen_models llama3 \
+    --model_type llama3 \
     --is_so_game \
     --num_train_rl_epochs 10 \
     --metrics acc,prf1,sr,total_reward,avg_turn

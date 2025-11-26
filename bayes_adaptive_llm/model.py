@@ -28,7 +28,6 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
         )
-        self.config = self.plm.config
 
         # extend vocabulary with task-specific tokens
         self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
@@ -52,20 +51,13 @@ class BayesAdaptiveLLMModel(Model):
         logits = self.out_layer(cls_token)
         return logits
 
-    # Expose embedding accessors expected by TRL trainers.
-    def get_input_embeddings(self):
-        return self.plm.get_input_embeddings()
-
-    def set_input_embeddings(self, new_embeddings):
-        self.plm.set_input_embeddings(new_embeddings)
-
-    # Expose gradient checkpointing toggles expected by HF trainers.
-    def gradient_checkpointing_enable(self, **kwargs):
-        if hasattr(self.plm, "gradient_checkpointing_enable"):
-            return self.plm.gradient_checkpointing_enable(**kwargs)
-        return None
-
-    def gradient_checkpointing_disable(self):
-        if hasattr(self.plm, "gradient_checkpointing_disable"):
-            return self.plm.gradient_checkpointing_disable()
-        return None
+    def score_candidates(self,
+                         dialogue_context: Sequence[Dict[str, Any]],
+                         candidates: Sequence[str],
+                         **kwargs) -> torch.Tensor:
+        """
+        Placeholder hook for future MCTS preference scoring.
+        Given a dialogue context and multiple candidate actions/responses,
+        return a tensor of scores so an MCTS loop can pick the highest-valued sample.
+        """
+        raise NotImplementedError("Candidate scoring for MCTS has not been implemented yet.")

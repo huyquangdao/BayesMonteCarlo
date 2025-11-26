@@ -3,7 +3,6 @@ import copy
 
 from dotenv import load_dotenv
 import openai
-from typing import Tuple
 
 from googleapiclient import discovery
 import json
@@ -23,56 +22,45 @@ from config.constants import LLM_MODEL, LLAMA3, CHATGPT, LLAMA3_MODEL, QWEN_MODE
 
 load_dotenv()
 
+# Build a compatibility layer for openai v0.28 (ChatCompletion) and v1.x (OpenAI client)
+API_KEY = os.getenv("API_KEY")
+MODEL = LLM_MODEL
+OpenAIClient = getattr(openai, "OpenAI", None)
 
-def _collect_openai_exceptions() -> Tuple[type, ...]:
-    """
-    Gather OpenAI exception classes in a backward/forward compatible way.
-    openai>=1.0 exposes exceptions at top-level (openai.APIError, ...),
-    older 0.x exposes them under openai.error.*
-    """
-    names = ["APIError", "APIConnectionError", "RateLimitError", "ServiceUnavailableError", "APITimeoutError", "Timeout"]
-    excs = []
-    for name in names:
-        exc = getattr(openai, name, None)
-        if exc is None and hasattr(openai, "error"):
-            exc = getattr(openai.error, name, None)
-        if exc:
-            excs.append(exc)
-    return tuple(excs)
+if OpenAIClient:
+    client = OpenAIClient(api_key=API_KEY) if API_KEY else OpenAIClient()
+    _chat_completion = client.chat.completions.create
+    retry_exceptions = tuple(
+        exc for exc in (
+            getattr(openai, "APIError", None),
+            getattr(openai, "APIConnectionError", None),
+            getattr(openai, "RateLimitError", None),
+            getattr(openai, "ServiceUnavailableError", None),
+            getattr(openai, "Timeout", None),
+        ) if exc
+    )
+else:
+    openai.api_key = API_KEY
+    _chat_completion = openai.ChatCompletion.create
+    error_module = getattr(openai, "error", None)
+    retry_exceptions = tuple(
+        getattr(error_module, name, None)
+        for name in ["APIError", "APIConnectionError", "RateLimitError", "ServiceUnavailableError", "Timeout"]
+        if error_module and getattr(error_module, name, None)
+    )
 
-
-# Build a client for OpenAI v1+; fall back to legacy module-level calls if needed.
-_openai_client = None
-if hasattr(openai, "OpenAI"):
-    _openai_client = openai.OpenAI()
+# Fallback to a broad exception to keep tenacity happy if none of the OpenAI-specific exceptions are available.
+if not retry_exceptions:
+    retry_exceptions = (Exception,)
 
 
 @retry(
-    retry=retry_if_exception_type(_collect_openai_exceptions()),
+    retry=retry_if_exception_type(retry_exceptions),
     wait=wait_random_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(10)
 )
 def chat_completion_with_backoff(**kwargs):
-    """
-    Call OpenAI chat completion with retry/backoff.
-    Supports both legacy (0.x) and new (1.x) clients.
-    """
-    if _openai_client is not None:
-        return _openai_client.chat.completions.create(**kwargs)
-    return openai.ChatCompletion.create(**kwargs)
-
-
-# load the environment variables
-load_dotenv()
-
-# The api key, llm model
-API_KEY = os.getenv("API_KEY")
-MODEL = LLM_MODEL
-# Configure client depending on OpenAI version.
-if _openai_client is not None:
-    _openai_client.api_key = API_KEY
-else:
-    openai.api_key = API_KEY
+    return _chat_completion(**kwargs)
 
 # API for toxicity evaluation
 PERSPECTIVE_API_KEY = os.getenv('PERSPECTIVE_KEY')
@@ -145,6 +133,20 @@ def reformat_demonstration(demonstration, is_agent_start=False):
     return new_demonstration
 
 
+def _get_message_content(choice):
+    """Extract message content from OpenAI response choice across API versions."""
+    message = getattr(choice, "message", None)
+    if message is not None:
+        content = getattr(message, "content", None)
+        if content is None and isinstance(message, dict):
+            content = message.get("content")
+        if content is not None:
+            return content
+    if isinstance(choice, dict):
+        return choice.get("message", {}).get("content")
+    return None
+
+
 def call_llm(prompt, n=1, temperature=0.0, max_token=10, model_type='chatgpt', **kwargs):
     """
     function that calls llm for n times using the given prompt
@@ -167,7 +169,7 @@ def call_llm(prompt, n=1, temperature=0.0, max_token=10, model_type='chatgpt', *
                 temperature=temperature,
                 max_tokens=max_token
             )
-            responses.append(response.choices[0]['message']['content'])
+            responses.append(_get_message_content(response.choices[0]) or "")
         # the llm is the llama 3 model
         else:
             # do something here

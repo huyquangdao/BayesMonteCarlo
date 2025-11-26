@@ -25,7 +25,6 @@ from bayes_adaptive_llm.utils import (
     stringify_dialogue_context,
     get_preference_pair,
 )
-from utils.logging_utils import append_to_log
 from config.constants import PERSUATION
 from logger.wandb_logger import WanDBLogger
 
@@ -96,7 +95,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             logger.info("Training with DPO on preference pairs ...")
             # assuming dataset already carries preference data or was just generated
             self.load_pretrained_model(is_rl=False)
-            self.trainer.train_dpo(self.dataset, self.device)
+            self.run_dpo()
 
         if getattr(self.model_config, "run_offline_eval", False):
             logger.info("Offline evaluation ...")
@@ -128,6 +127,9 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         Supervised fine-tuning entrypoint.
         """
         return self.trainer.train_sft(self.dataset, self.device)
+    
+    def run_dpo(self):
+        return self.trainer.train_dpo(self.dataset, self.device)
 
     def inference(self, instance: Dict[str, Any], action_mapping=None):
         """
@@ -186,11 +188,12 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         # logging raw responses to bayes_adaptive_llm/logs
         log_dir = Path(__file__).resolve().parent / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"pref_gen_{timestamp}.log"
-
         def _log_line(text: str) -> None:
-            append_to_log(log_file, [text])
+            with log_file.open("a", encoding="utf-8") as lf:
+                lf.write(text + "\n")
 
         for dialog_idx, case in enumerate(cases):
             # fix persuadee (simulator/persona) per dialog, similar to TRIP
