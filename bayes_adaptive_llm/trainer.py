@@ -287,7 +287,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         dev_loss = []
         self.model.eval()
         with torch.no_grad():
-            for batch in tqdm.tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
+            for batch in tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
                 with torch.no_grad():
                     logits = self.model(batch)
                     loss = criterion(logits, batch['labels'])
@@ -343,7 +343,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         lr_scheduler = self.create_scheduler(optimizer, warmup_steps, max_train_steps)
 
         self.criterion = self.create_criterion()
-        self.progress_bar = tqdm.tqdm(range(max_train_steps), disable=not self.accelerator.is_local_main_process)
+        self.progress_bar = tqdm(range(max_train_steps), disable=not self.accelerator.is_local_main_process)
 
         self.model.to(device)
         for epoch in range(self.model_config.num_train_epochs):
