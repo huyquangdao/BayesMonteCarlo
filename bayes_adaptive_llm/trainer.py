@@ -89,7 +89,8 @@ class PatchedDPOTrainer(DPOTrainer):
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).mean().item()
         del self._stored_metrics[train_eval]
-        return super().log(logs, start_time)
+        from transformers.trainer import Trainer as HFTrainer
+        return HFTrainer.log(self, logs, start_time)
 
 
 class PersonaDialogGame(DialogGame):
@@ -479,6 +480,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         trainer_kwargs = dict(
             model=model_path,
+            loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
             max_length=max_length,
