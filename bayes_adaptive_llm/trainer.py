@@ -471,7 +471,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             train_dataset=hf_dataset,
             max_length=max_length,
             max_prompt_length=max_prompt_length,
-            trust_remote_code=True,
         )
         
         try:
