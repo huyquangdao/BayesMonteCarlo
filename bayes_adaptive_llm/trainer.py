@@ -83,18 +83,12 @@ def cuda_bf16_supported() -> bool:
 class PatchedDPOTrainer(DPOTrainer):
     def log(self, logs: Dict[str, float], start_time: Optional[float] = None) -> None:
         """
-        Giữ nguyên behavior log metrics của DPOTrainer,
-        nhưng nhận thêm start_time để hợp với transformers>=4.47.
+        Preserve default DPOTrainer logging while accepting start_time for transformers>=4.47.
         """
-        # logs either has 'loss' or 'eval_loss'
         train_eval = "train" if "loss" in logs else "eval"
-
-        # Add averaged stored metrics to logs
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).mean().item()
         del self._stored_metrics[train_eval]
-
-        # gọi Trainer.log(logs, start_time) bản gốc
         return super().log(logs, start_time)
 
 
@@ -490,11 +484,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
-        
+
+        trainer_cls = PatchedDPOTrainer or DPOTrainer
         try:
-            dpo_trainer = DPOTrainer(processing_class=tokenizer, **trainer_kwargs)
+            dpo_trainer = trainer_cls(processing_class=tokenizer, **trainer_kwargs)
         except TypeError:
-            dpo_trainer = DPOTrainer(tokenizer=tokenizer, **trainer_kwargs)
+            dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
 
         # ensure models are on the requested device (Trainer will handle wrapping later)
         try:
