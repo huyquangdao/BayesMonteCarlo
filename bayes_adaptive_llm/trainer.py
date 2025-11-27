@@ -428,7 +428,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return
 
         model_path = getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "plm", "gpt2")
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
@@ -471,6 +471,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             train_dataset=hf_dataset,
             max_length=max_length,
             max_prompt_length=max_prompt_length,
+            trust_remote_code=True,
         )
         
         try:
