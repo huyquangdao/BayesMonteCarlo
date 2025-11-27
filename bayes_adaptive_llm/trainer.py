@@ -25,13 +25,14 @@ from itertools import count
 
 import numpy as np
 import torch
+from torch.optim import AdamW
 from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
-from transformers.optimization import AdamW
+
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
