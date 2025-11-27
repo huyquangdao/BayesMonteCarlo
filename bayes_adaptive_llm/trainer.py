@@ -467,15 +467,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         trainer_kwargs = dict(
             model=model_path,
-            beta=beta,
             args=training_args,
             train_dataset=hf_dataset,
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
-        if loss_type is not None:
-            trainer_kwargs["loss_type"] = loss_type
-
+        
         try:
             dpo_trainer = DPOTrainer(processing_class=tokenizer, **trainer_kwargs)
         except TypeError:
