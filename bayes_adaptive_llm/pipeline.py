@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
-
+from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
 
 import numpy as np
@@ -50,7 +50,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_sft", False):
             logger.info("Running supervised fine-tuning ...")
-            self.run_sft()
+            self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
             logger.info("Generating preference pairs with MCTS loop ...")
@@ -60,7 +60,11 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             logger.info("Training with DPO on preference pairs ...")
             # assuming dataset already carries preference data or was just generated
             self.load_pretrained_model(is_rl=False)
-            self.trainer.train_dpo(self.dataset, self.device)
+            pref_path = getattr(self.model_config, "preference_pairs_path", None)
+            if not pref_path or not os.path.exists(pref_path):
+                logger.warning("No preference pairs found or path does not exist; skipping DPO.")
+                return
+            self.trainer.train_dpo(pref_path, self.device)
 
         if getattr(self.model_config, "run_offline_eval", False):
             logger.info("Offline evaluation ...")
@@ -87,11 +91,6 @@ class BayesAdaptiveLLMPipeline(Pipeline):
                 lg.record(results, "Test Set")
         return results
 
-    def run_sft(self):
-        """
-        Supervised fine-tuning entrypoint.
-        """
-        return self.trainer.train_sft(self.dataset, self.device)
 
     def inference(self, instance: Dict[str, Any], action_mapping=None):
         """

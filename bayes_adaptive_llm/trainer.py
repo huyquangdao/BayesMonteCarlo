@@ -25,15 +25,12 @@ from itertools import count
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
-from torch.optim import AdamW, Optimizer
-from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import DataLoader, Dataset
-from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
-from peft import LoraConfig, TaskType, get_peft_model
+from torch.utils.data import DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
+from transformers.trainer import Trainer as HFTrainer
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
@@ -89,7 +86,6 @@ class PatchedDPOTrainer(DPOTrainer):
         for key, metrics in self._stored_metrics[train_eval].items():
             logs[key] = torch.tensor(metrics).mean().item()
         del self._stored_metrics[train_eval]
-        from transformers.trainer import Trainer as HFTrainer
         return HFTrainer.log(self, logs, start_time)
 
 
@@ -409,7 +405,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 loguru_logger.info("Training process is completed.")
                 break
 
-    def train_dpo(self, dataset, device: Optional[torch.device] = None) -> None:
+    def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
         """
         Run DPO fine-tuning on preference pairs using TRL's DPOTrainer.
         Loads the preference json/jsonl, feeds it directly to DPOTrainer (no custom collator),
@@ -420,13 +416,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
 
-        pref_path = getattr(self.model_config, "preference_pairs_path", None)
-        if not pref_path:
-            loguru_logger.warning("No preference_pairs_path provided; skipping DPO.")
-            return
-        if not os.path.exists(pref_path):
-            loguru_logger.warning("Preference pairs file not found at %s; skipping DPO.", pref_path)
-            return
 
         with open(pref_path, "r", encoding="utf-8") as handle:
             if pref_path.endswith(".jsonl"):
