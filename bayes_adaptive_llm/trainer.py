@@ -556,10 +556,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logger.warning("Preference search is currently implemented for persuasion only; skipping.")
             return []
 
-        if not dev_simulators and not test_simulators:
+        if not dev_simulators:
             raise ValueError("User simulators are required for MCTS preference generation.")
 
-        simulators = dev_simulators or test_simulators
+        simulators = dev_simulators
         if simulators is None or len(simulators) == 0:
             raise ValueError("No simulators available for preference generation.")
 
