@@ -732,6 +732,17 @@ class BayesAdaptiveLLMTrainer(Trainer):
                         f"{json.dumps(sample_scores, ensure_ascii=False)}"
                     )
 
+                logger.info(
+                    "Pref pair | dialog=%s turn=%s action=%s | chosen=%s (V=%.4f) | rejected=%s (V=%.4f)",
+                    dialog_idx,
+                    turn,
+                    goal,
+                    best_pair[0],
+                    float(best_pair[1]),
+                    worst_pair[0],
+                    float(worst_pair[1]),
+                )
+
                 _log_line(
                     f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
                     f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
