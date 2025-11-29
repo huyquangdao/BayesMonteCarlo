@@ -79,7 +79,7 @@ class MCTS():
         # if this leaf node is terminal, return the value
         if self.terminals[hashable_state] > 0:
             # terminal node
-            logger.debug("ended")
+            logger.info("MCTS terminal leaf encountered | state=%s", hashable_state)
             return self.terminals[hashable_state]
         # otherwise, return v
         if is_leaf_node:
@@ -128,7 +128,7 @@ class MCTS():
             prob[a] = self.Nsa[hashable_state][a]
         assert prob.sum() > 0
         prob /= prob.sum() + epsilon
-        logger.debug(
+        logger.info(
             "Action prob query | state=%s | Ns=%s | Nsa=%s | prob=%s",
             hashable_state,
             self.Ns.get(hashable_state, 0),
@@ -239,7 +239,7 @@ class OpenLoopMCTS(MCTS):
         # check if it is terminal node
         # failed or successfully recommending the target item.
         if terminated_v in [-1,1]:
-            logger.debug("ended")
+            logger.info("OpenLoopMCTS terminal leaf encountered | state=%s", hashable_state)
             return terminated_v
 
         # otherwise, if is nontermial leaf node, we initialize and return v
@@ -336,7 +336,7 @@ class OpenLoopMCTS(MCTS):
             "prob": prob_dict,
         }
         self.action_prob_traces.setdefault(state_key, []).append(trace_entry)
-        logger.debug(
+        logger.info(
             "MCTS sim=%s | state=%s | action=%s | prob=%s",
             self.simulation_counter,
             state_key,
@@ -371,7 +371,7 @@ class OpenLoopMCTS(MCTS):
         if hashable_state not in self.realizations_traces:
             self.realizations_traces[hashable_state] = {}
         self.realizations_traces[hashable_state].setdefault(sys_utt, []).append(float(v))
-        logger.debug(
+        logger.info(
             "Realization update | state=%s | utt=%s | n=%s | mean_v=%.4f | last_v=%.4f",
             hashable_state,
             sys_utt,

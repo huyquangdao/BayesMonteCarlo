@@ -630,7 +630,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # if outcome != 0:
                 #     break
                 
-                logger.debug("Dialog %s turn %s | state=%s", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
+                logger.info("Dialog %s turn %s | state=%s", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
 
                 # initialize the mcts planner
                 planner = OpenLoopMCTS(
@@ -651,7 +651,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
                     f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
                 )
-                logger.debug(
+                logger.info(
                     "Dialog %s turn %s | sims=%s | prob=%s",
                     dialog_idx,
                     turn,
@@ -660,7 +660,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 )
                 
                 if np.sum(action_prob) == 0:
-                    logger.debug("Zero action probability encountered; stopping dialog %s turn %s", dialog_idx, turn)
+                    logger.info("Zero action probability encountered; stopping dialog %s turn %s", dialog_idx, turn)
                     break
 
                 state_rep = planner._to_string_rep(state)

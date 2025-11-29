@@ -968,7 +968,7 @@ class SingleObjectiveRecommendationGame(RecommendationGame):
                                                                 terminators = self.game_config.terminators
                                                                 )
         
-        print(responses)
+        # print(responses)
         
         # compute the reward
         reward = []
