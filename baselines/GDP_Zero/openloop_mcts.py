@@ -316,6 +316,13 @@ class OpenLoopMCTS(MCTS):
         Record probability updates after each root-level simulation to aid debugging.
         """
         prob_dict = self._get_prob_distribution(state_key)
+        prior_obj = self.P.get(state_key, {})
+        if isinstance(prior_obj, np.ndarray):
+            prior_dict = {int(i): float(v) for i, v in enumerate(prior_obj)}
+        elif isinstance(prior_obj, dict):
+            prior_dict = {int(a): float(v) for a, v in prior_obj.items()}
+        else:
+            prior_dict = {}
         trace_entry = {
             "simulation": self.simulation_counter,
             "state": state_key,
@@ -325,7 +332,7 @@ class OpenLoopMCTS(MCTS):
             "Ns": int(self.Ns.get(state_key, 0)),
             "Nsa": {int(a): int(v) for a, v in self.Nsa.get(state_key, {}).items()},
             "Q": {int(a): float(v) for a, v in self.Q.get(state_key, {}).items()},
-            "P": {int(a): float(v) for a, v in self.P.get(state_key, {}).items()},
+            "P": prior_dict,
             "prob": prob_dict,
         }
         self.action_prob_traces.setdefault(state_key, []).append(trace_entry)
