@@ -1229,7 +1229,7 @@ class SingleObjectivePersuationGame(PersuationGame):
                                                             )
          
         rewards = []
-        logger.debug("Persuasion assessment responses: {}", responses)
+        # logger.debug("Persuasion assessment responses: {}", responses)
         for output in responses:
             if "yes" in output.lower():
                 rewards.append(1)
