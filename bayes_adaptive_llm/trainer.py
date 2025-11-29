@@ -630,7 +630,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # if outcome != 0:
                 #     break
                 
-                print("CURRENT STATE: ", state)
+                logger.debug("Dialog %s turn %s | state=%s", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
 
                 # initialize the mcts planner
                 planner = OpenLoopMCTS(
@@ -645,7 +645,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     planner.search(state)
 
                 action_prob = planner.get_action_prob(state)
-                print(action_prob)
+                prob_trace = planner.get_action_prob_trace(state)
+                last_prob = prob_trace[-1]["prob"] if prob_trace else {}
+                _log_line(
+                    f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
+                    f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
+                )
+                logger.debug(
+                    "Dialog %s turn %s | sims=%s | prob=%s",
+                    dialog_idx,
+                    turn,
+                    planner.simulation_counter,
+                    last_prob,
+                )
                 
                 if np.sum(action_prob) == 0:
                     logger.debug("Zero action probability encountered; stopping dialog %s turn %s", dialog_idx, turn)
@@ -694,6 +706,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     continue
                 
                 _, best_pair, worst_pair = pair
+                sample_scores = planner.get_realization_traces(state, best_action)
+                if sample_scores:
+                    _log_line(
+                        f"[Dialog {dialog_idx} | Turn {turn}] Sample scores (by realization): "
+                        f"{json.dumps(sample_scores, ensure_ascii=False)}"
+                    )
 
                 _log_line(
                     f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
