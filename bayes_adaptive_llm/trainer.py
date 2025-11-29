@@ -399,7 +399,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                             self.model.plm.save_pretrained(hf_dir)
                         if hasattr(self.model, "tokenizer"):
                             self.model.tokenizer.save_pretrained(hf_dir)
-                        loguru_logger.info("Saved HF-format checkpoint for DPO at %s", hf_dir)
+                        loguru_logger.info("Saved HF-format checkpoint for DPO at {}", hf_dir)
                     except Exception as exc:
                         loguru_logger.warning("Failed to export HF-format checkpoint to %s: %s", hf_dir, exc)
 
@@ -502,7 +502,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             if "train_loss" in log_row:
                 epoch_val = log_row.get("epoch", "?")
                 loss_val = log_row.get("train_loss")
-                loguru_logger.info("DPO epoch %s train_loss=%.4f", epoch_val, float(loss_val))
+                loguru_logger.info("DPO epoch {} train_loss={:.4f}", epoch_val, float(loss_val))
 
         adapter_dir = getattr(self.model_config, "dpo_adapter_path", None)
         if not adapter_dir:
@@ -512,7 +512,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         tokenizer.save_pretrained(adapter_dir)
         file_path = os.path.join(self.model_config.saved_dir, f"model_dpo.pth")
         self.save_model(file_path)
-        loguru_logger.info("Saved DPO checkpoint to %s", adapter_dir)
+        loguru_logger.info("Saved DPO checkpoint to {}", adapter_dir)
 
     def predict(self,
                 instance: Dict[str, Any],
@@ -630,7 +630,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # if outcome != 0:
                 #     break
                 
-                logger.info("Dialog %s turn %s | state=%s", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
+                logger.info("Dialog {} turn {} | state={}", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
 
                 # initialize the mcts planner
                 planner = OpenLoopMCTS(
@@ -660,7 +660,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 )
                 
                 if np.sum(action_prob) == 0:
-                    logger.info("Zero action probability encountered; stopping dialog %s turn %s", dialog_idx, turn)
+                    logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
                     break
 
                 state_rep = planner._to_string_rep(state)
@@ -747,13 +747,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
             else:
-                logger.debug("Dialog %s did not succeed (outcome=%.1f); skipping its preference pairs.", dialog_idx, outcome)
+                logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
 
         if preference_path and preference_pairs:
             with preference_path.open("w", encoding="utf-8") as f:
                 for item in preference_pairs:
                     f.write(json.dumps(item, ensure_ascii=False) + "\n")
-            logger.info("Wrote %d preference pairs to %s", len(preference_pairs), preference_path)
+            logger.info("Wrote {} preference pairs to {}", len(preference_pairs), preference_path)
 
         # Overwrite dataset splits so DPO trainer can consume them directly.
         if preference_pairs:
