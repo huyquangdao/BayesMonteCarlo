@@ -5,7 +5,7 @@ from typing import List, Tuple
 import re
 
 from utils.prompt import get_llm_based_assessment_for_negotiation, get_llm_based_assessment_for_recommendation, \
-    get_llm_based_assessment_for_emotional_support
+    get_llm_based_assessment_for_emotional_support, get_llm_based_assessment_for_persuation
 
 from config.constants import EMOTIONAL_SUPPORT, NEGOTIATION, RECOMMENDATION, PERSUATION, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, INSPIRED, USER_REWARD, ITEM_FREQ
 from utils.prompt import call_llm, get_user_sentiment_for_item_recommendation
@@ -362,8 +362,23 @@ class LLMPlayer(DialogPlanner):
             else:
                 score = sum(rewards) / len(rewards)
         elif self.game_name == PERSUATION:
-            # Persuasion uses preference pairs; keep heuristic neutral to allow search to proceed.
-            score = 0.0
+            # Lightweight persuasion value: reuse assessment prompt to score current dialogue.
+            responses = get_llm_based_assessment_for_persuation(state,
+                                                                simulated_conversation=simulated_conversation,
+                                                                n=3,
+                                                                temperature=1.0,
+                                                                model_type=self.model_type
+                                                                )
+            rewards = []
+            for output in responses:
+                if "yes" in output.lower():
+                    rewards.append(1.0)
+                elif "no" in output.lower():
+                    rewards.append(-0.5)
+            if len(rewards) == 0:
+                score = 0.0
+            else:
+                score = sum(rewards) / len(rewards)
         else:
             raise Exception('Something is wrong here ....')
         return score
