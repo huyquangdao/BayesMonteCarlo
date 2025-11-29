@@ -570,8 +570,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         # MCTS configuration
         num_MCTS_sims = getattr(self.model_config, "num_mcts_sims", 30)
-        max_realizations = getattr(self.model_config, "max_realizations", 8)
-        extra_pair_rollouts = getattr(self.model_config, "extra_pair_rollouts", 10)
+        max_realizations = getattr(self.model_config, "max_realizations", 3)
         # max_turns = getattr(self.model_config, "max_turns", 12)
         mcts_cfg = SimpleNamespace(
             cpuct=1.0,
@@ -702,27 +701,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     planner.realizations_Vs,
                 )
                 if pair is None:
-                    # try additional focused rollouts to collect more realizations
-                    for _ in range(extra_pair_rollouts):
-                        planner.search(state)
-                        action_prob = planner.get_action_prob(state)
-                        state_rep = planner._to_string_rep(state)
-                        valid_moves = planner.valid_moves.get(state_rep, [])
-                        pair = get_preference_pair(
-                            action_prob,
-                            state_rep,
-                            dialog_acts,
-                            valid_moves,
-                            planner.realizations_Vs,
-                        )
-                        if pair is not None:
-                            break
-                    if pair is None:
-                        logger.info(
-                            "Not enough realizations to form preference pair after extra rollouts; skipping turn."
-                        )
-                        state = next_state
-                        continue
+                    logger.info("Not enough realizations to form preference pair; skipping turn.")
+                    state = next_state
+                    continue
                 
                 _, best_pair, worst_pair = pair
                 sample_scores = planner.get_realization_traces(state, best_action)
