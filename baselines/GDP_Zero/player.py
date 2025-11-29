@@ -140,12 +140,31 @@ class LLMPlayer(DialogPlanner):
         self.cot_prompt = model_config.cot_prompt
         self.goal2id = action_mapping
         self.model_type = self.model_config.model_type
+        # # user-side dialog acts for persuasion heuristic
+        # self.user_dialog_acts = getattr(
+        #     self.model_config,
+        #     "user_dialog_acts",
+        #     ["U_NoDonation", "U_NegativeReaction", "U_Neutral", "U_PositiveReaction", "U_Donate"],
+        # )
 
         self.id2goal = {v: k for k, v in self.goal2id.items()}
         self.smoothing = 0.1
         self.n = 5
         pass
 
+    def _get_user_generated_da(self, data) -> list:
+		# convert generated responses to DA
+        pred_da = []
+        for resp in data:
+            resp = resp['generated_text'].strip()
+            start_idx = resp.find("[")
+            end_idx = resp.find("]")
+            if start_idx == -1 or end_idx == -1:
+                continue
+            found_da = resp[start_idx + 1: end_idx].strip()
+            if found_da in self.user_dialog_acts:
+                pred_da.append(found_da)
+        return pred_da
     def get_valid_moves(self, state):
         """
         return valid goals
@@ -362,23 +381,66 @@ class LLMPlayer(DialogPlanner):
             else:
                 score = sum(rewards) / len(rewards)
         elif self.game_name == PERSUATION:
-            # Lightweight persuasion value: reuse assessment prompt to score current dialogue.
-            responses = get_llm_based_assessment_for_persuation(state,
-                                                                simulated_conversation=simulated_conversation,
-                                                                n=3,
-                                                                temperature=1.0,
-                                                                model_type=self.model_type
-                                                                )
-            rewards = []
-            for output in responses:
-                if "yes" in output.lower():
-                    rewards.append(1.0)
-                elif "no" in output.lower():
-                    rewards.append(-0.5)
-            if len(rewards) == 0:
-                score = 0.0
-            else:
-                score = sum(rewards) / len(rewards)
+            # Persuasion heuristic: sample user-side dialog acts to estimate donation likelihood.
+            try:
+                user_task_prompt = (
+                    "You are a persuadee. A Persuader is trying to persuade you to donate to a charity called "
+                    "Save the Children. You can choose amongst the following actions during a conversation to respond "
+                    "to the Persuader: " + " ".join([f"[{da}]" for da in getattr(self.model_config, "user_dialog_acts", [])])
+                ).strip()
+                user_new_task_prompt = "The following is a new conversation between a Persuader and a Persuadee (you)."
+                messages = [
+                    {"role": "system", "content": user_task_prompt},
+                    {"role": "system", "content": user_new_task_prompt},
+                ]
+                for utt in simulated_conversation:
+                    role = utt.get("role", "user")
+                    content = utt.get("content", "")
+                    messages.append({"role": "assistant" if role == "assistant" else "user", "content": content})
+                messages.append({
+                    "role": "user",
+                    "content": "Persuader: Would you be interested in donating to Save the Children?",
+                })
+
+                inf_args = {
+                    "max_new_tokens": 12,
+                    "temperature": 1.1,
+                    "return_full_text": False,
+                    "do_sample": True,
+                    "num_return_sequences": 10,
+                }
+                data = self.model_config.generation_model.chat_generate(messages, **inf_args)
+                sampled_das =  self._get_user_generated_da(data)
+                rewards = []
+                for da in sampled_das:
+                    if da == "U_NoDonation":
+                        rewards.append(-1.0)
+                    elif da == "U_NegativeReaction":
+                        rewards.append(-0.5)
+                    elif da == "U_Neutral":
+                        rewards.append(0.0)
+                    elif da == "U_PositiveReaction":
+                        rewards.append(0.5)
+                    elif da == "U_Donate":
+                        rewards.append(1.0)
+                score = 0.0 if len(rewards) == 0 else float(np.mean(rewards))
+            except Exception:
+                # fallback to yes/no assessment
+                responses = get_llm_based_assessment_for_persuation(state,
+                                                                    simulated_conversation=simulated_conversation,
+                                                                    n=3,
+                                                                    temperature=1.0,
+                                                                    model_type=self.model_type
+                                                                    )
+                rewards = []
+                for output in responses:
+                    if "yes" in output.lower():
+                        rewards.append(1.0)
+                    elif "no" in output.lower():
+                        rewards.append(-0.5)
+                score = 0.0 if len(rewards) == 0 else sum(rewards) / len(rewards)
+            # add tiny jitter to break ties
+            score += float(np.random.uniform(-0.05, 0.05))
         else:
             raise Exception('Something is wrong here ....')
         return score

@@ -455,7 +455,7 @@ def get_llm_based_assessment_for_persuation(state,
                                             n=10,
                                             temperature=1.1,
                                             max_tokens=30,
-                                            model_type='chatgpt',
+                                            model_type='llama3',
                                             **kwargs
                                             ):
     # the reward computation function for persuation conversation

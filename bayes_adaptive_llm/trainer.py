@@ -565,6 +565,16 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)
+        if not hasattr(self.model_config, "user_dialog_acts"):
+            # default persuadee acts for persuasion setting
+            self.model_config.user_dialog_acts = [
+                "U_NoDonation",
+                "U_NegativeReaction",
+                "U_Neutral",
+                "U_PositiveReaction",
+                "U_Donate",
+            ]
+        logger.info("Action mapping: {}", action_mapping)
         dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
         player = LLMPlayer(self.game_config, action_mapping, self.model_config)
 
