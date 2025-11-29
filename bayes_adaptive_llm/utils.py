@@ -77,31 +77,13 @@ def get_preference_pair(
 
     prefetch_key = f"{state_rep}__{label}"
     realization_dict = realizations_vs.get(prefetch_key)
-    if realization_dict and len(realization_dict) >= 2:
-        best_pair = max(realization_dict.items(), key=lambda kv: kv[1])
-        worst_pair = min(realization_dict.items(), key=lambda kv: kv[1])
-        return target_idx, best_pair, worst_pair
-
-    # Fallback: allow cross-action comparison when a single action has <2 unique realizations.
-    all_entries = []
-    for action_idx in valid_moves_list:
-        if 0 <= action_idx < len(dialog_acts_list):
-            lbl = dialog_acts_list[action_idx]
-        else:
-            lbl = str(action_idx)
-        key = f"{state_rep}__{lbl}"
-        entries = realizations_vs.get(key, {})
-        for utt, v in entries.items():
-            all_entries.append((action_idx, utt, v))
-
-    if len(all_entries) < 2:
+    if not realization_dict or len(realization_dict) < 2:
         return None
 
-    best_entry = max(all_entries, key=lambda tup: tup[2])
-    worst_entry = min(all_entries, key=lambda tup: tup[2])
-    best_idx, best_utt, best_v = best_entry
-    _, worst_utt, worst_v = worst_entry
-    return best_idx, (best_utt, best_v), (worst_utt, worst_v)
+    best_pair = max(realization_dict.items(), key=lambda kv: kv[1])
+    worst_pair = min(realization_dict.items(), key=lambda kv: kv[1])
+
+    return target_idx, best_pair, worst_pair
 
 
 def coerce_to_float(value, default):
