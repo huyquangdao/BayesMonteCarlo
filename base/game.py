@@ -206,7 +206,7 @@ class RecommendationGame(Game):
         # compute the reward
         reward, done, o_done = self.compute_reward(state, action, system_response, simulator.user_profile_description)
 
-        print(reward, done, o_done)
+        logger.debug("Step reward tuple: reward=%s done=%s o_done=%s", reward, done, o_done)
         # return the new state, intermediate reward, and termination flag.
         return state, reward, done, o_done
 
@@ -340,7 +340,7 @@ class RecommendationGame(Game):
         if AVG_TURN in self.game_config.objectives:
             reward.append(avg_turn_reward)
 
-        print(reward)
+        logger.debug("Multi-objective reward vector: %s", reward)
         return reward, done, o_done
 
 
@@ -494,8 +494,7 @@ class NegotiationGame(Game):
                                                              terminators = self.game_config.terminators
                                                              )
 
-        print(time.time() - t)
-        print(responses)
+        logger.debug("Neg assessment latency=%.3fs responses=%s", time.time() - t, responses)
 
         # deal used to compute the neg_sr
         # indicate whether the system and the user reach a deal
@@ -614,7 +613,7 @@ class NegotiationGame(Game):
         if SUCCESS_RATE in self.game_config.objectives:
             reward.append(neg_sr)
 
-        print(reward)
+        logger.debug("Neg multi-objective reward vector: %s", reward)
         return reward, done, done
 
 
@@ -770,7 +769,7 @@ class EmotionalSupportGame(Game):
                                                                    terminators = self.game_config.terminators
                                                                    )
 
-        print(responses)
+        logger.debug("ES assessment responses: %s", responses)
 
         # used to compute the es_sr
         # indicate whether the supporter solved the seeker problem.
@@ -846,7 +845,7 @@ class EmotionalSupportGame(Game):
         if AVG_TURN in self.game_config.objectives:
             rewards.append(turn_reward)
 
-        print(rewards)
+        logger.debug("ES multi-objective rewards: %s", rewards)
         return rewards, done, done
     
     
@@ -880,8 +879,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                                                              terminators = self.game_config.terminators
                                                              )
 
-        print(time.time() - t)
-        print(responses)
+        logger.debug("SingleNeg assessment latency=%.3fs responses=%s", time.time() - t, responses)
 
         deals = []
         rewards = []
@@ -908,7 +906,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 reward = max(set(rewards), key = rewards.count)
     
         if reward >= self.game_config.epsilon:
-            print('--> Goal completed !')
+            logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
@@ -919,7 +917,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 # logger.info('The conversation is on-going !')
                 pass
             
-        print(reward)
+        logger.debug("SingleNeg reward: %.4f", reward)
         return reward, done, done
 
 
@@ -968,7 +966,7 @@ class SingleObjectiveRecommendationGame(RecommendationGame):
                                                                 terminators = self.game_config.terminators
                                                                 )
         
-        # print(responses)
+        logger.debug("Rec assessment responses: %s", responses)
         
         # compute the reward
         reward = []
@@ -979,24 +977,24 @@ class SingleObjectiveRecommendationGame(RecommendationGame):
                 reward.append(0)
         
         reward = sum(reward) / len(reward)
-        print(reward)
+        logger.debug("Rec reward score: %.4f", reward)
         
         # check if the target item appear in the conversation
         # o_done = 1 if the target item appear in the conversation
         if target_item.lower().strip().replace(" ", "") in system_response.lower().strip().replace(" ", ""):
             o_done = 1
                     
-        print(reward, o_done)
+        logger.debug("Rec reward/o_done: %.4f | %s", reward, o_done)
         
         if reward >= self.game_config.epsilon and o_done == 1:
-            print('--> Goal completed !')
+            logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
-                print('--> Maximum number of turns reached !')
+                logger.info('--> Maximum number of turns reached !')
                 done = -1
             else:
-                print('--> On-going !')
+                logger.info('--> On-going !')
         
         return reward, done, done
 
@@ -1031,7 +1029,7 @@ class SingleObjectiveEmotionalSupportGame(EmotionalSupportGame):
                                                                    terminators = self.game_config.terminators
                                                                    )
         rewards = []
-        print(responses)
+        logger.debug("ES assessment responses: %s", responses)
         for output in responses:
             for key in self.game_config.reward_dict:
                 if key in output.lower():
@@ -1043,17 +1041,17 @@ class SingleObjectiveEmotionalSupportGame(EmotionalSupportGame):
         else:
             reward = sum(rewards)/len(rewards)
         
-        print("reward: ", reward)
+        logger.debug("ES reward: %.4f", reward)
         
         if reward > self.game_config.epsilon:
-            print('--> Goal completed !')
+            logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
-                print('--> Maximum number of turns reached !')
+                logger.info('--> Maximum number of turns reached !')
                 done = -1
             else:
-                print('--> On-going !')
+                logger.info('--> On-going !')
         
         return reward, done, done
 
@@ -1231,7 +1229,7 @@ class SingleObjectivePersuationGame(PersuationGame):
                                                             )
          
         rewards = []
-        print(responses)
+        logger.debug("Persuasion assessment responses: %s", responses)
         for output in responses:
             if "yes" in output.lower():
                 rewards.append(1)
@@ -1243,16 +1241,16 @@ class SingleObjectivePersuationGame(PersuationGame):
         else:
             reward = sum(rewards)/len(rewards)
         
-        print("reward: ", reward)
+        logger.debug("Persuasion reward: %.4f", reward)
         
         if reward >= self.game_config.epsilon:
-            print('--> Goal completed !')
+            logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
-                print('--> Maximum number of turns reached !')
+                logger.info('--> Maximum number of turns reached !')
                 done = -1
             else:
-                print('--> On-going !')
+                logger.info('--> On-going !')
         
         return reward, done, done
