@@ -733,7 +733,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     )
 
                 logger.info(
-                    "Pref pair | dialog=%s turn=%s action=%s | chosen=%s (V=%.4f) | rejected=%s (V=%.4f)",
+                    "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
                     dialog_idx,
                     turn,
                     goal,
