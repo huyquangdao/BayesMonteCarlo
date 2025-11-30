@@ -636,9 +636,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             # interactive conversations
                         
             for turn in count():
-                # outcome = dialog_game.get_dialog_ended(state)
-                # if outcome != 0:
-                #     break
+                outcome = dialog_game.get_dialog_ended(state)
+                if outcome != 0:
+                    logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
+                    break
                 
                 logger.info("Dialog {} turn {} | state={}", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
 
