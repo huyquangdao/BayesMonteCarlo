@@ -75,6 +75,11 @@ def create_llm_pipeline(model_name, eos_token):
         model_kwargs={"torch_dtype": torch.bfloat16},
         device_map="auto",
     )
+    # ensure pad_token_id is set to suppress HF warnings
+    tok = llm_pipeline.tokenizer
+    if tok.pad_token_id is None:
+        tok.pad_token = tok.eos_token
+        tok.pad_token_id = tok.eos_token_id
 
     terminators = [
         llm_pipeline.tokenizer.eos_token_id,

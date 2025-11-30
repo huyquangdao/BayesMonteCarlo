@@ -1241,7 +1241,7 @@ class SingleObjectivePersuationGame(PersuationGame):
         else:
             reward = sum(rewards)/len(rewards)
         
-        logger.debug("Persuasion reward: {:.4f}", reward)
+        # logger.debug("Persuasion reward: {:.4f}", reward)
         
         if reward >= self.game_config.epsilon:
             logger.info('--> Goal completed !')

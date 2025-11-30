@@ -133,13 +133,13 @@ class MCTS():
             prob[a] = self.Nsa[hashable_state][a]
         assert prob.sum() > 0
         prob /= prob.sum() + epsilon
-        logger.info(
-            "Action prob query | state=%s | Ns=%s | Nsa=%s | prob=%s",
-            hashable_state,
-            self.Ns.get(hashable_state, 0),
-            self.Nsa.get(hashable_state, {}),
-            {int(a): float(prob[a]) for a in self.valid_moves[hashable_state]},
-        )
+        # logger.info(
+        #     "Action prob query | state=%s | Ns=%s | Nsa=%s | prob=%s",
+        #     hashable_state,
+        #     self.Ns.get(hashable_state, 0),
+        #     self.Nsa.get(hashable_state, {}),
+        #     {int(a): float(prob[a]) for a in self.valid_moves[hashable_state]},
+        # )
         return prob
 
 
@@ -341,13 +341,13 @@ class OpenLoopMCTS(MCTS):
             "prob": prob_dict,
         }
         self.action_prob_traces.setdefault(state_key, []).append(trace_entry)
-        logger.info(
-            "MCTS sim=%s | state=%s | action=%s | prob=%s",
-            self.simulation_counter,
-            state_key,
-            action,
-            prob_dict,
-        )
+        # logger.info(
+        #     "MCTS sim=%s | state=%s | action=%s | prob=%s",
+        #     self.simulation_counter,
+        #     state_key,
+        #     action,
+        #     prob_dict,
+        # )
 
     def get_action_prob_trace(self, state):
         """
@@ -376,14 +376,14 @@ class OpenLoopMCTS(MCTS):
         if hashable_state not in self.realizations_traces:
             self.realizations_traces[hashable_state] = {}
         self.realizations_traces[hashable_state].setdefault(sys_utt, []).append(float(v))
-        logger.info(
-            "Realization update | state=%s | utt=%s | n=%s | mean_v=%.4f | last_v=%.4f",
-            hashable_state,
-            sys_utt,
-            self.realizations_Ns[hashable_state][sys_utt],
-            self.realizations_Vs[hashable_state][sys_utt],
-            v,
-        )
+        # logger.info(
+        #     "Realization update | state=%s | utt=%s | n=%s | mean_v=%.4f | last_v=%.4f",
+        #     hashable_state,
+        #     sys_utt,
+        #     self.realizations_Ns[hashable_state][sys_utt],
+        #     self.realizations_Vs[hashable_state][sys_utt],
+        #     v,
+        # )
         return
 
     def get_realization_traces(self, state, action: int = None):
