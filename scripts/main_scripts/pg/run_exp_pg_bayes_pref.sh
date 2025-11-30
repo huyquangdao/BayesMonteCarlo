@@ -8,18 +8,21 @@ EXPNAME="P4G_BAYES_PREF"
 for seed in 1
 do
 CUDA_VISIBLE_DEVICES=0 accelerate launch --main_process_port 8081 --gpu_ids 1 --num_processes 1 run.py \
-    --exp_name "${EXPNAME}" \
-    --project_name ProactiveLLM \
-    --seed "${seed}" \
-    --scenario persuation \
-    --log_dir logs \
-    --loggers terminal \
-    --datasets p4g \
-    --models bayes_adaptive_llm \
-    --gen_models qwen \
-    --model_type qwen \
-    --is_so_game \
-    --use_persona \
-    --num_train_rl_epochs 10 \
-    --metrics acc,prf1,sr,total_reward,avg_turn
+  --exp_name "${EXPNAME}" \
+  --project_name ProactiveLLM \
+  --seed "${seed}" \
+  --scenario persuation \
+  --log_dir logs \
+  --loggers terminal \
+  --datasets p4g \
+  --models bayes_adaptive_llm \
+  --gen_models qwen \
+  --model_type qwen \
+  --model_name_or_path checkpoints/sft_p4g \
+  --saved_dir checkpoints/sft_p4g \
+  --is_so_game \
+  --use_persona \
+  --num_train_rl_epochs 10 \
+  --metrics acc,prf1,sr,total_reward,avg_turn
+
 done

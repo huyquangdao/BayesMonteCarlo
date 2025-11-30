@@ -768,14 +768,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # log full dialog transcript
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
+                # flush dialog pairs to disk incrementally if path provided
+                if preference_path and dialog_pairs:
+                    with preference_path.open("a", encoding="utf-8") as f:
+                        for item in dialog_pairs:
+                            f.write(json.dumps(item, ensure_ascii=False) + "\n")
+                    logger.info("Appended %d pairs from dialog %d to %s", len(dialog_pairs), dialog_idx, preference_path)
             else:
                 logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
 
         if preference_path and preference_pairs:
-            with preference_path.open("w", encoding="utf-8") as f:
-                for item in preference_pairs:
-                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
-            logger.info("Wrote {} preference pairs to {}", len(preference_pairs), preference_path)
+            # already appended per dialog; nothing more to write here.
+            logger.info("Total pairs written so far: %d (path: %s)", len(preference_pairs), preference_path)
 
         # Overwrite dataset splits so DPO trainer can consume them directly.
         if preference_pairs:
