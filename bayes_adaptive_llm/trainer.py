@@ -589,10 +589,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         # Dialog seeds
-        cases = train_cases
-        max_cases = getattr(self.model_config, "mcts_num_evaluate", None)
-        if max_cases is not None and max_cases > 0:
-            cases = cases[:max_cases]
+        # cases = train_cases
+        # max_cases = getattr(self.model_config, "mcts_num_evaluate", None)
+        # if max_cases is not None and max_cases > 0:
+        #     cases = cases[:max_cases]
 
         preference_pairs: List[Dict[str, Any]] = []
         preference_path: Optional[Path] = None
@@ -637,7 +637,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                         
             for turn in count():
                 outcome = dialog_game.get_dialog_ended(state)
-                if outcome != 0:
+                if outcome == 1.0 or outcome == -1.0:
                     logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
                     break
                 
@@ -783,5 +783,5 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.dataset.dev_instances = []
             self.dataset.test_instances = []
 
-        logger.info("Generated %d preference pairs from %d dialogs.", len(preference_pairs), len(cases))
+        logger.info("Generated %d preference pairs from %d dialogs.", len(preference_pairs), len(train_cases))
         return preference_pairs
