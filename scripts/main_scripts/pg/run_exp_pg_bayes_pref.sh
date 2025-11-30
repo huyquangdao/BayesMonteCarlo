@@ -18,8 +18,6 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch --main_process_port 8081 --gpu_ids 1 --
   --models bayes_adaptive_llm \
   --gen_models qwen \
   --model_type qwen \
-  --model_name_or_path checkpoints/sft_p4g \
-  --saved_dir checkpoints/sft_p4g \
   --is_so_game \
   --use_persona \
   --num_train_rl_epochs 10 \
