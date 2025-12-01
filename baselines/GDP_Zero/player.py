@@ -395,7 +395,7 @@ class LLMPlayer(DialogPlanner):
                     rewards.append(1.0)
                 elif 'no' in response.lower():
                     rewards.append(-0.5)
-            print("len rewards: ", len(rewards))
+            # print("len rewards: ", len(rewards))
             score = 0.0 if len(rewards) == 0 else sum(rewards) / len(rewards)
             # # Persuasion heuristic: sample user-side dialog acts to estimate donation likelihood.
             # user_task_prompt = (
@@ -440,7 +440,7 @@ class LLMPlayer(DialogPlanner):
             #         rewards.append(1.0)
             # score = 0.0 if len(rewards) == 0 else float(np.mean(rewards))
             # add tiny jitter to break ties
-            score += float(np.random.uniform(-0.05, 0.05))
+            # score += float(np.random.uniform(-0.05, 0.05))
         else:
             raise Exception('Something is wrong here ....')
         return score

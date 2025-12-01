@@ -463,7 +463,7 @@ def get_llm_based_assessment_for_persuation(state,
                                             model_type='llama3',
                                             **kwargs
                                             ):
-    logger = kwargs.get("logger", None)
+
     # the reward computation function for persuation conversation
     # the following code is inspired from the PPDPP official implementation
     dial = ''
@@ -500,10 +500,6 @@ def get_llm_based_assessment_for_persuation(state,
                         Answer: """
                 }
     ]
-    try:
-        print(f"Persuasion assessment prompt | n={n} temp={temperature:.2f} max_tokens={max_tokens} | dial={dial}")
-    except Exception:
-        pass
 
     responses = []
     # prompt llm for n times
