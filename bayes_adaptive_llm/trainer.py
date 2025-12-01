@@ -692,16 +692,37 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
+
+                # Chọn cách lấy response: "env" (mặc định) hoặc "preview"
+                response_mode = getattr(self.model_config, "response_mode", "preview")
+
+                if response_mode == "preview":
+                    preview_state = state.copy()
+                    preview_state["pred_goal"] = goal
+                    preview_state["goal"] = goal
+                    sys_utt = self.generation_method.generate_response(
+                        preview_state,
+                        llm_pipeline=self.game_config.llm_pipeline,
+                        terminators=self.game_config.terminators,
+                    )
+                    user_utt = simulator.respond(
+                        preview_state,
+                        llm_pipeline=self.game_config.llm_pipeline,
+                        terminators=self.game_config.terminators,
+                    )
+                    next_state = state
+                    done = 0
+                else:
+                    # Option env: dùng env.step để vừa sinh response vừa cập nhật state
+                    next_state, _, done, _ = self.game.step(
+                        state,
+                        goal,
+                        self.generation_method,
+                        simulator
+                    )
+                    sys_utt = next_state["dialogue_context"][-2]["content"]
+                    user_utt = next_state["dialogue_context"][-1]["content"]
                 
-                # next_state = dialog_game.get_next_state(state, goal)
-                next_state, _, done, _ = self.game.step(state, 
-                                                goal, 
-                                                self.generation_method, 
-                                                simulator
-                                                )
-                
-                sys_utt = next_state["dialogue_context"][-2]["content"]
-                user_utt = next_state["dialogue_context"][-1]["content"]
 
                 # print full history up to current turn
                 history_str = stringify_dialogue_context(next_state["dialogue_context"])
