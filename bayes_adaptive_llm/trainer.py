@@ -122,375 +122,375 @@ class PersonaDialogGame(DialogGame):
         )
         return next_state
 
-    class BayesAdaptiveLLMTrainer(Trainer):
+class BayesAdaptiveLLMTrainer(Trainer):
+    """
+    High-level trainer skeleton for the Bayes-Adaptive LLM pipeline.
+    """
+
+    def __init__(self,
+                game_config,
+                model_config,
+                accelerator,
+                game,
+                model,
+                offline_evaluator,
+                online_evaluator,
+                loggers,
+                generation_method=None) -> None:
+        super().__init__(game_config, model_config, accelerator, game, model, offline_evaluator,
+                        online_evaluator, loggers)
+        self.generation_method = generation_method
+        self.tokenizer = getattr(self.model, "tokenizer", None)
+        loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
+
+    def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
         """
-        High-level trainer skeleton for the Bayes-Adaptive LLM pipeline.
+        Process the raw dataset and return the training/validation/test splits.
         """
+        return dataset.train_instances, dataset.dev_instances, dataset.test_instances
+    def _instance_to_messages_for_persuasion(self, inst):
+        persona = getattr(inst, "persona", None) or getattr(
+            inst, "user_profile_description", None
+        )
 
-        def __init__(self,
-                    game_config,
-                    model_config,
-                    accelerator,
-                    game,
-                    model,
-                    offline_evaluator,
-                    online_evaluator,
-                    loggers,
-                    generation_method=None) -> None:
-            super().__init__(game_config, model_config, accelerator, game, model, offline_evaluator,
-                            online_evaluator, loggers)
-            self.generation_method = generation_method
-            self.tokenizer = getattr(self.model, "tokenizer", None)
-            loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
+        system_content = (
+            "You are a Persuader trying to persuade the user to donate to a charity."
+        )
+        if persona:
+            system_content += f" The current user's profile is: {persona}"
 
-        def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
-            """
-            Process the raw dataset and return the training/validation/test splits.
-            """
-            return dataset.train_instances, dataset.dev_instances, dataset.test_instances
-        def _instance_to_messages_for_persuasion(self, inst):
-            persona = getattr(inst, "persona", None) or getattr(
-                inst, "user_profile_description", None
-            )
-
-            system_content = (
-                "You are a Persuader trying to persuade the user to donate to a charity."
-            )
-            if persona:
-                system_content += f" The current user's profile is: {persona}"
-
-            messages = [{"role": "system", "content": system_content}]
-            turns = getattr(inst, "turns", None) or getattr(inst, "dialog", None)
-            if turns is None:
-                # fallback: nếu inst đã có sẵn messages
-                maybe_msgs = getattr(inst, "messages", None) or inst.get("messages", None)
-                if maybe_msgs is not None:
-                    return {"messages": maybe_msgs}
-                else:
-                    raise ValueError(
-                        "Cannot infer conversation structure from instance. "
-                        "Please adapt _instance_to_messages_for_persuasion."
-                    )
-
-            for t in turns:
-                speaker = t.get("speaker", "").lower()
-                text = t.get("text", "")
-
-                if not text:
-                    continue
-
-                if "persuader" in speaker:
-                    role = "assistant"
-                else:
-                    role = "user"
-
-                messages.append({"role": role, "content": text})
-
-            return {"messages": messages}
-
-        def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
-            if self.tokenizer is None:
-                raise ValueError("self.model.tokenizer is None; cannot run SFT.")
-
-            tokenizer = self.tokenizer
-            train_records = [
-                self._instance_to_messages_for_persuasion(inst)
-                for inst in train_instances
-            ]
-            dev_records = [
-                self._instance_to_messages_for_persuasion(inst)
-                for inst in dev_instances
-            ]
-
-            raw_datasets = DatasetDict(
-                {
-                    "train": Dataset.from_list(train_records),
-                    "eval": Dataset.from_list(dev_records),
-                }
-            )
-
-            def apply_chat_template(example):
-                messages = list(example["messages"])
-
-                if len(messages) == 0:
-                    messages = [{"role": "system", "content": ""}]
-                elif messages[0]["role"] != "system":
-                    messages.insert(0, {"role": "system", "content": ""})
-
-                text = tokenizer.apply_chat_template(
-                    messages,
-                    tokenize=False,
-                )
-                return {"text": text}
-
-            num_proc = min(4, cpu_count())
-
-            raw_datasets = raw_datasets.map(
-                apply_chat_template,
-                num_proc=num_proc,
-                remove_columns=raw_datasets["train"].column_names,
-                desc="Applying chat template for SFT",
-            )
-            for idx in random.sample(range(min(3, len(raw_datasets["train"]))), k=min(3, len(raw_datasets["train"]))):
-                print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:400]}...\n")
-
-            return raw_datasets["train"], raw_datasets["eval"]
-        
-        # def construct_dataloaders(self,
-        #                         data_instances: Sequence[Any],
-        #                         batch_size: int,
-        #                         goal2id: Dict[str, int],
-        #                         shuffle: bool = True,
-        #                         num_workers: int = 1) -> DataLoader:
-        #     """
-        #     Build task-specific datasets and dataloaders.
-        #     """
-        #     if self.game_config.name == RECOMMENDATION:
-        #         torch_dataset = BayesTorchDatasetForRecommendation(
-        #             tokenizer=self.tokenizer,
-        #             instances=data_instances,
-        #             goal2id=goal2id,
-        #             max_sequence_length=self.model_config.max_sequence_length,
-        #             device=self.device,
-        #             convert_example_to_feature=BayesDataProcessorForPersuation()
-        #         )
-        #     # negotiation scenario
-        #     elif self.game_config.name == NEGOTIATION:
-        #         torch_dataset = BayesTorchDatasetForNegotiation(
-        #             tokenizer=self.tokenizer,
-        #             instances=data_instances,
-        #             goal2id=goal2id,
-        #             max_sequence_length=self.model_config.max_sequence_length,
-        #             device=self.device,
-        #             convert_example_to_feature=BayesDataProcessorForNegotiation()
-        #         )
-        #     # emotional support conversation
-        #     elif self.game_config.name == EMOTIONAL_SUPPORT:
-        #         torch_dataset = BayesTorchDatasetForEmotionalSupport(
-        #             tokenizer=self.tokenizer,
-        #             instances=data_instances,
-        #             goal2id=goal2id,
-        #             max_sequence_length=self.model_config.max_sequence_length,
-        #             device=self.device,
-        #             convert_example_to_feature=BayesDataProcessorForEmotionalSupport()
-        #         )
-        #     # persuasion conversations
-        #     elif self.game_config.name == PERSUATION:
-        #         torch_dataset = BayesTorchDatasetForPersuation(
-        #                 tokenizer=self.tokenizer,
-        #                 instances=data_instances,
-        #                 goal2id=goal2id,
-        #                 max_sequence_length=self.model_config.max_sequence_length,
-        #                 device=self.device,
-        #                 convert_example_to_feature=BayesDataProcessorForPersuation()
-        #             )
-        #     else:
-        #         raise Exception("Something is wrong here ....")
-
-        #     dataloader = DataLoader(
-        #         torch_dataset,
-        #         batch_size=batch_size,
-        #         shuffle=shuffle,
-        #         num_workers=num_workers,
-        #         collate_fn=torch_dataset.collate_fn,
-        #     )
-        #     return dataloader
-
-        # def create_criterion(self):
-        #     """
-        #     method that create the loss function to train the model
-        #     :return: a torch.nn.CrossEntropyLoss object
-        #     """
-        #     return torch.nn.CrossEntropyLoss()
-
-        # def create_optimizer(self, model, learning_rate=1e-5):
-        #     """
-        #     method that create the optimizer to train the model
-        #     :return: a torch.optim.Optimizer
-        #     """
-        #     # Ensure lr is numeric even if accidentally loaded as string from yaml/cli.
-        #     try:
-        #         lr_value = float(learning_rate)
-        #     except Exception:
-        #         lr_value = 1e-5
-        #     modules = [model]
-        #     no_decay = ["bias", "LayerNorm.weight"]
-        #     optimizer_grouped_parameters = [
-        #         {
-        #             "params": [p for model in modules for n, p in model.named_parameters()
-        #                     if not any(nd in n for nd in no_decay) and p.requires_grad],
-        #             "weight_decay": self.model_config.weight_decay,
-        #         },
-        #         {
-        #             "params": [p for model in modules for n, p in model.named_parameters()
-        #                     if any(nd in n for nd in no_decay) and p.requires_grad],
-        #             "weight_decay": 0.0,
-        #         },
-        #     ]
-        #     optimizer = AdamW(optimizer_grouped_parameters, lr=lr_value)
-        #     return optimizer
-
-        # def create_scheduler(self, optimizer, num_warmup_steps, max_train_steps):
-        #     """
-        #     method that create the lr scheduler for training the model
-        #     :param optimizer: the optimizer that we use to train the model
-        #     :param num_warmup_steps: number of worm up steps
-        #     :param max_train_steps: number of training steps.
-        #     :return: a torch.optim.lr_scheduler
-        #     """
-        #     lr_scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps, max_train_steps)
-        #     return lr_scheduler
-
-        # def train_epoch(self, data_loader, optimizer, lr_scheduler, criterion, max_train_steps):
-            """
-            method that trains the model on one epoch
-            :param data_loader: data loader used to train the model
-            :param optimizer: the optimizer used to train the model
-            :param lr_scheduler:  the lr scheduler used to train the model
-            :param criterion: the loss function that we use to train the model
-            :param max_train_steps: the maximum number of training steps
-            :return: the training loss in the current epoch
-            """
-            stop = False
-            train_loss = []
-            grad_accum = getattr(self.model_config, "gradient_accumulation", 1)
-            for step, batch in enumerate(data_loader):
-                logits = self.model(batch)
-                loss = criterion(logits, batch['labels']) / grad_accum
-                self.accelerator.backward(loss)
-                train_loss.append(float(loss))
-
-                self.progress_bar.update(1)
-                self.global_step += 1
-
-                # optim step
-                if step % grad_accum == 0 or step == len(data_loader) - 1:
-                    if self.model_config.max_grad_norm is not None:
-                        self.accelerator.clip_grad_norm_(self.model.parameters(), self.model_config.max_grad_norm)
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.zero_grad()
-
-                if self.global_step >= max_train_steps:
-                    stop = True
-                    break
-
-            # compute average train loss
-            train_loss = np.mean(train_loss) * grad_accum
-            return train_loss, stop
-
-        # def eval_epoch(self, data_loader, criterion):
-        #     """
-        #     method that evaluates the model on the validation set.
-        #     :param data_loader:  the data loader used to evaluate the model
-        #     :param criterion: the loss function
-        #     :return: evaluation loss
-        #     """
-        #     dev_loss = []
-        #     self.model.eval()
-        #     with torch.no_grad():
-        #         for batch in tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
-        #             with torch.no_grad():
-        #                 logits = self.model(batch)
-        #                 loss = criterion(logits, batch['labels'])
-        #                 self.offline_evaluator.record(logits, batch['labels'])
-        #                 dev_loss.append(float(loss))
-
-        #     dev_loss = np.mean(dev_loss) * getattr(self.model_config, "gradient_accumulation", 1)
-        #     results = self.offline_evaluator.report()
-        #     results['loss'] = dev_loss
-        #     return results
-
-    #region Preparation for DPO training
-    #endregion
-
-        def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:
-            """
-            Supervised fine-tuning aligned with the TRIP trainer structure but using
-            the configuration schema from the reference Hugging Face script.
-            """
-
-            train_instances, dev_instances, _ = self.process_dataset(dataset)
-
-  
-            train_dataset, eval_dataset = self._build_sft_datasets_from_instances(
-                train_instances, dev_instances
-            )
-
-            base_model = getattr(self.model, "plm", self.model)
-
-            use_lora = getattr(self.model_config, "use_lora", True)
-            peft_config = None
-            if use_lora:
-                peft_config = LoraConfig(
-                    r=getattr(self.model_config, "lora_r", 16),
-                    lora_alpha=getattr(self.model_config, "lora_alpha", 32),
-                    lora_dropout=getattr(self.model_config, "lora_dropout", 0.05),
-                    bias="none",
-                    task_type="CAUSAL_LM",
-                )
-
-            sft_config = SFTConfig(
-                output_dir=self.model_config.saved_dir,
-                num_train_epochs=self.model_config.num_train_epochs,
-                per_device_train_batch_size=self.model_config.batch_size,
-                per_device_eval_batch_size=self.model_config.batch_size,
-                gradient_accumulation_steps=getattr(
-                    self.model_config, "gradient_accumulation", 1
-                ),
-                learning_rate=float(self.model_config.learning_rate),
-                warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
-                weight_decay=getattr(self.model_config, "weight_decay", 0.0),
-                max_seq_length=self.model_config.max_sequence_length,
-                lr_scheduler_type=getattr(
-                    self.model_config, "lr_scheduler_type", "cosine"
-                ),
-                logging_steps=getattr(self.model_config, "logging_steps", 10),
-                save_steps=getattr(self.model_config, "save_steps", 500),
-                eval_steps=getattr(self.model_config, "eval_steps", 500),
-                evaluation_strategy="steps",
-                save_total_limit=getattr(self.model_config, "save_total_limit", 3),
-                bf16=getattr(self.model_config, "bf16", True),
-                fp16=getattr(self.model_config, "fp16", False),
-                gradient_checkpointing=getattr(
-                    self.model_config, "gradient_checkpointing", True
-                ),
-                packing=False,
-                assistant_only_loss=True,
-                dataset_text_field="text",
-                model_init_kwargs={
-                    "torch_dtype": "auto",
-                    "device_map": "auto",  
-                },
-                report_to=["none"],
-            )
-
-            loguru_logger.info("Initializing TRL SFTTrainer for persuasion SFT...")
-
-            sft_trainer = SFTTrainer(
-                model=base_model,
-                args=sft_config,
-                train_dataset=train_dataset,
-                eval_dataset=eval_dataset,
-                tokenizer=self.tokenizer,
-                peft_config=peft_config,
-            )
-
-            sft_trainer.train()
-
-            sft_trainer.save_model(self.model_config.saved_dir)
-            if self.tokenizer is not None:
-                self.tokenizer.save_pretrained(self.model_config.saved_dir)
-
-            trained_plm = sft_trainer.model
-            if hasattr(self.model, "plm"):
-                self.model.plm = trained_plm
+        messages = [{"role": "system", "content": system_content}]
+        turns = getattr(inst, "turns", None) or getattr(inst, "dialog", None)
+        if turns is None:
+            # fallback: nếu inst đã có sẵn messages
+            maybe_msgs = getattr(inst, "messages", None) or inst.get("messages", None)
+            if maybe_msgs is not None:
+                return {"messages": maybe_msgs}
             else:
-                self.model = trained_plm
+                raise ValueError(
+                    "Cannot infer conversation structure from instance. "
+                    "Please adapt _instance_to_messages_for_persuasion."
+                )
 
-            loguru_logger.info(
-                "SFT training completed. Updated backbone LM with SFT weights."
+        for t in turns:
+            speaker = t.get("speaker", "").lower()
+            text = t.get("text", "")
+
+            if not text:
+                continue
+
+            if "persuader" in speaker:
+                role = "assistant"
+            else:
+                role = "user"
+
+            messages.append({"role": role, "content": text})
+
+        return {"messages": messages}
+
+    def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
+        if self.tokenizer is None:
+            raise ValueError("self.model.tokenizer is None; cannot run SFT.")
+
+        tokenizer = self.tokenizer
+        train_records = [
+            self._instance_to_messages_for_persuasion(inst)
+            for inst in train_instances
+        ]
+        dev_records = [
+            self._instance_to_messages_for_persuasion(inst)
+            for inst in dev_instances
+        ]
+
+        raw_datasets = DatasetDict(
+            {
+                "train": Dataset.from_list(train_records),
+                "eval": Dataset.from_list(dev_records),
+            }
+        )
+
+        def apply_chat_template(example):
+            messages = list(example["messages"])
+
+            if len(messages) == 0:
+                messages = [{"role": "system", "content": ""}]
+            elif messages[0]["role"] != "system":
+                messages.insert(0, {"role": "system", "content": ""})
+
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
             )
+            return {"text": text}
+
+        num_proc = min(4, cpu_count())
+
+        raw_datasets = raw_datasets.map(
+            apply_chat_template,
+            num_proc=num_proc,
+            remove_columns=raw_datasets["train"].column_names,
+            desc="Applying chat template for SFT",
+        )
+        for idx in random.sample(range(min(3, len(raw_datasets["train"]))), k=min(3, len(raw_datasets["train"]))):
+            print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:400]}...\n")
+
+        return raw_datasets["train"], raw_datasets["eval"]
+    
+    # def construct_dataloaders(self,
+    #                         data_instances: Sequence[Any],
+    #                         batch_size: int,
+    #                         goal2id: Dict[str, int],
+    #                         shuffle: bool = True,
+    #                         num_workers: int = 1) -> DataLoader:
+    #     """
+    #     Build task-specific datasets and dataloaders.
+    #     """
+    #     if self.game_config.name == RECOMMENDATION:
+    #         torch_dataset = BayesTorchDatasetForRecommendation(
+    #             tokenizer=self.tokenizer,
+    #             instances=data_instances,
+    #             goal2id=goal2id,
+    #             max_sequence_length=self.model_config.max_sequence_length,
+    #             device=self.device,
+    #             convert_example_to_feature=BayesDataProcessorForPersuation()
+    #         )
+    #     # negotiation scenario
+    #     elif self.game_config.name == NEGOTIATION:
+    #         torch_dataset = BayesTorchDatasetForNegotiation(
+    #             tokenizer=self.tokenizer,
+    #             instances=data_instances,
+    #             goal2id=goal2id,
+    #             max_sequence_length=self.model_config.max_sequence_length,
+    #             device=self.device,
+    #             convert_example_to_feature=BayesDataProcessorForNegotiation()
+    #         )
+    #     # emotional support conversation
+    #     elif self.game_config.name == EMOTIONAL_SUPPORT:
+    #         torch_dataset = BayesTorchDatasetForEmotionalSupport(
+    #             tokenizer=self.tokenizer,
+    #             instances=data_instances,
+    #             goal2id=goal2id,
+    #             max_sequence_length=self.model_config.max_sequence_length,
+    #             device=self.device,
+    #             convert_example_to_feature=BayesDataProcessorForEmotionalSupport()
+    #         )
+    #     # persuasion conversations
+    #     elif self.game_config.name == PERSUATION:
+    #         torch_dataset = BayesTorchDatasetForPersuation(
+    #                 tokenizer=self.tokenizer,
+    #                 instances=data_instances,
+    #                 goal2id=goal2id,
+    #                 max_sequence_length=self.model_config.max_sequence_length,
+    #                 device=self.device,
+    #                 convert_example_to_feature=BayesDataProcessorForPersuation()
+    #             )
+    #     else:
+    #         raise Exception("Something is wrong here ....")
+
+    #     dataloader = DataLoader(
+    #         torch_dataset,
+    #         batch_size=batch_size,
+    #         shuffle=shuffle,
+    #         num_workers=num_workers,
+    #         collate_fn=torch_dataset.collate_fn,
+    #     )
+    #     return dataloader
+
+    # def create_criterion(self):
+    #     """
+    #     method that create the loss function to train the model
+    #     :return: a torch.nn.CrossEntropyLoss object
+    #     """
+    #     return torch.nn.CrossEntropyLoss()
+
+    # def create_optimizer(self, model, learning_rate=1e-5):
+    #     """
+    #     method that create the optimizer to train the model
+    #     :return: a torch.optim.Optimizer
+    #     """
+    #     # Ensure lr is numeric even if accidentally loaded as string from yaml/cli.
+    #     try:
+    #         lr_value = float(learning_rate)
+    #     except Exception:
+    #         lr_value = 1e-5
+    #     modules = [model]
+    #     no_decay = ["bias", "LayerNorm.weight"]
+    #     optimizer_grouped_parameters = [
+    #         {
+    #             "params": [p for model in modules for n, p in model.named_parameters()
+    #                     if not any(nd in n for nd in no_decay) and p.requires_grad],
+    #             "weight_decay": self.model_config.weight_decay,
+    #         },
+    #         {
+    #             "params": [p for model in modules for n, p in model.named_parameters()
+    #                     if any(nd in n for nd in no_decay) and p.requires_grad],
+    #             "weight_decay": 0.0,
+    #         },
+    #     ]
+    #     optimizer = AdamW(optimizer_grouped_parameters, lr=lr_value)
+    #     return optimizer
+
+    # def create_scheduler(self, optimizer, num_warmup_steps, max_train_steps):
+    #     """
+    #     method that create the lr scheduler for training the model
+    #     :param optimizer: the optimizer that we use to train the model
+    #     :param num_warmup_steps: number of worm up steps
+    #     :param max_train_steps: number of training steps.
+    #     :return: a torch.optim.lr_scheduler
+    #     """
+    #     lr_scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps, max_train_steps)
+    #     return lr_scheduler
+
+    # def train_epoch(self, data_loader, optimizer, lr_scheduler, criterion, max_train_steps):
+        """
+        method that trains the model on one epoch
+        :param data_loader: data loader used to train the model
+        :param optimizer: the optimizer used to train the model
+        :param lr_scheduler:  the lr scheduler used to train the model
+        :param criterion: the loss function that we use to train the model
+        :param max_train_steps: the maximum number of training steps
+        :return: the training loss in the current epoch
+        """
+        stop = False
+        train_loss = []
+        grad_accum = getattr(self.model_config, "gradient_accumulation", 1)
+        for step, batch in enumerate(data_loader):
+            logits = self.model(batch)
+            loss = criterion(logits, batch['labels']) / grad_accum
+            self.accelerator.backward(loss)
+            train_loss.append(float(loss))
+
+            self.progress_bar.update(1)
+            self.global_step += 1
+
+            # optim step
+            if step % grad_accum == 0 or step == len(data_loader) - 1:
+                if self.model_config.max_grad_norm is not None:
+                    self.accelerator.clip_grad_norm_(self.model.parameters(), self.model_config.max_grad_norm)
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+
+            if self.global_step >= max_train_steps:
+                stop = True
+                break
+
+        # compute average train loss
+        train_loss = np.mean(train_loss) * grad_accum
+        return train_loss, stop
+
+    # def eval_epoch(self, data_loader, criterion):
+    #     """
+    #     method that evaluates the model on the validation set.
+    #     :param data_loader:  the data loader used to evaluate the model
+    #     :param criterion: the loss function
+    #     :return: evaluation loss
+    #     """
+    #     dev_loss = []
+    #     self.model.eval()
+    #     with torch.no_grad():
+    #         for batch in tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
+    #             with torch.no_grad():
+    #                 logits = self.model(batch)
+    #                 loss = criterion(logits, batch['labels'])
+    #                 self.offline_evaluator.record(logits, batch['labels'])
+    #                 dev_loss.append(float(loss))
+
+    #     dev_loss = np.mean(dev_loss) * getattr(self.model_config, "gradient_accumulation", 1)
+    #     results = self.offline_evaluator.report()
+    #     results['loss'] = dev_loss
+    #     return results
+
+#region Preparation for DPO training
+#endregion
+
+    def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:
+        """
+        Supervised fine-tuning aligned with the TRIP trainer structure but using
+        the configuration schema from the reference Hugging Face script.
+        """
+
+        train_instances, dev_instances, _ = self.process_dataset(dataset)
+
+
+        train_dataset, eval_dataset = self._build_sft_datasets_from_instances(
+            train_instances, dev_instances
+        )
+
+        base_model = getattr(self.model, "plm", self.model)
+
+        use_lora = getattr(self.model_config, "use_lora", True)
+        peft_config = None
+        if use_lora:
+            peft_config = LoraConfig(
+                r=getattr(self.model_config, "lora_r", 16),
+                lora_alpha=getattr(self.model_config, "lora_alpha", 32),
+                lora_dropout=getattr(self.model_config, "lora_dropout", 0.05),
+                bias="none",
+                task_type="CAUSAL_LM",
+            )
+
+        sft_config = SFTConfig(
+            output_dir=self.model_config.saved_dir,
+            num_train_epochs=self.model_config.num_train_epochs,
+            per_device_train_batch_size=self.model_config.batch_size,
+            per_device_eval_batch_size=self.model_config.batch_size,
+            gradient_accumulation_steps=getattr(
+                self.model_config, "gradient_accumulation", 1
+            ),
+            learning_rate=float(self.model_config.learning_rate),
+            warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
+            weight_decay=getattr(self.model_config, "weight_decay", 0.0),
+            max_seq_length=self.model_config.max_sequence_length,
+            lr_scheduler_type=getattr(
+                self.model_config, "lr_scheduler_type", "cosine"
+            ),
+            logging_steps=getattr(self.model_config, "logging_steps", 10),
+            save_steps=getattr(self.model_config, "save_steps", 500),
+            eval_steps=getattr(self.model_config, "eval_steps", 500),
+            evaluation_strategy="steps",
+            save_total_limit=getattr(self.model_config, "save_total_limit", 3),
+            bf16=getattr(self.model_config, "bf16", True),
+            fp16=getattr(self.model_config, "fp16", False),
+            gradient_checkpointing=getattr(
+                self.model_config, "gradient_checkpointing", True
+            ),
+            packing=False,
+            assistant_only_loss=True,
+            dataset_text_field="text",
+            model_init_kwargs={
+                "torch_dtype": "auto",
+                "device_map": "auto",  
+            },
+            report_to=["none"],
+        )
+
+        loguru_logger.info("Initializing TRL SFTTrainer for persuasion SFT...")
+
+        sft_trainer = SFTTrainer(
+            model=base_model,
+            args=sft_config,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=self.tokenizer,
+            peft_config=peft_config,
+        )
+
+        sft_trainer.train()
+
+        sft_trainer.save_model(self.model_config.saved_dir)
+        if self.tokenizer is not None:
+            self.tokenizer.save_pretrained(self.model_config.saved_dir)
+
+        trained_plm = sft_trainer.model
+        if hasattr(self.model, "plm"):
+            self.model.plm = trained_plm
+        else:
+            self.model = trained_plm
+
+        loguru_logger.info(
+            "SFT training completed. Updated backbone LM with SFT weights."
+        )
 
     def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
         """
