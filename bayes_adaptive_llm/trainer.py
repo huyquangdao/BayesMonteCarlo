@@ -472,12 +472,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 self.model_config, "gradient_checkpointing", True
             ),
             packing=False,
-            assistant_only_loss=True,
             dataset_text_field="text",
-            model_init_kwargs={
-                "torch_dtype": "auto",
-                "device_map": "auto",  
-            },
             report_to=["none"],
         )
 
