@@ -577,6 +577,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         logger.info("Action mapping: {}", action_mapping)
         dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
         player = LLMPlayer(self.game_config, action_mapping, self.model_config)
+        # expose generation pipeline to player heuristics if needed
+        setattr(self.model_config, "llm_pipeline", self.game_config.llm_pipeline)
+        setattr(self.model_config, "terminators", self.game_config.terminators)
 
         # MCTS configuration
         num_MCTS_sims = getattr(self.model_config, "num_mcts_sims", 30)

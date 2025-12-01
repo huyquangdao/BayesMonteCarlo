@@ -386,8 +386,10 @@ class LLMPlayer(DialogPlanner):
                                                                 n=5,
                                                                 temperature=1.1,
                                                                 max_tokens=20,
-                                                                model_type=self.model_type
-                                                                )
+                                                                 model_type=self.model_type,
+                                                                 llm_pipeline=getattr(self.model_config, "llm_pipeline", None),
+                                                                 terminators=getattr(self.model_config, "terminators", None),
+                                                                 )
             # used to compute the persuasion sr
             rewards = []
             for response in responses:
