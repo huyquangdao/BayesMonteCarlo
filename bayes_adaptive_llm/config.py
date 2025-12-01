@@ -107,9 +107,9 @@ class BayesAdaptiveConfigForEmotionalSupport(BayesAdaptiveConfig):
 
 class BayesAdaptiveConfigForPersuation(BayesAdaptiveConfig):
     # MCTS loop for preference pair generation
-    # mcts_num_evaluate = 1
-    num_mcts_sims = 30
-    max_realizations = 4
+    epsilon = 1.0
+    num_mcts_sims = 20
+    max_realizations = 3
     max_turns = 12
     combined_action = False
     special_tokens_dict = pg_special_tokens_dict
