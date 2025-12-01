@@ -696,7 +696,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 state["turn_id"] = turn
                 
                 if response_mode == "preview":
-                    sys_utt = planner.get_best_realizations(state, best_action)
+                    sys_utt = planner.get_best_realization(state, best_action)
                     user_utt = simulator.respond(
                         state,
                         llm_pipeline=self.game_config.llm_pipeline,
