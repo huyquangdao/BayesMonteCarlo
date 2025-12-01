@@ -500,11 +500,10 @@ def get_llm_based_assessment_for_persuation(state,
                         Answer: """
                 }
     ]
-    if logger:
-        try:
-            logger.info("Persuasion assessment prompt | n={} temp={:.2f} max_tokens={} | dial={}", n, temperature, max_tokens, dial)
-        except Exception:
-            pass
+    try:
+        print(f"Persuasion assessment prompt | n={n} temp={temperature:.2f} max_tokens={max_tokens} | dial={dial}")
+    except Exception:
+        pass
 
     responses = []
     # prompt llm for n times
@@ -528,11 +527,10 @@ def get_llm_based_assessment_for_persuation(state,
 
         responses.extend(call_llm_model(messages, temperature, max_tokens, n_return_sequences=n, **kwargs))
 
-    if logger:
-        try:
-            logger.info("Persuasion assessment responses (n={}): {}", n, responses)
-        except Exception:
-            pass
+    try:
+        print(f"Persuasion assessment responses (n={n}): {responses}")
+    except Exception:
+        pass
 
     # convert the text-based assessment to scalar based assessment
     # processing the llm's outputs
