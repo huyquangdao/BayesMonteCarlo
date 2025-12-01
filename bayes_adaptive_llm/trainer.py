@@ -677,61 +677,49 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
                     break
 
+                response_mode = getattr(self.model_config, "response_mode", "preview")
+
                 state_rep = planner._to_string_rep(state)
                 valid_moves = planner.valid_moves.get(state_rep, [])
 
-                # pick the highest-probability action (restricted to valid moves if provided)
+                # sample to avoid repeatedly picking the first action when all priors are flat
                 if valid_moves is not None and len(valid_moves) > 0:
-                    masked_prob = action_prob[valid_moves]
-                    best_action = int(valid_moves[int(np.argmax(masked_prob))])
+                    prob = action_prob.copy()
+                    prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
+                    best_action = int(np.random.choice(len(prob), p=prob))
                 else:
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
-                # pick the highest-value sampled system utterance for the chosen action
-                best_sys_utt = None
-                action_key = f"{state_rep}__{goal}"
-                if planner.realizations_Vs.get(action_key):
-                    action_realizations = planner.realizations_Vs[action_key]
-                    best_sys_utt = max(action_realizations.items(), key=lambda kv: kv[1])[0]
-                if best_sys_utt is None:
-                    best_sys_utt = planner.get_best_realization(state, best_action)
-
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
-
-                if best_sys_utt:
-                    base_state = copy.deepcopy(state)
-                    base_state["pred_goal"] = goal
-                    base_state["goal"] = goal
-                    rollout_state = copy.deepcopy(base_state)
-                    rollout_state["dialogue_context"].append({"role": "assistant", "content": best_sys_utt})
+                
+                if response_mode == "preview":
+                    sys_utt = planner.get_best_realizations(state, best_action)
                     user_utt = simulator.respond(
-                        rollout_state,
+                        state,
                         llm_pipeline=self.game_config.llm_pipeline,
                         terminators=self.game_config.terminators,
                     )
-                    next_state = update_state_for_open_loop_mcts(
-                        state=base_state,
-                        system_response=best_sys_utt,
-                        user_response=user_utt,
-                        action=goal,
-                    )
-                    _, done, _ = self.game.compute_reward(
-                        next_state,
-                        goal,
-                        best_sys_utt,
-                        getattr(simulator, "user_profile_description", None),
-                    )
-                    sys_utt = best_sys_utt
+                    # update the dialogue context
+                    state['response'] = sys_utt
+                    state['dialogue_context'].append({"role": "assistant", "content": sys_utt})
+
+                    state['dialogue_context'].append({"role": "user", "content": user_utt})
+                    state['pre_goals'].append(goal)
+
+                    logger.info(f"[System]: {sys_utt}")
+                    logger.info(f"[USER]: {user_utt}")
+                    next_state = state
+
                 else:
-                    next_state, _, done, _ = self.game.step(
-                        state,
-                        goal,
-                        self.generation_method,
-                        simulator,
-                    )
+                    next_state, _, done, _ = self.game.step(state, 
+                                                    goal, 
+                                                    self.generation_method, 
+                                                    simulator
+                                                    )
+                    
                     sys_utt = next_state["dialogue_context"][-2]["content"]
                     user_utt = next_state["dialogue_context"][-1]["content"]
 
