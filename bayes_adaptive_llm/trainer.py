@@ -236,112 +236,112 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         return raw_datasets["train"], raw_datasets["eval"]
     
-    # def construct_dataloaders(self,
-    #                         data_instances: Sequence[Any],
-    #                         batch_size: int,
-    #                         goal2id: Dict[str, int],
-    #                         shuffle: bool = True,
-    #                         num_workers: int = 1) -> DataLoader:
-    #     """
-    #     Build task-specific datasets and dataloaders.
-    #     """
-    #     if self.game_config.name == RECOMMENDATION:
-    #         torch_dataset = BayesTorchDatasetForRecommendation(
-    #             tokenizer=self.tokenizer,
-    #             instances=data_instances,
-    #             goal2id=goal2id,
-    #             max_sequence_length=self.model_config.max_sequence_length,
-    #             device=self.device,
-    #             convert_example_to_feature=BayesDataProcessorForPersuation()
-    #         )
-    #     # negotiation scenario
-    #     elif self.game_config.name == NEGOTIATION:
-    #         torch_dataset = BayesTorchDatasetForNegotiation(
-    #             tokenizer=self.tokenizer,
-    #             instances=data_instances,
-    #             goal2id=goal2id,
-    #             max_sequence_length=self.model_config.max_sequence_length,
-    #             device=self.device,
-    #             convert_example_to_feature=BayesDataProcessorForNegotiation()
-    #         )
-    #     # emotional support conversation
-    #     elif self.game_config.name == EMOTIONAL_SUPPORT:
-    #         torch_dataset = BayesTorchDatasetForEmotionalSupport(
-    #             tokenizer=self.tokenizer,
-    #             instances=data_instances,
-    #             goal2id=goal2id,
-    #             max_sequence_length=self.model_config.max_sequence_length,
-    #             device=self.device,
-    #             convert_example_to_feature=BayesDataProcessorForEmotionalSupport()
-    #         )
-    #     # persuasion conversations
-    #     elif self.game_config.name == PERSUATION:
-    #         torch_dataset = BayesTorchDatasetForPersuation(
-    #                 tokenizer=self.tokenizer,
-    #                 instances=data_instances,
-    #                 goal2id=goal2id,
-    #                 max_sequence_length=self.model_config.max_sequence_length,
-    #                 device=self.device,
-    #                 convert_example_to_feature=BayesDataProcessorForPersuation()
-    #             )
-    #     else:
-    #         raise Exception("Something is wrong here ....")
+    def construct_dataloaders(self,
+                            data_instances: Sequence[Any],
+                            batch_size: int,
+                            goal2id: Dict[str, int],
+                            shuffle: bool = True,
+                            num_workers: int = 1) -> DataLoader:
+        """
+        Build task-specific datasets and dataloaders.
+        """
+        if self.game_config.name == RECOMMENDATION:
+            torch_dataset = BayesTorchDatasetForRecommendation(
+                tokenizer=self.tokenizer,
+                instances=data_instances,
+                goal2id=goal2id,
+                max_sequence_length=self.model_config.max_sequence_length,
+                device=self.device,
+                convert_example_to_feature=BayesDataProcessorForPersuation()
+            )
+        # negotiation scenario
+        elif self.game_config.name == NEGOTIATION:
+            torch_dataset = BayesTorchDatasetForNegotiation(
+                tokenizer=self.tokenizer,
+                instances=data_instances,
+                goal2id=goal2id,
+                max_sequence_length=self.model_config.max_sequence_length,
+                device=self.device,
+                convert_example_to_feature=BayesDataProcessorForNegotiation()
+            )
+        # emotional support conversation
+        elif self.game_config.name == EMOTIONAL_SUPPORT:
+            torch_dataset = BayesTorchDatasetForEmotionalSupport(
+                tokenizer=self.tokenizer,
+                instances=data_instances,
+                goal2id=goal2id,
+                max_sequence_length=self.model_config.max_sequence_length,
+                device=self.device,
+                convert_example_to_feature=BayesDataProcessorForEmotionalSupport()
+            )
+        # persuasion conversations
+        elif self.game_config.name == PERSUATION:
+            torch_dataset = BayesTorchDatasetForPersuation(
+                    tokenizer=self.tokenizer,
+                    instances=data_instances,
+                    goal2id=goal2id,
+                    max_sequence_length=self.model_config.max_sequence_length,
+                    device=self.device,
+                    convert_example_to_feature=BayesDataProcessorForPersuation()
+                )
+        else:
+            raise Exception("Something is wrong here ....")
 
-    #     dataloader = DataLoader(
-    #         torch_dataset,
-    #         batch_size=batch_size,
-    #         shuffle=shuffle,
-    #         num_workers=num_workers,
-    #         collate_fn=torch_dataset.collate_fn,
-    #     )
-    #     return dataloader
+        dataloader = DataLoader(
+            torch_dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            num_workers=num_workers,
+            collate_fn=torch_dataset.collate_fn,
+        )
+        return dataloader
 
-    # def create_criterion(self):
-    #     """
-    #     method that create the loss function to train the model
-    #     :return: a torch.nn.CrossEntropyLoss object
-    #     """
-    #     return torch.nn.CrossEntropyLoss()
+    def create_criterion(self):
+        """
+        method that create the loss function to train the model
+        :return: a torch.nn.CrossEntropyLoss object
+        """
+        return torch.nn.CrossEntropyLoss()
 
-    # def create_optimizer(self, model, learning_rate=1e-5):
-    #     """
-    #     method that create the optimizer to train the model
-    #     :return: a torch.optim.Optimizer
-    #     """
-    #     # Ensure lr is numeric even if accidentally loaded as string from yaml/cli.
-    #     try:
-    #         lr_value = float(learning_rate)
-    #     except Exception:
-    #         lr_value = 1e-5
-    #     modules = [model]
-    #     no_decay = ["bias", "LayerNorm.weight"]
-    #     optimizer_grouped_parameters = [
-    #         {
-    #             "params": [p for model in modules for n, p in model.named_parameters()
-    #                     if not any(nd in n for nd in no_decay) and p.requires_grad],
-    #             "weight_decay": self.model_config.weight_decay,
-    #         },
-    #         {
-    #             "params": [p for model in modules for n, p in model.named_parameters()
-    #                     if any(nd in n for nd in no_decay) and p.requires_grad],
-    #             "weight_decay": 0.0,
-    #         },
-    #     ]
-    #     optimizer = AdamW(optimizer_grouped_parameters, lr=lr_value)
-    #     return optimizer
+    def create_optimizer(self, model, learning_rate=1e-5):
+        """
+        method that create the optimizer to train the model
+        :return: a torch.optim.Optimizer
+        """
+        # Ensure lr is numeric even if accidentally loaded as string from yaml/cli.
+        try:
+            lr_value = float(learning_rate)
+        except Exception:
+            lr_value = 1e-5
+        modules = [model]
+        no_decay = ["bias", "LayerNorm.weight"]
+        optimizer_grouped_parameters = [
+            {
+                "params": [p for model in modules for n, p in model.named_parameters()
+                        if not any(nd in n for nd in no_decay) and p.requires_grad],
+                "weight_decay": self.model_config.weight_decay,
+            },
+            {
+                "params": [p for model in modules for n, p in model.named_parameters()
+                        if any(nd in n for nd in no_decay) and p.requires_grad],
+                "weight_decay": 0.0,
+            },
+        ]
+        optimizer = AdamW(optimizer_grouped_parameters, lr=lr_value)
+        return optimizer
 
-    # def create_scheduler(self, optimizer, num_warmup_steps, max_train_steps):
-    #     """
-    #     method that create the lr scheduler for training the model
-    #     :param optimizer: the optimizer that we use to train the model
-    #     :param num_warmup_steps: number of worm up steps
-    #     :param max_train_steps: number of training steps.
-    #     :return: a torch.optim.lr_scheduler
-    #     """
-    #     lr_scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps, max_train_steps)
-    #     return lr_scheduler
+    def create_scheduler(self, optimizer, num_warmup_steps, max_train_steps):
+        """
+        method that create the lr scheduler for training the model
+        :param optimizer: the optimizer that we use to train the model
+        :param num_warmup_steps: number of worm up steps
+        :param max_train_steps: number of training steps.
+        :return: a torch.optim.lr_scheduler
+        """
+        lr_scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps, max_train_steps)
+        return lr_scheduler
 
-    # def train_epoch(self, data_loader, optimizer, lr_scheduler, criterion, max_train_steps):
+    def train_epoch(self, data_loader, optimizer, lr_scheduler, criterion, max_train_steps):
         """
         method that trains the model on one epoch
         :param data_loader: data loader used to train the model
@@ -379,27 +379,27 @@ class BayesAdaptiveLLMTrainer(Trainer):
         train_loss = np.mean(train_loss) * grad_accum
         return train_loss, stop
 
-    # def eval_epoch(self, data_loader, criterion):
-    #     """
-    #     method that evaluates the model on the validation set.
-    #     :param data_loader:  the data loader used to evaluate the model
-    #     :param criterion: the loss function
-    #     :return: evaluation loss
-    #     """
-    #     dev_loss = []
-    #     self.model.eval()
-    #     with torch.no_grad():
-    #         for batch in tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
-    #             with torch.no_grad():
-    #                 logits = self.model(batch)
-    #                 loss = criterion(logits, batch['labels'])
-    #                 self.offline_evaluator.record(logits, batch['labels'])
-    #                 dev_loss.append(float(loss))
+    def eval_epoch(self, data_loader, criterion):
+        """
+        method that evaluates the model on the validation set.
+        :param data_loader:  the data loader used to evaluate the model
+        :param criterion: the loss function
+        :return: evaluation loss
+        """
+        dev_loss = []
+        self.model.eval()
+        with torch.no_grad():
+            for batch in tqdm(data_loader, disable=not self.accelerator.is_local_main_process):
+                with torch.no_grad():
+                    logits = self.model(batch)
+                    loss = criterion(logits, batch['labels'])
+                    self.offline_evaluator.record(logits, batch['labels'])
+                    dev_loss.append(float(loss))
 
-    #     dev_loss = np.mean(dev_loss) * getattr(self.model_config, "gradient_accumulation", 1)
-    #     results = self.offline_evaluator.report()
-    #     results['loss'] = dev_loss
-    #     return results
+        dev_loss = np.mean(dev_loss) * getattr(self.model_config, "gradient_accumulation", 1)
+        results = self.offline_evaluator.report()
+        results['loss'] = dev_loss
+        return results
 
 #region Preparation for DPO training
 #endregion
