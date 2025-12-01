@@ -757,8 +757,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # update the current state of the conversation
                 state = next_state
+                # if env signals termination, stop the turn loop
+                # if done != 0:
+                #     logger.info("Environment terminated dialog %s at turn %s with done=%s", dialog_idx, turn, done)
+                #     break
                 
-                # print("done: ", done)
+                print("done: ", done)
                 if len(state['dialogue_context']) >= self.game_config.max_horizon:
                     break
 
