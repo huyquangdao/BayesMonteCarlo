@@ -677,7 +677,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
                     break
 
-                response_mode = getattr(self.model_config, "response_mode", "preview")
+                
 
                 state_rep = planner._to_string_rep(state)
                 valid_moves = planner.valid_moves.get(state_rep, [])
@@ -694,35 +694,35 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
+                # response_mode = getattr(self.model_config, "response_mode", "preview")
+                # if response_mode == "preview":
+                #     sys_utt = planner.get_best_realization(state, best_action)
+                #     user_utt = simulator.respond(
+                #         state,
+                #         llm_pipeline=self.game_config.llm_pipeline,
+                #         terminators=self.game_config.terminators,
+                #     )
+                #     # update the dialogue context
+                #     state['response'] = sys_utt
+                #     state['dialogue_context'].append({"role": "assistant", "content": sys_utt})
+
+                #     state['dialogue_context'].append({"role": "user", "content": user_utt})
+                #     state['pre_goals'].append(goal)
+
+                #     logger.info(f"[System]: {sys_utt}")
+                #     logger.info(f"[USER]: {user_utt}")
+                #     next_state = state
+
+                # else:
+                next_state, _, done, _ = self.game.step(state, 
+                                                goal, 
+                                                self.generation_method, 
+                                                simulator
+                                                )
                 
-                if response_mode == "preview":
-                    sys_utt = planner.get_best_realization(state, best_action)
-                    user_utt = simulator.respond(
-                        state,
-                        llm_pipeline=self.game_config.llm_pipeline,
-                        terminators=self.game_config.terminators,
-                    )
-                    # update the dialogue context
-                    state['response'] = sys_utt
-                    state['dialogue_context'].append({"role": "assistant", "content": sys_utt})
-
-                    state['dialogue_context'].append({"role": "user", "content": user_utt})
-                    state['pre_goals'].append(goal)
-
-                    logger.info(f"[System]: {sys_utt}")
-                    logger.info(f"[USER]: {user_utt}")
-                    next_state = state
-
-                else:
-                    next_state, _, done, _ = self.game.step(state, 
-                                                    goal, 
-                                                    self.generation_method, 
-                                                    simulator
-                                                    )
-                    
-                    sys_utt = next_state["dialogue_context"][-2]["content"]
-                    user_utt = next_state["dialogue_context"][-1]["content"]
-                    print("done: ", done)
+                sys_utt = next_state["dialogue_context"][-2]["content"]
+                user_utt = next_state["dialogue_context"][-1]["content"]
+                print("done: ", done)
 
                 # print full history up to current turn
                 history_str = stringify_dialogue_context(next_state["dialogue_context"])
