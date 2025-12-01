@@ -687,7 +687,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 else:
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
-                best_sys_utt = planner.get_best_realization(state, best_action)
+
+                # pick the highest-value sampled system utterance for the chosen action
+                best_sys_utt = None
+                action_key = f"{state_rep}__{goal}"
+                if planner.realizations_Vs.get(action_key):
+                    action_realizations = planner.realizations_Vs[action_key]
+                    best_sys_utt = max(action_realizations.items(), key=lambda kv: kv[1])[0]
+                if best_sys_utt is None:
+                    best_sys_utt = planner.get_best_realization(state, best_action)
 
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
