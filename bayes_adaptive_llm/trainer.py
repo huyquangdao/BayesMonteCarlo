@@ -208,7 +208,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if self.tokenizer is None:
             raise ValueError("self.model.tokenizer is None; cannot run SFT.")
 
-        tokenizer = self.tokenizer
+        tokenizer = self.model_config.tokenizer
         train_records = [
             self._instance_to_messages_for_persuasion(inst)
             for inst in train_instances
@@ -425,7 +425,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Supervised fine-tuning aligned with the TRIP trainer structure but using
         the configuration schema from the reference Hugging Face script.
         """
-
+        
         train_instances, dev_instances, _ = self.process_dataset(dataset)
 
 
