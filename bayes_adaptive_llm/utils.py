@@ -139,9 +139,9 @@ def get_preference_pair(
     # First try within the most likely action.
     single_action_pair = _pair_single_action(state_rep, target_idx, dialog_acts, realizations_vs)
     if single_action_pair:
-        logger.info("Selected single-action preference pair for action %s", target_idx)
+        logger.info("Selected single-action preference pair for action {}", target_idx)
         return single_action_pair
-    logger.info("No single-action pair found for action %s, trying cross-action.", target_idx)
+    logger.info("No single-action pair found for action {}, trying cross-action.", target_idx)
     # Fallback: cross-action using top-2 actions.
     return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves, realizations_vs)
 

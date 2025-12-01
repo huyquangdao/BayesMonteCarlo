@@ -152,19 +152,19 @@ class LLMPlayer(DialogPlanner):
         self.n = 5
         pass
 
-    def _get_user_generated_da(self, data) -> list:
-		# convert generated responses to DA
-        pred_da = []
-        for resp in data:
-            resp = resp['generated_text'].strip()
-            start_idx = resp.find("[")
-            end_idx = resp.find("]")
-            if start_idx == -1 or end_idx == -1:
-                continue
-            found_da = resp[start_idx + 1: end_idx].strip()
-            if found_da in self.user_dialog_acts:
-                pred_da.append(found_da)
-        return pred_da
+    # def _get_user_generated_da(self, data) -> list:
+	# 	# convert generated responses to DA
+    #     pred_da = []
+    #     for resp in data:
+    #         resp = resp['generated_text'].strip()
+    #         start_idx = resp.find("[")
+    #         end_idx = resp.find("]")
+    #         if start_idx == -1 or end_idx == -1:
+    #             continue
+    #         found_da = resp[start_idx + 1: end_idx].strip()
+    #         if found_da in self.user_dialog_acts:
+    #             pred_da.append(found_da)
+    #     return pred_da
     def get_valid_moves(self, state):
         """
         return valid goals
@@ -442,7 +442,7 @@ class LLMPlayer(DialogPlanner):
             #         rewards.append(1.0)
             # score = 0.0 if len(rewards) == 0 else float(np.mean(rewards))
             # add tiny jitter to break ties
-            # score += float(np.random.uniform(-0.05, 0.05))
+            score += float(np.random.uniform(-0.05, 0.05))
         else:
             raise Exception('Something is wrong here ....')
         return score
