@@ -1244,13 +1244,13 @@ class SingleObjectivePersuationGame(PersuationGame):
         # logger.debug("Persuasion reward: {:.4f}", reward)
         
         if reward >= self.game_config.epsilon:
-            logger.info('--> Goal completed !')
+            # logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
                 logger.info('--> Maximum number of turns reached !')
                 done = -1
-            else:
-                logger.info('--> On-going !')
+            # else:
+                # logger.info('--> On-going !')
         
         return reward, done, done

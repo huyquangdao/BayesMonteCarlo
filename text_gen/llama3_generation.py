@@ -78,6 +78,6 @@ class Llama3Generation(LLMGeneration):
                             **kwargs
                             )
         
-        print("Response Generation Time: ", time.time() - t)
+        # print("Response Generation Time: ", time.time() - t)
         # returning the response
         return response[0]

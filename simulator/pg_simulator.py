@@ -100,7 +100,7 @@ class PersuationSimulator(Simulator):
                             **kwargs
                             )
                         
-        print("Simulator Generation Time: ", time.time() - t)
+        # print("Simulator Generation Time: ", time.time() - t)
         return response[0]
 
     def generate_persona_description(self, user_profile):
