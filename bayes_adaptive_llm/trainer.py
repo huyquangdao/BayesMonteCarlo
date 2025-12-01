@@ -679,50 +679,53 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 state_rep = planner._to_string_rep(state)
                 valid_moves = planner.valid_moves.get(state_rep, [])
-                
-                # sample to avoid repeatedly picking the first action when all priors are flat
+
+                # pick the highest-probability action (restricted to valid moves if provided)
                 if valid_moves is not None and len(valid_moves) > 0:
-                    prob = action_prob.copy()
-                    prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
-                    best_action = int(np.random.choice(len(prob), p=prob))
+                    masked_prob = action_prob[valid_moves]
+                    best_action = int(valid_moves[int(np.argmax(masked_prob))])
                 else:
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
+                best_sys_utt = planner.get_best_realization(state, best_action)
 
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
 
-                # Chọn cách lấy response: "env" (mặc định) hoặc "preview"
-                response_mode = getattr(self.model_config, "response_mode", "preview")
-
-                if response_mode == "preview":
-                    preview_state = state.copy()
-                    preview_state["pred_goal"] = goal
-                    preview_state["goal"] = goal
-                    sys_utt = self.generation_method.generate_response(
-                        preview_state,
-                        llm_pipeline=self.game_config.llm_pipeline,
-                        terminators=self.game_config.terminators,
-                    )
+                if best_sys_utt:
+                    base_state = copy.deepcopy(state)
+                    base_state["pred_goal"] = goal
+                    base_state["goal"] = goal
+                    rollout_state = copy.deepcopy(base_state)
+                    rollout_state["dialogue_context"].append({"role": "assistant", "content": best_sys_utt})
                     user_utt = simulator.respond(
-                        preview_state,
+                        rollout_state,
                         llm_pipeline=self.game_config.llm_pipeline,
                         terminators=self.game_config.terminators,
                     )
-                    next_state = state
-                    done = 0
+                    next_state = update_state_for_open_loop_mcts(
+                        state=base_state,
+                        system_response=best_sys_utt,
+                        user_response=user_utt,
+                        action=goal,
+                    )
+                    _, done, _ = self.game.compute_reward(
+                        next_state,
+                        goal,
+                        best_sys_utt,
+                        getattr(simulator, "user_profile_description", None),
+                    )
+                    sys_utt = best_sys_utt
                 else:
-                    # Option env: dùng env.step để vừa sinh response vừa cập nhật state
                     next_state, _, done, _ = self.game.step(
                         state,
                         goal,
                         self.generation_method,
-                        simulator
+                        simulator,
                     )
                     sys_utt = next_state["dialogue_context"][-2]["content"]
                     user_utt = next_state["dialogue_context"][-1]["content"]
-                
 
                 # print full history up to current turn
                 history_str = stringify_dialogue_context(next_state["dialogue_context"])

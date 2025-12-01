@@ -303,11 +303,20 @@ class OpenLoopMCTS(MCTS):
         return v
 
     def get_best_realization(self, state, action: int):
-        prefetch_state = self._to_string_rep(state) + "__" + self.player.dialog_acts[action]
+        goal = None
+        if hasattr(self.player, "dialog_acts"):
+            goal = self.player.dialog_acts.get(action, None)
+        if goal is None and hasattr(self.player, "id2goal"):
+            goal = self.player.id2goal.get(action, None)
+
+        if goal is None:
+            return None
+
+        prefetch_state = self._to_string_rep(state) + "__" + goal
         if prefetch_state not in self.realizations_Vs:
-            raise Exception("querying a state that has no realizations sampled before")
-        # get the counts for all moves
-        # convert to prob
+            return None
+
+        # pick the system utterance with the highest estimated value
         curr_best_v = -float('inf')
         curr_best_realization = None
         for sys_utt, v in self.realizations_Vs[prefetch_state].items():
