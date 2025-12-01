@@ -722,6 +722,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     
                     sys_utt = next_state["dialogue_context"][-2]["content"]
                     user_utt = next_state["dialogue_context"][-1]["content"]
+                    print("done: ", done)
 
                 # print full history up to current turn
                 history_str = stringify_dialogue_context(next_state["dialogue_context"])
@@ -785,7 +786,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 #     logger.info("Environment terminated dialog %s at turn %s with done=%s", dialog_idx, turn, done)
                 #     break
                 
-                print("done: ", done)
+                
                 if len(state['dialogue_context']) >= self.game_config.max_horizon:
                     break
 
