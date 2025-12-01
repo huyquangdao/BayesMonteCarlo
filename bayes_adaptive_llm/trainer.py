@@ -208,7 +208,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if self.tokenizer is None:
             raise ValueError("self.model.tokenizer is None; cannot run SFT.")
 
-        tokenizer = self.model_config.tokenizer
+        tokenizer = self.tokenizer
         train_records = [
             self._instance_to_messages_for_persuasion(inst)
             for inst in train_instances

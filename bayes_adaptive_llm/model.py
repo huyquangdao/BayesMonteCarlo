@@ -33,6 +33,18 @@ class BayesAdaptiveLLMModel(Model):
         self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
         self.plm.resize_token_embeddings(len(self.tokenizer))
 
+        if getattr(self.tokenizer, "chat_template", None) is None:
+            self.tokenizer.chat_template = (
+                "{% for message in messages %}"
+                "{% if message['role'] == 'system' %}"
+                "[SYSTEM] {{ message['content'] }}\n"
+                "{% elif message['role'] == 'user' %}"
+                "[USER] {{ message['content'] }}\n"
+                "{% elif message['role'] == 'assistant' %}"
+                "[ASSISTANT] {{ message['content'] }}\n"
+                "{% endif %}"
+                "{% endfor %}"
+            )
         self.n_classes = self._infer_num_actions()
         self.drop_out = nn.Dropout(p=getattr(self.model_config, "dropout", 0.1))
         self.out_layer = nn.Linear(self.model_config.lm_size, self.n_classes)
