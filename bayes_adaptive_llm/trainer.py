@@ -149,9 +149,16 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         return dataset.train_instances, dataset.dev_instances, dataset.test_instances
     def _instance_to_messages_for_persuasion(self, inst):
-        persona = getattr(inst, "persona", None) or getattr(
-            inst, "user_profile_description", None
-        )
+        """
+        Convert a persuasion instance to chat messages for SFT.
+        Supports structures with `turns`/`dialog` and P4G-style `dialogue_context`/`response`.
+        """
+        def _get(obj, key, default=None):
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
         system_content = (
             "You are a Persuader trying to persuade the user to donate to a charity."
@@ -160,33 +167,42 @@ class BayesAdaptiveLLMTrainer(Trainer):
             system_content += f" The current user's profile is: {persona}"
 
         messages = [{"role": "system", "content": system_content}]
-        turns = getattr(inst, "turns", None) or getattr(inst, "dialog", None)
-        if turns is None:
-            # fallback: nếu inst đã có sẵn messages
-            maybe_msgs = getattr(inst, "messages", None) or inst.get("messages", None)
-            if maybe_msgs is not None:
-                return {"messages": maybe_msgs}
-            else:
-                raise ValueError(
-                    "Cannot infer conversation structure from instance. "
-                    "Please adapt _instance_to_messages_for_persuasion."
-                )
 
-        for t in turns:
-            speaker = t.get("speaker", "").lower()
-            text = t.get("text", "")
+        # 1) direct turns/dialog structure
+        turns = _get(inst, "turns") or _get(inst, "dialog")
+        if turns is not None:
+            for t in turns:
+                speaker = t.get("speaker", "").lower()
+                text = t.get("text", "")
+                if not text:
+                    continue
+                role = "assistant" if "persuader" in speaker else "user"
+                messages.append({"role": role, "content": text})
+            return {"messages": messages}
 
-            if not text:
-                continue
+        # 2) p4g-style conversation with dialogue_context + target response
+        dialogue_context = _get(inst, "dialogue_context")
+        target_resp = _get(inst, "response")
+        if dialogue_context:
+            for utt in dialogue_context:
+                content = utt.get("content", "")
+                if not content:
+                    continue
+                role = "assistant" if utt.get("role", "user") == "assistant" else "user"
+                messages.append({"role": role, "content": content})
+            if target_resp:
+                messages.append({"role": "assistant", "content": target_resp})
+            return {"messages": messages}
 
-            if "persuader" in speaker:
-                role = "assistant"
-            else:
-                role = "user"
+        # 3) fallback if messages already provided
+        maybe_msgs = _get(inst, "messages")
+        if maybe_msgs is not None:
+            return {"messages": maybe_msgs}
 
-            messages.append({"role": role, "content": text})
-
-        return {"messages": messages}
+        raise ValueError(
+            "Cannot infer conversation structure from instance. "
+            "Please adapt _instance_to_messages_for_persuasion."
+        )
 
     def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
         if self.tokenizer is None:
