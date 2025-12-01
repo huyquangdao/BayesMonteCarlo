@@ -4,8 +4,8 @@
 ###
 
 # Backbone (reduced for 8GB GPU)
-tokenizer: roberta-base
-plm: roberta-base
+tokenizer: llama3
+plm: llama3
 lm_size: 768
 cached_dir: "cache/BAYES/"
 dropout: 0.1
