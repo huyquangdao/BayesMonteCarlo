@@ -464,7 +464,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             save_steps=getattr(self.model_config, "save_steps", 500),
             eval_steps=getattr(self.model_config, "eval_steps", 500),
-            evaluation_strategy="steps",
+            eval_strategy="steps",
             save_total_limit=getattr(self.model_config, "save_total_limit", 3),
             bf16=getattr(self.model_config, "bf16", True),
             fp16=getattr(self.model_config, "fp16", False),
