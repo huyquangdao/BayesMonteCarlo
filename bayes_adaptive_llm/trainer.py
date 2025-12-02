@@ -536,6 +536,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
+        # also persist a torch-style checkpoint for pipeline.load_pretrained_model expectations
+        os.makedirs(self.model_config.saved_dir, exist_ok=True)
+        torch_ckpt_path = os.path.join(self.model_config.saved_dir, "model.pth")
+        self.save_model(torch_ckpt_path)
+        loguru_logger.info("Saved SFT checkpoint to {}", torch_ckpt_path)
+
         loguru_logger.info(
             "SFT training completed. Updated backbone LM with SFT weights."
         )
@@ -550,6 +556,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
 
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         # 1. load preference pairs
         with open(pref_path, "r", encoding="utf-8") as handle:
             if pref_path.endswith(".jsonl"):
