@@ -506,6 +506,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             gradient_checkpointing=getattr(
                 self.model_config, "gradient_checkpointing", False
             ),
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
             packing=False,
             dataset_text_field="text",
