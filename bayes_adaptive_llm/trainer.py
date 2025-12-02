@@ -146,7 +146,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
     def _instance_to_messages_for_persuasion(self, inst):
         """
         Convert a persuasion instance to chat messages for SFT.
-        Supports structures with `turns`/`dialog` and P4G-style `dialogue_context`/`response`.
+        Support:
+        - TRIP-style: inst["turns"] = [{"speaker", "text"}, ...]
+        - P4G-style: inst["dialog"] = [{"er": [...], "ee": [...]}, ...]
+        - generic:   inst["messages"]
         """
         def _get(obj, key, default=None):
             if isinstance(obj, dict):
@@ -155,32 +158,45 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
-        system_content = (
-            "You are a Persuader trying to persuade the user to donate to a charity."
-        )
+        system_content = "You are a Persuader trying to persuade the user to donate to a charity."
         if persona:
             system_content += f" The current user's profile is: {persona}"
 
         messages = [{"role": "system", "content": system_content}]
 
-        # 1) direct turns/dialog structure
-        turns = _get(inst, "turns") or _get(inst, "dialog")
+        # 1) TRIP-style turns: [{"speaker": "...", "text": "..."}]
+        turns = _get(inst, "turns")
         if turns is not None:
             for t in turns:
-                speaker = t.get("speaker", "").lower()
-                text = t.get("text", "")
+                speaker = (t.get("speaker") or "").lower()
+                text = (t.get("text") or "").strip()
                 if not text:
                     continue
                 role = "assistant" if "persuader" in speaker else "user"
                 messages.append({"role": role, "content": text})
             return {"messages": messages}
 
-        # 2) p4g-style conversation with dialogue_context + target response
+        # 2) P4G-style: dialog = [{"er": [...], "ee": [...]}, ...]
+        dialog = _get(inst, "dialog")
+        if dialog is not None:
+            for turn in dialog:
+                # er = persuader → assistant
+                for utt in turn.get("er", []):
+                    utt = (utt or "").strip()
+                    if utt:
+                        messages.append({"role": "assistant", "content": utt})
+                # ee = persuadee → user
+                for utt in turn.get("ee", []):
+                    utt = (utt or "").strip()
+                    if utt:
+                        messages.append({"role": "user", "content": utt})
+            return {"messages": messages}
+
         dialogue_context = _get(inst, "dialogue_context")
         target_resp = _get(inst, "response")
         if dialogue_context:
             for utt in dialogue_context:
-                content = utt.get("content", "")
+                content = (utt.get("content") or "").strip()
                 if not content:
                     continue
                 role = "assistant" if utt.get("role", "user") == "assistant" else "user"
@@ -189,7 +205,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 messages.append({"role": "assistant", "content": target_resp})
             return {"messages": messages}
 
-        # 3) fallback if messages already provided
         maybe_msgs = _get(inst, "messages")
         if maybe_msgs is not None:
             return {"messages": maybe_msgs}
@@ -198,6 +213,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Cannot infer conversation structure from instance. "
             "Please adapt _instance_to_messages_for_persuasion."
         )
+
 
     def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
         if self.tokenizer is None:
@@ -222,8 +238,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         def apply_chat_template(example):
             messages = list(example["messages"])
-
-            # đảm bảo luôn có system message đầu
             if len(messages) == 0:
                 messages = [{"role": "system", "content": ""}]
             elif messages[0]["role"] != "system":
@@ -235,7 +249,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             )
             return {"text": text}
 
-        # Nếu đang chạy distributed (đa GPU) → để num_proc=1 cho lành
         if dist.is_available() and dist.is_initialized():
             num_proc = 1
         else:
