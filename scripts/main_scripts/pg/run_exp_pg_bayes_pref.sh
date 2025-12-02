@@ -7,7 +7,7 @@ EXPNAME="P4G_BAYES_PREF"
 
 for seed in 1
 do
-CUDA_VISIBLE_DEVICES=5 accelerate launch --main_process_port 8081 --gpu_ids 1 --num_processes 1 run.py \
+CUDA_VISIBLE_DEVICES=5 accelerate launch --main_process_port 8081 --gpu_ids all --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
