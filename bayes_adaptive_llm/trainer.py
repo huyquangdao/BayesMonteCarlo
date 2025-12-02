@@ -6,13 +6,13 @@ so later we can port the actual logic with minimal friction.
 
 from __future__ import annotations
 
-import math
 import os
 import random
-import warnings
 import json
 import copy
 import inspect
+import torch.distributed as dist
+import random
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from tqdm import tqdm
 
@@ -143,11 +143,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         self.tokenizer = getattr(self.model, "tokenizer", None)
         loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
 
-    def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
-        """
-        Process the raw dataset and return the training/validation/test splits.
-        """
-        return dataset.train_instances, dataset.dev_instances, dataset.test_instances
     def _instance_to_messages_for_persuasion(self, inst):
         """
         Convert a persuasion instance to chat messages for SFT.
@@ -228,6 +223,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         def apply_chat_template(example):
             messages = list(example["messages"])
 
+            # đảm bảo luôn có system message đầu
             if len(messages) == 0:
                 messages = [{"role": "system", "content": ""}]
             elif messages[0]["role"] != "system":
@@ -239,7 +235,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
             )
             return {"text": text}
 
-        num_proc = min(4, cpu_count())
+        # Nếu đang chạy distributed (đa GPU) → để num_proc=1 cho lành
+        if dist.is_available() and dist.is_initialized():
+            num_proc = 1
+        else:
+            num_proc = min(4, cpu_count())
 
         raw_datasets = raw_datasets.map(
             apply_chat_template,
@@ -247,10 +247,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
             remove_columns=raw_datasets["train"].column_names,
             desc="Applying chat template for SFT",
         )
-        for idx in random.sample(range(min(3, len(raw_datasets["train"]))), k=min(3, len(raw_datasets["train"]))):
-            print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:400]}...\n")
+
+        if self.accelerator.is_local_main_process:
+            for idx in random.sample(range(min(3, len(raw_datasets["train"]))), k=min(3, len(raw_datasets["train"]))):
+                print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:400]}...\n")
 
         return raw_datasets["train"], raw_datasets["eval"]
+#region abstract methods
+    def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
+        """
+        Process the raw dataset and return the training/validation/test splits.
+        """
+        return dataset.train_instances, dataset.dev_instances, dataset.test_instances
     
     def construct_dataloaders(self,
                             data_instances: Sequence[Any],
@@ -417,7 +425,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
-#region Preparation for DPO training
 #endregion
 
     def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:

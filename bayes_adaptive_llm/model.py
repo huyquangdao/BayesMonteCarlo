@@ -62,6 +62,19 @@ class BayesAdaptiveLLMModel(Model):
         cls_token = self.drop_out(cls_token)
         logits = self.out_layer(cls_token)
         return logits
+    
+    def generate_text(self, prompt: str, max_new_tokens: int = 128, **gen_kwargs) -> str:
+        self.plm.eval()
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.plm.device)
+        output_ids = self.plm.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=gen_kwargs.get("do_sample", True),
+            temperature=gen_kwargs.get("temperature", 0.7),
+            top_p=gen_kwargs.get("top_p", 0.9),
+            eos_token_id=self.tokenizer.eos_token_id,
+        )
+        return self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
     def score_candidates(self,
                          dialogue_context: Sequence[Dict[str, Any]],
