@@ -451,6 +451,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 lora_dropout=getattr(self.model_config, "lora_dropout", 0.05),
                 bias="none",
                 task_type="CAUSAL_LM",
+                target_modules=getattr(
+                    self.model_config,
+                    "lora_target_modules",
+                    ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                ),
             )
 
         sft_config = SFTConfig(
@@ -459,7 +464,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             per_device_train_batch_size=self.model_config.batch_size,
             per_device_eval_batch_size=self.model_config.batch_size,
             gradient_accumulation_steps=getattr(
-                self.model_config, "gradient_accumulation", 1
+                self.model_config, "gradient_accumulation", 4
             ),
             learning_rate=float(self.model_config.learning_rate),
             warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
@@ -478,6 +483,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             gradient_checkpointing=getattr(
                 self.model_config, "gradient_checkpointing", True
             ),
+            optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
             packing=False,
             dataset_text_field="text",
             report_to=["none"],
