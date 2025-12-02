@@ -455,7 +455,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            
+
         train_instances, dev_instances, _ = self.process_dataset(dataset)
 
         train_dataset, eval_dataset = self._build_sft_datasets_from_instances(
@@ -481,6 +481,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             )
 
         sft_config = SFTConfig(
+            ddp_find_unused_parameters=False,
             output_dir=self.model_config.saved_dir,
             num_train_epochs=self.model_config.num_train_epochs,
             per_device_train_batch_size=self.model_config.batch_size,
