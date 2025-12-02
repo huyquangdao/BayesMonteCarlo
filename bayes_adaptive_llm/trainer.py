@@ -262,8 +262,16 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         if self.accelerator.is_local_main_process:
-            for idx in random.sample(range(min(1, len(train_records))), k=3):
-                print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:1000]}...\n")
+            for idx in random.sample(range(min(1, len(train_records))), k=1):
+                print("\n=== RAW INSTANCE ===")
+                print(train_instances[idx])
+                print("\n=== MESSAGES ===")
+                msgs = self._instance_to_messages_for_persuasion(train_instances[idx])["messages"]
+                for m in msgs:
+                    print(m["role"], ":", m["content"])
+                print("=== TEMPLATE TEXT (first 400) ===")
+                print(raw_datasets["train"][idx]["text"][:400])
+                print("\n")
 
         return raw_datasets["train"], raw_datasets["eval"]
 #region abstract methods
