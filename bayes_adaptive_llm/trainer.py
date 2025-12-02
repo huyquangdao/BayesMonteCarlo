@@ -611,6 +611,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                                 getattr(self.model_config, "fp16", False)))
         use_bf16 = bool(getattr(self.model_config, "dpo_bf16",
                                 getattr(self.model_config, "bf16", False)))
+        gradient_checkpointing = bool(getattr(self.model_config, "gradient_checkpointing", True))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
 
@@ -625,6 +626,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=warmup_ratio,
             fp16=use_fp16,
             bf16=use_bf16,
+            gradient_checkpointing=gradient_checkpointing,
             save_strategy=IntervalStrategy.NO,
             logging_strategy="epoch",
             report_to="none",
@@ -642,6 +644,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             train_dataset=hf_dataset,
             max_length=max_length,
             max_prompt_length=max_prompt_length,
+            model_init_kwargs={
+                "torch_dtype": torch.bfloat16 if cuda_bf16_supported() else torch.float16,
+                "device_map": "auto",
+            },
         )
 
         trainer_cls = PatchedDPOTrainer or DPOTrainer

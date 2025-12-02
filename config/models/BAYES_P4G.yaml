@@ -39,6 +39,7 @@ max_sequence_length: 1024
 dpo_beta: 0.1
 max_length: 1024
 max_prompt_length: 1024
+dpo_batch_size: 1
 fp16: true
 bf16: false
 gradient_checkpointing: true
