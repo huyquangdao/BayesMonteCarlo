@@ -481,7 +481,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             bf16=getattr(self.model_config, "bf16", True),
             fp16=getattr(self.model_config, "fp16", False),
             gradient_checkpointing=getattr(
-                self.model_config, "gradient_checkpointing", True
+                self.model_config, "gradient_checkpointing", False
             ),
             optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
             packing=False,
