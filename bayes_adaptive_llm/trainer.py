@@ -262,7 +262,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         if self.accelerator.is_local_main_process:
-            for idx in random.sample(range(min(0, len(raw_datasets["train"]))), k=min(3, len(raw_datasets["train"]))):
+            for idx in random.sample(range(min(1, len(train_records))), k=3):
                 print(f"\n[SFT sample {idx}]\n{raw_datasets['train'][idx]['text'][:1000]}...\n")
 
         return raw_datasets["train"], raw_datasets["eval"]
