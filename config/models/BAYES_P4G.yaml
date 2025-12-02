@@ -24,7 +24,7 @@ max_gen_length: 256
 max_gen_tokens: 256
 
 # SFT hyperparameters (memory-friendly)
-batch_size: 4
+batch_size: 1
 gradient_accumulation: 4
 learning_rate: 3e-5
 warmup_ratio: 0.05
