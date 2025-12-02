@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
 
 from base.model import Model
 
@@ -24,9 +24,10 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
         )
-        self.plm = AutoModel.from_pretrained(
+        self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
+            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
         )
 
         # extend vocabulary with task-specific tokens
