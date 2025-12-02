@@ -547,6 +547,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
     def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
+        """
+        DPO fine-tuning trên preference pairs.
+        - Dùng backbone đã SFT (self.model.plm / self.model)
+        - reference_free=True để tránh clone ref_model (tiết kiệm VRAM)
+        """
 
         device = device or getattr(
             self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -558,66 +563,49 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        # 1. load preference pairs
-        with open(pref_path, "r", encoding="utf-8") as handle:
+
+        # 1. Load preference pairs
+        with open(pref_path, "r", encoding="utf-8") as f:
             if pref_path.endswith(".jsonl"):
-                preference_pairs = [json.loads(line) for line in handle if line.strip()]
+                preference_pairs = [json.loads(line) for line in f if line.strip()]
             else:
-                preference_pairs = json.load(handle)
+                preference_pairs = json.load(f)
 
         required_keys = {"prompt", "chosen", "rejected"}
-        preference_pairs = [
-            row for row in preference_pairs
-            if isinstance(row, dict) and required_keys.issubset(row)
-        ]
+        preference_pairs = [row for row in preference_pairs if isinstance(row, dict) and required_keys.issubset(row)]
         if not preference_pairs:
-            loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
+            loguru_logger.warning(
+                "No valid preference pairs (missing prompt/chosen/rejected); skipping DPO."
+            )
             return
 
         base_model = getattr(self.model, "plm", self.model)
 
-        model_path = getattr(self.model_config, "dpo_model_path", None) or \
-                    getattr(self.model_config, "saved_dir", None) or \
-                    getattr(self.model_config, "plm", "llama3")
+        model_path = (getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "saved_dir", None) or getattr(self.model_config, "plm", "llama3"))
 
         tokenizer = self.tokenizer or AutoTokenizer.from_pretrained(model_path)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
-        # 4. Hyperparameters
-        max_length = getattr(self.model_config, "dpo_max_length",
-                            getattr(self.model_config, "max_length", 1024))
+        # 3. Hyperparameters (giữ những cái thật sự cần)
+        max_length = getattr(self.model_config, "dpo_max_length", getattr(self.model_config, "max_length", 1024),)
         max_prompt_length = getattr(self.model_config, "max_prompt_length", max_length)
-        batch_size = getattr(self.model_config, "dpo_batch_size",
-                            getattr(self.model_config, "batch_size", 2))
-        epochs = getattr(self.model_config, "dpo_epochs",
-                        getattr(self.model_config, "num_train_epochs", 3))
-        learning_rate = getattr(self.model_config, "dpo_learning_rate",
-                                getattr(self.model_config, "learning_rate", 1e-5))
+        batch_size = getattr(self.model_config, "dpo_batch_size", getattr(self.model_config, "batch_size", 2))
+        epochs = getattr(self.model_config, "dpo_epochs", getattr(self.model_config, "num_train_epochs", 3))
+        learning_rate = getattr(self.model_config, "dpo_learning_rate", getattr(self.model_config, "learning_rate", 1e-5))
         beta = getattr(self.model_config, "dpo_beta", 0.1)
-        warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio",
-                            getattr(self.model_config, "warmup_ratio", 0.1))
-        grad_accum = max(
-            1,
-            int(
-                getattr(
-                    self.model_config,
-                    "dpo_gradient_accumulation",
-                    getattr(self.model_config, "gradient_accumulation", 1),
-                )
-            ),
-        )
-        use_fp16 = bool(getattr(self.model_config, "dpo_fp16",
-                                getattr(self.model_config, "fp16", False)))
-        use_bf16 = bool(getattr(self.model_config, "dpo_bf16",
-                                getattr(self.model_config, "bf16", False)))
-        gradient_checkpointing = bool(getattr(self.model_config, "gradient_checkpointing", True))
+        warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio", getattr(self.model_config, "warmup_ratio", 0.1))
+        grad_accum = max(1, int(getattr(self.model_config, "dpo_gradient_accumulation", getattr(self.model_config, "gradient_accumulation", 1))))
+        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", False)))
+        use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", False)))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
 
+        # 4. Dataset
         hf_dataset = HFDataset.from_list(preference_pairs)
 
-        training_args = DPOConfig(
+        # 5. Training args (DPOConfig)
+        base_args = dict(
             output_dir=save_dir,
             per_device_train_batch_size=batch_size,
             gradient_accumulation_steps=grad_accum,
@@ -626,71 +614,86 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=warmup_ratio,
             fp16=use_fp16,
             bf16=use_bf16,
-            gradient_checkpointing=gradient_checkpointing,
+            gradient_checkpointing=True,          # bật luôn để tiết kiệm VRAM
             save_strategy=IntervalStrategy.NO,
             logging_strategy="epoch",
             report_to="none",
             remove_unused_columns=False,
             logging_steps=getattr(self.model_config, "logging_steps", 10),
-            # multi-GPU stability
-            ddp_find_unused_parameters=False,
         )
 
+        try:
+            training_args = DPOConfig(
+                **base_args,
+                ddp_find_unused_parameters=False,  # nếu version support
+            )
+        except TypeError:
+            training_args = DPOConfig(**base_args)
+
+        # 6. DPOTrainer kwargs – **KHÔNG** dùng model_init_kwargs (vì đã có model instance)
+        use_reference_free = getattr(self.model_config, "dpo_reference_free", True)
+
         trainer_kwargs = dict(
-            model=base_model,              
+            model=base_model,
             loss_type=loss_type,
             beta=beta,
             args=training_args,
             train_dataset=hf_dataset,
             max_length=max_length,
             max_prompt_length=max_prompt_length,
-            model_init_kwargs={
-                "torch_dtype": torch.bfloat16 if cuda_bf16_supported() else torch.float16,
-                "device_map": "auto",
-            },
+            reference_free=use_reference_free,
         )
 
         trainer_cls = PatchedDPOTrainer or DPOTrainer
         try:
             dpo_trainer = trainer_cls(processing_class=tokenizer, **trainer_kwargs)
         except TypeError:
+            # phiên bản cũ dùng 'tokenizer' thay vì 'processing_class'
             dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
-
-        # try:
-        #     dpo_trainer.model.to(device)
-        #     if hasattr(dpo_trainer, "ref_model"):
-        #         dpo_trainer.ref_model.to(device)
-        # except Exception as exc:
-        #     loguru_logger.warning("Could not move DPO models to device %s: %s", device, exc)
 
         loguru_logger.info(
             f"Starting DPO training on {device}: {len(preference_pairs)} pairs, "
             f"epochs={epochs}, batch_size={batch_size}, lr={learning_rate:.1e}, "
-            f"beta={beta:.2f}, grad_accum={grad_accum}"
+            f"beta={beta:.2f}, grad_accum={grad_accum}, reference_free={use_reference_free}"
         )
 
         dpo_trainer.train()
-        for log_row in dpo_trainer.state.log_history:
-            if "train_loss" in log_row:
-                epoch_val = log_row.get("epoch", "?")
-                loss_val = log_row.get("train_loss")
-                loguru_logger.info("DPO epoch {} train_loss={:.4f}", epoch_val, float(loss_val))
 
-        adapter_dir = getattr(self.model_config, "dpo_adapter_path", None)
-        if not adapter_dir:
-            adapter_dir = os.path.join(save_dir, "dpo_adapter")
-        os.makedirs(adapter_dir, exist_ok=True)
+        # 7. Log loss theo epoch
+        for row in dpo_trainer.state.log_history:
+            if "train_loss" in row:
+                loguru_logger.info(
+                    "DPO epoch {} train_loss={:.4f}",
+                    row.get("epoch", "?"),
+                    float(row["train_loss"]),
+                )
 
-        if getattr(dpo_trainer, "accelerator", None) is None or dpo_trainer.accelerator.is_main_process:
+        # 8. Save checkpoint – chỉ main process lưu
+        is_main = True
+        if getattr(dpo_trainer, "accelerator", None) is not None:
+            is_main = dpo_trainer.accelerator.is_main_process
+
+        adapter_dir = getattr(self.model_config, "dpo_adapter_path", None) or os.path.join(
+            save_dir, "dpo_adapter"
+        )
+
+        if is_main:
+            os.makedirs(adapter_dir, exist_ok=True)
             dpo_trainer.save_model(adapter_dir)
             tokenizer.save_pretrained(adapter_dir)
 
-            file_path = os.path.join(self.model_config.saved_dir, "model_dpo.pth")
-            self.save_model(file_path)
+            # lưu thêm .pth cho pipeline
+            dpo_path = os.path.join(self.model_config.saved_dir, "model_dpo.pth")
+            self.save_model(dpo_path)
 
-            loguru_logger.info("Saved DPO checkpoint to {}", adapter_dir)
+            # đồng bộ với model.pth cho các stage sau (RL/online test)
+            default_path = os.path.join(self.model_config.saved_dir, "model.pth")
+            self.save_model(default_path)
+
+            loguru_logger.info("Saved DPO checkpoint to {} (and updated {}).", adapter_dir, default_path)
         else:
             loguru_logger.info("Skipped saving DPO checkpoint on non-main process.")
+
 
     def predict(self,
                 instance: Dict[str, Any],
