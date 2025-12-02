@@ -41,7 +41,7 @@ max_length: 256
 max_prompt_length: 256
 fp16: true
 bf16: false
-gradient_checkpointing: true
+gradient_checkpointing: false
 # Path to preference pairs (jsonl) used for DPO; each row should include
 # dialog_id, prompt, chosen, rejected, and an optional persona_hint with
 # personality/decision_making_style.
