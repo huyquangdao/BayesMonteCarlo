@@ -42,7 +42,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         )
 
-        self.model = load_model(saved_model_path, device=device)
+        self.model = load_model(self.trainer, saved_model_path, device=device)
 
 
     def execute(self):
