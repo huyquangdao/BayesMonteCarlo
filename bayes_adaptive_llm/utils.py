@@ -272,7 +272,7 @@ def load_from_meta_checkpoint(self, save_dir: str) -> None:
     saved_format = meta.get("saved_format", "full_state_dict")
     device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"),)
     bf16 = bool(getattr(self.model_config, "bf16", True))
-    base_model = getattr(self.model_config, "plm", None)
+    base_model = getattr(self.model, "plm", None)
 
     plm = _load_plm_from_meta(base_model, save_dir, saved_format)
     plm.to(device)
