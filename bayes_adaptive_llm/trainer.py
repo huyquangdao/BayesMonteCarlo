@@ -147,7 +147,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         Convert a persuasion instance to chat messages for SFT.
         Support:
-        - TRIP-style: inst["turns"] = [{"speaker", "text"}, ...]
         - P4G-style: inst["dialog"] = [{"er": [...], "ee": [...]}, ...]
         - generic:   inst["messages"]
         """
@@ -164,19 +163,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         messages = [{"role": "system", "content": system_content}]
 
-        # 1) TRIP-style turns: [{"speaker": "...", "text": "..."}]
-        turns = _get(inst, "turns")
-        if turns is not None:
-            for t in turns:
-                speaker = (t.get("speaker") or "").lower()
-                text = (t.get("text") or "").strip()
-                if not text:
-                    continue
-                role = "assistant" if "persuader" in speaker else "user"
-                messages.append({"role": role, "content": text})
-            return {"messages": messages}
-
-        # 2) P4G-style: dialog = [{"er": [...], "ee": [...]}, ...]
         dialog = _get(inst, "dialog")
         if dialog is not None:
             for turn in dialog:
@@ -213,7 +199,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Cannot infer conversation structure from instance. "
             "Please adapt _instance_to_messages_for_persuasion."
         )
-
 
     def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
         if self.tokenizer is None:
@@ -260,20 +245,21 @@ class BayesAdaptiveLLMTrainer(Trainer):
             remove_columns=raw_datasets["train"].column_names,
             desc="Applying chat template for SFT",
         )
-
-        if self.accelerator.is_local_main_process:
-            for idx in random.sample(range(min(1, len(train_records))), k=1):
-                print("\n=== RAW INSTANCE ===")
-                print(train_instances[idx])
-                print("\n=== MESSAGES ===")
-                msgs = self._instance_to_messages_for_persuasion(train_instances[idx])["messages"]
-                for m in msgs:
-                    print(m["role"], ":", m["content"])
-                print("=== TEMPLATE TEXT (first 400) ===")
-                print(raw_datasets["train"][idx]["text"][:400])
-                print("\n")
+        # For debugging: print a random sample
+        # if self.accelerator.is_local_main_process:
+        #     for idx in random.sample(range(min(1, len(train_records))), k=1):
+        #         print("\n=== RAW INSTANCE ===")
+        #         print(train_instances[idx])
+        #         print("\n=== MESSAGES ===")
+        #         msgs = self._instance_to_messages_for_persuasion(train_instances[idx])["messages"]
+        #         for m in msgs:
+        #             print(m["role"], ":", m["content"])
+        #         print("=== TEMPLATE TEXT (first 400) ===")
+        #         print(raw_datasets["train"][idx]["text"][:400])
+        #         print("\n")
 
         return raw_datasets["train"], raw_datasets["eval"]
+
 #region abstract methods
     def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
         """
