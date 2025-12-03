@@ -217,11 +217,11 @@ def load_model(trainer, load_file_path: str, device: Optional[torch.device] = No
     trainer.model = model
     return trainer.model
 
-def has_meta_checkpoint(self, save_dir: str) -> bool:
+def has_meta_checkpoint(save_dir: str) -> bool:
     meta_path = os.path.join(save_dir, "meta.pt")
     return os.path.exists(meta_path)
 
-def _load_plm_from_meta(self, base_model, save_dir: str, saved_format: str):
+def _load_plm_from_meta(base_model, save_dir: str, saved_format: str):
     if saved_format == "lora_adapter":
         adapter_dir = os.path.join(save_dir, "lora_adapter")
         if not os.path.isdir(adapter_dir):

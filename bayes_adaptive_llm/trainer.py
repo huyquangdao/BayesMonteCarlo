@@ -616,15 +616,20 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 loss_val = log_row.get("train_loss")
                 loguru_logger.info("DPO epoch {} train_loss={:.4f}", epoch_val, float(loss_val))
 
-        adapter_dir = getattr(self.model_config, "dpo_adapter_path", None)
-        if not adapter_dir:
-            adapter_dir = os.path.join(save_dir, "dpo_adapter")
-        os.makedirs(adapter_dir, exist_ok=True)
-        dpo_trainer.save_model(adapter_dir)
-        tokenizer.save_pretrained(adapter_dir)
-        file_path = os.path.join(self.model_config.saved_dir, f"model_dpo.pth")
-        self.save_model(file_path)
-        loguru_logger.info("Saved DPO checkpoint to {}", adapter_dir)
+        trained_plm = dpo_trainer.model
+        if hasattr(self.model, "plm"):
+            self.model.plm = trained_plm
+        else:
+            self.model = trained_plm
+
+        base_save_dir = self.model_config.saved_dir
+        dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
+        if not dpo_save_dir:
+            dpo_save_dir = os.path.join(base_save_dir, "dpo")
+
+        self.save_finetuned_model(dpo_save_dir)
+        loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
+
 
 
 
