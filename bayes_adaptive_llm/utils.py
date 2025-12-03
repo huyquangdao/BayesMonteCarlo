@@ -261,17 +261,10 @@ def load_from_meta_checkpoint(self, save_dir: str) -> None:
     meta_path = os.path.join(save_dir, "meta.pt")
     meta = torch.load(meta_path, map_location="cpu")
 
-    # base_model_name = meta.get(
-    #     "base_model_name",
-    #     getattr(self.model_config, "plm", None),
-    # )
-    # if base_model_name is None:
-    #     raise ValueError("base_model_name is missing in meta.pt and model_config.")
-
-    use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
+    # use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
     saved_format = meta.get("saved_format", "full_state_dict")
     device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"),)
-    bf16 = bool(getattr(self.model_config, "bf16", True))
+    # bf16 = bool(getattr(self.model_config, "bf16", True))
     base_model = getattr(self.model, "plm", None)
 
     plm = _load_plm_from_meta(base_model, save_dir, saved_format)
