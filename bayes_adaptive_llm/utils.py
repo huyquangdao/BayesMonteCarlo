@@ -3,7 +3,7 @@ Utility helpers shared across the Bayes-Adaptive LLM pipeline.
 """
 
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 import numpy as np
 from loguru import logger
 import torch
