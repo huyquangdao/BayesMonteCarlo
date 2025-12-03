@@ -512,7 +512,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         sft_trainer.train()
 
-        sft_trainer.save_model(self.model_config.saved_dir)
+        # sft_trainer.save_model(self.model_config.saved_dir)
         if self.tokenizer is not None:
             self.tokenizer.save_pretrained(self.model_config.saved_dir)
 
@@ -522,11 +522,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
-        # also persist a torch-style checkpoint for pipeline.load_pretrained_model expectations
-        os.makedirs(self.model_config.saved_dir, exist_ok=True)
-        torch_ckpt_path = os.path.join(self.model_config.saved_dir, "model.pth")
-        self.save_model(torch_ckpt_path)
-        loguru_logger.info("Saved SFT checkpoint to {}", torch_ckpt_path)
+        ckpt_dir = self.model_config.saved_dir  # hoặc self.model_config.saved_dir
+        os.makedirs(ckpt_dir, exist_ok=True)
+        ckpt_path = os.path.join(ckpt_dir, "model.pth")
+
+        # Lưu gọn: chỉ weight
+        torch.save(self.model.state_dict(), ckpt_path)
+        logger.info("Saved SFT checkpoint to {}", ckpt_path)
 
         loguru_logger.info(
             "SFT training completed. Updated backbone LM with SFT weights."

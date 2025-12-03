@@ -164,10 +164,10 @@ def coerce_to_float(value, default):
 
 import torch.nn as nn
 
-def load_model(self, load_file_path: str, device: Optional[torch.device] = None):
+def load_model(trainer, load_file_path: str, device: Optional[torch.device] = None):
     if device is None:
         device = getattr(
-            self,
+            trainer,
             "device",
             torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         )
@@ -180,34 +180,28 @@ def load_model(self, load_file_path: str, device: Optional[torch.device] = None)
     # KHÔNG map thẳng lên GPU để tránh OOM khi load
     obj = torch.load(load_file_path, map_location="cpu")
 
-    # Trường hợp 1: checkpoint kiểu mới -> state_dict
     if isinstance(obj, dict):
         state_dict = obj
         logger.info("Checkpoint type: state_dict (dict)")
-
-    # Trường hợp 2: checkpoint kiểu cũ -> nguyên cái nn.Module
     elif isinstance(obj, nn.Module):
         logger.info(
             "Checkpoint type: full nn.Module ({}), extracting state_dict",
             type(obj),
         )
         state_dict = obj.state_dict()
-
     else:
         raise TypeError(
             f"Unexpected checkpoint type: {type(obj)}. "
             "Expected dict (state_dict) or nn.Module."
         )
 
-    # Lấy model hiện tại từ trainer
-    model = getattr(self, "model", None)
+    model = getattr(trainer, "model", None)
     if model is None:
         raise RuntimeError(
-            "self.model is None in load_model. "
+            "trainer.model is None in load_model. "
             "Ensure model architecture is built before calling load_model."
         )
 
-    # Nếu đang bọc bởi DDP/Accelerate -> lấy model gốc
     if hasattr(model, "module"):
         model_to_load = model.module
     else:
@@ -220,5 +214,5 @@ def load_model(self, load_file_path: str, device: Optional[torch.device] = None)
         logger.warning("Unexpected keys when loading: {}", unexpected)
 
     model.to(device)
-    self.model = model
-    return self.model
+    trainer.model = model
+    return trainer.model
