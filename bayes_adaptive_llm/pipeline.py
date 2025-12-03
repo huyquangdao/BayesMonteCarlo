@@ -53,6 +53,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
+            self.load_pretrained_model(is_rl=False)
             logger.info("Generating preference pairs with MCTS loop ...")
             preference_pairs = self.generate_preference_data()
 
