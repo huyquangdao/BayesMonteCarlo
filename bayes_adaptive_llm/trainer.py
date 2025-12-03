@@ -24,8 +24,6 @@ from loguru import logger
 from datasets import Dataset, DatasetDict
 from multiprocessing import cpu_count
 from itertools import count
-from peft import PeftModel  # nếu chưa import
-
 
 import numpy as np
 import torch
@@ -528,20 +526,22 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         sft_trainer.train()
 
-        trained_plm = sft_trainer.model
-
-        if use_lora and isinstance(trained_plm, PeftModel):
-            trained_plm.save_pretrained(self.model_config.saved_dir, safe_serialization=True)
-        else:
-            trained_plm.save_pretrained(self.model_config.saved_dir, safe_serialization=True)
-
+        sft_trainer.save_model(self.model_config.saved_dir)
         if self.tokenizer is not None:
             self.tokenizer.save_pretrained(self.model_config.saved_dir)
 
+        trained_plm = sft_trainer.model
         if hasattr(self.model, "plm"):
             self.model.plm = trained_plm
         else:
             self.model = trained_plm
+
+        # also persist a torch-style checkpoint for pipeline.load_pretrained_model expectations
+        os.makedirs(self.model_config.saved_dir, exist_ok=True)
+        torch_ckpt_path = os.path.join(self.model_config.saved_dir, "model.pth")
+        self.save_model(torch_ckpt_path)
+        loguru_logger.info("Saved SFT checkpoint to {}", torch_ckpt_path)
+
         loguru_logger.info(
             "SFT training completed. Updated backbone LM with SFT weights."
         )
@@ -570,15 +570,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
 
-        base_model_id = getattr(self.model_config, "plm", "gpt2")
-
-        # thư mục chứa LoRA SFT adapter (chính là saved_dir sau train_sft)
-        sft_adapter_dir = getattr(
-            self.model_config, "sft_adapter_dir", self.model_config.saved_dir
-        )
-
-        # tokenizer: ưu tiên load từ adapter dir (đã save ở train_sft)
-        tokenizer = AutoTokenizer.from_pretrained(sft_adapter_dir)
+        model_path = getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "plm", "gpt2")
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
 
@@ -616,21 +609,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=getattr(self.model_config, "logging_steps", 10),
         )
         
-        base_model = AutoModelForCausalLM.from_pretrained(
-            base_model_id,
-            torch_dtype=torch.bfloat16 if use_bf16 else (torch.float16 if use_fp16 else None),
-        )
-        try:
-            policy_model = PeftModel.from_pretrained(base_model, sft_adapter_dir)
-        except Exception as exc:
-            loguru_logger.warning(
-                "Could not load LoRA adapter from %s, fallback to base model only: %s",
-                sft_adapter_dir, exc,
-            )
-            policy_model = base_model
-
         trainer_kwargs = dict(
-            model=policy_model,           
+            model=model_path,
             loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
@@ -662,8 +642,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         os.makedirs(adapter_dir, exist_ok=True)
         dpo_trainer.save_model(adapter_dir)
         tokenizer.save_pretrained(adapter_dir)
-        # file_path = os.path.join(self.model_config.saved_dir, f"model_dpo.pth")
-        # self.save_model(file_path)
+        file_path = os.path.join(self.model_config.saved_dir, f"model_dpo.pth")
+        self.save_model(file_path)
         loguru_logger.info("Saved DPO checkpoint to {}", adapter_dir)
 
 
