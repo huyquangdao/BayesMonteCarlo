@@ -15,6 +15,7 @@ import torch.distributed as dist
 import random
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from tqdm import tqdm
+from bayes_adaptive_llm.utils import save_finetuned_model
 
 from datetime import datetime
 from pathlib import Path
@@ -522,17 +523,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
-        ckpt_dir = self.model_config.saved_dir  # hoặc self.model_config.saved_dir
-        os.makedirs(ckpt_dir, exist_ok=True)
-        ckpt_path = os.path.join(ckpt_dir, "model.pth")
-
-        # Lưu gọn: chỉ weight
-        torch.save(self.model.state_dict(), ckpt_path)
-        logger.info("Saved SFT checkpoint to {}", ckpt_path)
-
-        loguru_logger.info(
-            "SFT training completed. Updated backbone LM with SFT weights."
-        )
+        save_finetuned_model(self)
+        loguru_logger.info("SFT training completed. Updated backbone LM with SFT weights.")
 
     def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
         """

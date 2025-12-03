@@ -6,8 +6,10 @@ import os
 from typing import Dict, List, Optional
 import numpy as np
 from loguru import logger
+from transformers import AutoModelForCausalLM
 import torch
-
+import torch.nn as nn
+from peft import PeftModel
 
 
 
@@ -162,8 +164,6 @@ def coerce_to_float(value, default):
             return float(s)
     return default
 
-import torch.nn as nn
-
 def load_model(trainer, load_file_path: str, device: Optional[torch.device] = None):
     if device is None:
         device = getattr(
@@ -216,3 +216,116 @@ def load_model(trainer, load_file_path: str, device: Optional[torch.device] = No
     model.to(device)
     trainer.model = model
     return trainer.model
+
+def has_meta_checkpoint(self, save_dir: str) -> bool:
+    meta_path = os.path.join(save_dir, "meta.pt")
+    return os.path.exists(meta_path)
+
+def _load_plm_from_meta(self, base_model, save_dir: str, saved_format: str):
+    if saved_format == "lora_adapter":
+        adapter_dir = os.path.join(save_dir, "lora_adapter")
+        if not os.path.isdir(adapter_dir):
+            raise FileNotFoundError(f"LoRA adapter dir not found: {adapter_dir}")
+
+        plm = PeftModel.from_pretrained(
+            base_model,
+            adapter_dir,
+            device_map={"": "cpu"},
+        )
+        return plm
+
+    if saved_format == "full_state_dict":
+        ckpt_path = os.path.join(save_dir, "model.pth")
+        if not os.path.exists(ckpt_path):
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+
+        state_dict = torch.load(ckpt_path, map_location="cpu")
+        base_model.load_state_dict(state_dict, strict=False)
+        return base_model
+
+    raise ValueError(f"Unknown saved_format in meta.pt: {saved_format}")
+
+def load_legacy_checkpoint(self, save_dir: str, is_rl: bool) -> None:
+    ckpt_name = "rl_model.pth" if is_rl else "model.pth"
+    ckpt_path = os.path.join(save_dir, ckpt_name)
+
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"No pretrained model found at {ckpt_path}")
+
+    self.trainer.model = self.model
+
+    device = self._get_device()
+    self.model = load_model(self.trainer, ckpt_path, device=device)
+
+def load_from_meta_checkpoint(self, save_dir: str) -> None:
+    meta_path = os.path.join(save_dir, "meta.pt")
+    meta = torch.load(meta_path, map_location="cpu")
+
+    base_model_name = meta.get(
+        "base_model_name",
+        getattr(self.model_config, "model_name", None),
+    )
+    if base_model_name is None:
+        raise ValueError("base_model_name is missing in meta.pt and model_config.")
+
+    use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
+    saved_format = meta.get("saved_format", "full_state_dict")
+
+    device = getattr(
+        self,
+        "device",
+        torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+    )
+
+    bf16 = bool(getattr(self.model_config, "bf16", True))
+
+    base_model = AutoModelForCausalLM.from_pretrained(
+        base_model_name,
+        torch_dtype=torch.bfloat16 if bf16 else None,
+        device_map={"": "cpu"},
+    )
+
+    plm = _load_plm_from_meta(base_model, save_dir, saved_format)
+    plm.to(device)
+
+    if hasattr(self.model, "plm"):
+        self.model.plm = plm
+    else:
+        # Nếu self.model chính là backbone
+        self.model = plm
+
+    self.trainer.model = self.model
+
+def save_finetuned_model(self, save_dir: Optional[str] = None) -> None:
+    if save_dir is None:
+        save_dir = self.model_config.saved_dir
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    if getattr(self, "tokenizer", None) is not None:
+        self.tokenizer.save_pretrained(save_dir)
+
+    plm = getattr(self.model, "plm", self.model)
+
+    meta = {
+        "base_model_name": getattr(self.model_config, "model_name", None),
+        "use_lora": bool(getattr(self.model_config, "use_lora", False)),
+        "saved_format": None,  
+    }
+
+    if meta["use_lora"] and isinstance(plm, PeftModel):
+        adapter_dir = os.path.join(save_dir, "lora_adapter")
+        plm.save_pretrained(adapter_dir)  
+
+        meta["saved_format"] = "lora_adapter"
+        torch.save(meta, os.path.join(save_dir, "meta.pt"))
+
+    else:
+        ckpt_path = os.path.join(save_dir, "model.pth")
+        torch.save(plm.state_dict(), ckpt_path)
+
+        meta["saved_format"] = "full_state_dict"
+        torch.save(meta, os.path.join(save_dir, "meta.pt"))
+
+    logger.info("Saved finetuned model to {} (format: {})", save_dir, meta["saved_format"])
+

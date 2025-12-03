@@ -10,7 +10,7 @@ from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
 
-from bayes_adaptive_llm.utils import load_model 
+from bayes_adaptive_llm.utils import load_legacy_checkpoint, has_meta_checkpoint, load_from_meta_checkpoint
 import torch
 import numpy as np
 from loguru import logger
@@ -21,28 +21,13 @@ from base.pipeline import Pipeline
 
 class BayesAdaptiveLLMPipeline(Pipeline):
 
-    def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False):
-        """
-        Load the latest supervised/DPO (hoặc RL) checkpoint.
-        """
-        if is_rl:
-            ckpt_name = "rl_model.pth"
+    def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False) -> None:
+        save_dir = self.model_config.saved_dir
+        if has_meta_checkpoint(save_dir):
+            load_from_meta_checkpoint(save_dir)
         else:
-            ckpt_name = "model.pth"
+            load_legacy_checkpoint(save_dir, is_rl)
 
-        saved_model_path = os.path.join(self.model_config.saved_dir, ckpt_name)
-
-        if not os.path.exists(saved_model_path):
-            raise FileNotFoundError(f"No pretrained model found at {saved_model_path}")
-
-        self.trainer.model = self.model
-        device = getattr(
-            self,
-            "device",
-            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        )
-
-        self.model = load_model(self.trainer, saved_model_path, device=device)
 
 
     def execute(self):
@@ -60,7 +45,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
-            # self.load_pretrained_model(is_rl=False)
+            self.load_pretrained_model(is_rl=False)
             logger.info("Generating preference pairs with MCTS loop ...")
             preference_pairs = self.generate_preference_data()
 
