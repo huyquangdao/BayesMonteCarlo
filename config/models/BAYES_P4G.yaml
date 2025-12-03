@@ -17,7 +17,7 @@ model_name_or_path: checkpoints/sft_p4g   # nếu cần để pipeline/generatio
 # Training toggles
 run_sft: false
 run_dpo: true
-run_preference_search: true   # MCTS preference search handled separately
+run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: false
 max_gen_length: 256
