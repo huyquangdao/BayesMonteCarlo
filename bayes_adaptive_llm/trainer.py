@@ -586,7 +586,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         grad_accum = max(
             1, int(getattr(self.model_config, "dpo_gradient_accumulation", getattr(self.model_config, "gradient_accumulation", 4)))
         )
-        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", False)))
+        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", True)))
         use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", False)))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
@@ -608,8 +608,26 @@ class BayesAdaptiveLLMTrainer(Trainer):
             remove_unused_columns=False,
             logging_steps=getattr(self.model_config, "logging_steps", 10),
         )
+        device_policy = 0
+        device_ref = 1
+
+        policy_model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16 if use_bf16 else (torch.float16 if use_fp16 else None),
+            device_map={"": device_policy},   # policy trên GPU 0
+        )
+        policy_model.config.use_cache = False
+
+        ref_model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16 if use_bf16 else (torch.float16 if use_fp16 else None),
+            device_map={"": device_ref},      # ref trên GPU 1
+        )
+        ref_model.requires_grad_(False)
+        ref_model.config.use_cache = False
         trainer_kwargs = dict(
-            model=model_path,
+            policy_model=policy_model,
+            ref_model=ref_model,
             loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
