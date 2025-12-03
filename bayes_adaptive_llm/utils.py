@@ -2,9 +2,12 @@
 Utility helpers shared across the Bayes-Adaptive LLM pipeline.
 """
 
+import os
 from typing import Dict, List
 import numpy as np
 from loguru import logger
+import torch
+
 
 
 
@@ -158,3 +161,40 @@ def coerce_to_float(value, default):
         if re.fullmatch(r"[+-]?\\d*\\.?\\d+(e[+-]?\\d+)?", s, re.IGNORECASE):
             return float(s)
     return default
+
+
+def load_model(self, load_file_path: str, device: Optional[torch.device] = None):
+    if device is None:
+        device = getattr(
+            self, "device",
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        )
+
+    if not os.path.isfile(load_file_path):
+        raise FileNotFoundError(f"Checkpoint not found: {load_file_path}")
+
+    logger.info("Loading model state_dict from {} to {}", load_file_path, device)
+
+    state_dict = torch.load(load_file_path, map_location="cpu")
+
+    model = getattr(self, "model", None)
+    if model is None:
+        raise RuntimeError(
+            "self.model is None in load_model. "
+            "Ensure model architecture is built before calling load_model."
+        )
+
+    if hasattr(model, "module"):
+        model_to_load = model.module
+    else:
+        model_to_load = model
+
+    missing, unexpected = model_to_load.load_state_dict(state_dict, strict=False)
+    if missing:
+        logger.warning("Missing keys when loading: {}", missing)
+    if unexpected:
+        logger.warning("Unexpected keys when loading: {}", unexpected)
+
+    model.to(device)
+    self.model = model
+    return self.model

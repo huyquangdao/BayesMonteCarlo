@@ -5,15 +5,13 @@ and later plug in MCTS-based preference generation plus DPO training.
 """
 
 import os
-import json
-import random
-from datetime import datetime
-from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
 
+from bayes_adaptive_llm.utils import load_model 
+import torch
 import numpy as np
 from loguru import logger
 from sklearn.model_selection import train_test_split
@@ -25,18 +23,27 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
     def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False):
         """
-        Load the latest supervised/DPO checkpoint.
-        RL support is not wired yet but the signature mirrors TRIP/PPDPP.
+        Load the latest supervised/DPO (hoặc RL) checkpoint.
         """
         if is_rl:
-            saved_model_path = os.path.join(self.model_config.saved_dir, "rl_model.pth")
+            ckpt_name = "rl_model.pth"
         else:
-            saved_model_path = os.path.join(self.model_config.saved_dir, "model.pth")
+            ckpt_name = "model.pth"
+
+        saved_model_path = os.path.join(self.model_config.saved_dir, ckpt_name)
 
         if not os.path.exists(saved_model_path):
-            raise FileNotFoundError("No pretrained model found at {}".format(saved_model_path))
+            raise FileNotFoundError(f"No pretrained model found at {saved_model_path}")
 
-        self.model = self.trainer.load_model(saved_model_path)
+        self.trainer.model = self.model
+        device = getattr(
+            self,
+            "device",
+            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
+
+        self.model = load_model(saved_model_path, device=device)
+
 
     def execute(self):
         """
