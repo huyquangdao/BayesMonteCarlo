@@ -623,14 +623,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except TypeError:
             dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
 
-        # ensure models are on the requested device (Trainer will handle wrapping later)
-        try:
-            dpo_trainer.model.to(device)
-            if hasattr(dpo_trainer, "ref_model"):
-                dpo_trainer.ref_model.to(device)
-        except Exception as exc:
-            loguru_logger.warning("Could not move DPO models to device %s: %s", device, exc)
-
         loguru_logger.info(
             f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
             f"batch_size={batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
