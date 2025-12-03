@@ -95,32 +95,32 @@ class PatchedDPOTrainer(DPOTrainer):
         return HFTrainer.log(self, logs, start_time)
 
 
-# class PersonaDialogGame(DialogGame):
-#     """
-#     DialogGame that injects per-turn persona hints into the state so the Persuader
-#     generation can condition on the current persuadee profile.
-#     """
+class PersonaDialogGame(DialogGame):
+    """
+    DialogGame that injects per-turn persona hints into the state so the Persuader
+    generation can condition on the current persuadee profile.
+    """
 
-#     def get_next_state(self, state, action):
-#         # attach selected goal and persona hint to the state passed into generation
-#         state = state.copy()
-#         state["pred_goal"] = action
+    def get_next_state(self, state, action):
+        # attach selected goal and persona hint to the state passed into generation
+        state = state.copy()
+        state["pred_goal"] = action
 
-#         raw_persona = getattr(self.user_simulator, "user_profile_description", None)
-#         persona_hint = sanitize_persona_description(raw_persona or "")
-#         if persona_hint:
-#             state["persona_hint"] = persona_hint
+        raw_persona = getattr(self.user_simulator, "user_profile_description", None)
+        persona_hint = sanitize_persona_description(raw_persona or "")
+        if persona_hint:
+            state["persona_hint"] = persona_hint
         
-#         system_response = self.generation_method.generate_response(state, llm_pipeline=self.llm_pipeline, terminators = self.terminators)
-#         user_response = self.user_simulator.respond(state, llm_pipeline = self.llm_pipeline, terminators = self.terminators)
+        system_response = self.generation_method.generate_response(state, llm_pipeline=self.llm_pipeline, terminators = self.terminators)
+        user_response = self.user_simulator.respond(state, llm_pipeline = self.llm_pipeline, terminators = self.terminators)
                 
-#         next_state = update_state_for_open_loop_mcts(
-#             state=state,
-#             action=action,
-#             system_response=system_response,
-#             user_response=user_response,
-#         )
-#         return next_state
+        next_state = update_state_for_open_loop_mcts(
+            state=state,
+            action=action,
+            system_response=system_response,
+            user_response=user_response,
+        )
+        return next_state
 
 class BayesAdaptiveLLMTrainer(Trainer):
     """
@@ -728,13 +728,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
             # fix persuadee (simulator/persona) per dialog, similar to TRIP
             # sample a simulator from the simulator pool
             simulator = random.choice(simulators)
-            dialog_game = DialogGame(self.game, 
-                                    self.generation_method, 
-                                    simulator,
-                                    #### 
-                                    llm_pipeline = self.game_config.llm_pipeline, 
-                                    terminators = self.game_config.terminators
-                                    )
+            dialog_game = PersonaDialogGame(self.game, 
+                                            self.generation_method, 
+                                            simulator,
+                                            #### 
+                                            llm_pipeline = self.game_config.llm_pipeline, 
+                                            terminators = self.game_config.terminators
+                                            )
                         
             # reset the initial state            
             state = self.game.reset(case, simulator)
