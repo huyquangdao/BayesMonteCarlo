@@ -65,14 +65,21 @@ def _pair_single_action(state_rep: str, target_idx: int, dialog_acts, realizatio
     return target_idx, best_pair, worst_pair
 
 
-def _pair_top_actions(probabilities, state_rep: str, dialog_acts, valid_moves, realizations_vs):
+def _pair_top_actions(probabilities, state_rep: str, dialog_acts, valid_moves, realizations_vs, preferred_action: Optional[int] = None):
     """
-    Fallback: gather realizations across actions, prioritizing top-2 by probability.
+    Fallback: gather realizations across actions, prioritizing top-2 by probability
+    (and always including preferred_action if provided).
     """
     dialog_acts_list = list(dialog_acts)
     valid_moves_list = [int(action_idx) for action_idx in valid_moves]
     prob_pairs = [(idx, float(probabilities[idx])) for idx in valid_moves_list]
     top_actions = [p[0] for p in sorted(prob_pairs, key=lambda x: x[1], reverse=True)[:2]]
+    if preferred_action is not None:
+        try:
+            pref_idx = int(preferred_action)
+            top_actions = list(dict.fromkeys([pref_idx] + top_actions))
+        except (TypeError, ValueError):
+            pass
 
     all_entries = []
     for action_idx in valid_moves_list:
@@ -114,15 +121,15 @@ def get_preference_pair(
     dialog_acts,
     valid_moves,
     realizations_vs,
+    selected_action: Optional[int] = None,
 ):
     """
-    Select the best/worst realization for the most likely action from an OpenLoopMCTS search.
+    Select the best/worst realization for a chosen action (if provided) or the most likely action.
     Returns (action_idx, best_pair, worst_pair) where each pair is (utterance, value).
     """
     if not realizations_vs:
         return None
 
-    probabilities = probabilities
     if probabilities is None or len(probabilities) == 0:
         return None
 
@@ -130,13 +137,27 @@ def get_preference_pair(
     if not valid_moves_list:
         return None
 
-    best_prob = -float("inf")
-    target_idx = None
-    for action_idx in valid_moves_list:
-        prob_val = float(probabilities[action_idx])
-        if prob_val > best_prob:
-            best_prob = prob_val
-            target_idx = action_idx
+    target_idx: Optional[int] = None
+    if selected_action is not None:
+        try:
+            candidate_idx = int(selected_action)
+        except (TypeError, ValueError):
+            candidate_idx = None
+        if candidate_idx is not None and 0 <= candidate_idx < len(probabilities):
+            if candidate_idx in valid_moves_list:
+                target_idx = candidate_idx
+            else:
+                logger.debug("Selected action {} not in valid moves; falling back to probabilities.", selected_action)
+        else:
+            logger.debug("Selected action {} is out of bounds; falling back to probabilities.", selected_action)
+
+    if target_idx is None:
+        best_prob = -float("inf")
+        for action_idx in valid_moves_list:
+            prob_val = float(probabilities[action_idx])
+            if prob_val > best_prob:
+                best_prob = prob_val
+                target_idx = action_idx
 
     if target_idx is None:
         return None
@@ -148,7 +169,7 @@ def get_preference_pair(
         return single_action_pair
     logger.info("No single-action pair found for action {}, trying cross-action.", target_idx)
     # Fallback: cross-action using top-2 actions.
-    return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves, realizations_vs)
+    return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves_list, realizations_vs, preferred_action=target_idx)
 
 
 def coerce_to_float(value, default):

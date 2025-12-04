@@ -845,6 +845,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     dialog_acts,
                     valid_moves,
                     planner.realizations_Vs,
+                    selected_action=best_action
                 )
                 if pair is None:
                     logger.info("Not enough realizations to form preference pair; skipping turn.")
