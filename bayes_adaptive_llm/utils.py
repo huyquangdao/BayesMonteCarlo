@@ -177,7 +177,6 @@ def load_model(trainer, load_file_path: str, device: Optional[torch.device] = No
 
     logger.info("Loading checkpoint from {} to {}", load_file_path, device)
 
-    # KHÔNG map thẳng lên GPU để tránh OOM khi load
     obj = torch.load(load_file_path, map_location="cpu")
 
     if isinstance(obj, dict):
@@ -254,7 +253,7 @@ def load_legacy_checkpoint(self, save_dir: str, is_rl: bool) -> None:
 
     self.trainer.model = self.model
 
-    device = self._get_device()
+    device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     self.model = load_model(self.trainer, ckpt_path, device=device)
 
 def load_from_meta_checkpoint(self, save_dir: str) -> None:
@@ -263,12 +262,12 @@ def load_from_meta_checkpoint(self, save_dir: str) -> None:
 
     # use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
     saved_format = meta.get("saved_format", "full_state_dict")
-    device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"),)
+    # device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     # bf16 = bool(getattr(self.model_config, "bf16", True))
     base_model = getattr(self.model, "plm", None)
 
     plm = _load_plm_from_meta(base_model, save_dir, saved_format)
-    plm.to(device)
+    # plm.to(device)
 
     if hasattr(self.model, "plm"):
         self.model.plm = plm
