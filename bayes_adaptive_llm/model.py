@@ -8,7 +8,7 @@ from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
 
 from base.model import Model
 
@@ -23,16 +23,33 @@ class BayesAdaptiveLLMModel(Model):
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
+            # torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
+            # device_map={"": 0} if torch.cuda.is_available() else None,
         )
-        self.plm = AutoModel.from_pretrained(
+        self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
+            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
+            device_map="auto",
+            # device_map={"": 1} if torch.cuda.is_available() else None,
         )
 
         # extend vocabulary with task-specific tokens
         self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
-        self.plm.resize_token_embeddings(len(self.tokenizer))
+        self.plm.resize_token_embeddings(len(self.tokenizer), mean_resizing=False)
 
+        if getattr(self.tokenizer, "chat_template", None) is None:
+            self.tokenizer.chat_template = (
+                "{% for message in messages %}"
+                "{% if message['role'] == 'system' %}"
+                "[SYSTEM] {{ message['content'] }}\n"
+                "{% elif message['role'] == 'user' %}"
+                "[USER] {{ message['content'] }}\n"
+                "{% elif message['role'] == 'assistant' %}"
+                "[ASSISTANT] {{ message['content'] }}\n"
+                "{% endif %}"
+                "{% endfor %}"
+            )
         self.n_classes = self._infer_num_actions()
         self.drop_out = nn.Dropout(p=getattr(self.model_config, "dropout", 0.1))
         self.out_layer = nn.Linear(self.model_config.lm_size, self.n_classes)
@@ -50,6 +67,19 @@ class BayesAdaptiveLLMModel(Model):
         cls_token = self.drop_out(cls_token)
         logits = self.out_layer(cls_token)
         return logits
+    
+    def generate_text(self, prompt: str, max_new_tokens: int = 128, **gen_kwargs) -> str:
+        self.plm.eval()
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.plm.device)
+        output_ids = self.plm.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=gen_kwargs.get("do_sample", True),
+            temperature=gen_kwargs.get("temperature", 0.7),
+            top_p=gen_kwargs.get("top_p", 0.9),
+            eos_token_id=self.tokenizer.eos_token_id,
+        )
+        return self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
     def score_candidates(self,
                          dialogue_context: Sequence[Dict[str, Any]],

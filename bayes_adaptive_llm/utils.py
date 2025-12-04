@@ -2,9 +2,14 @@
 Utility helpers shared across the Bayes-Adaptive LLM pipeline.
 """
 
-from typing import Dict, List
+import os
+from typing import Dict, List, Optional
 import numpy as np
 from loguru import logger
+from transformers import AutoModelForCausalLM
+import torch
+import torch.nn as nn
+from peft import PeftModel
 
 
 
@@ -60,14 +65,21 @@ def _pair_single_action(state_rep: str, target_idx: int, dialog_acts, realizatio
     return target_idx, best_pair, worst_pair
 
 
-def _pair_top_actions(probabilities, state_rep: str, dialog_acts, valid_moves, realizations_vs):
+def _pair_top_actions(probabilities, state_rep: str, dialog_acts, valid_moves, realizations_vs, preferred_action: Optional[int] = None):
     """
-    Fallback: gather realizations across actions, prioritizing top-2 by probability.
+    Fallback: gather realizations across actions, prioritizing top-2 by probability
+    (and always including preferred_action if provided).
     """
     dialog_acts_list = list(dialog_acts)
     valid_moves_list = [int(action_idx) for action_idx in valid_moves]
     prob_pairs = [(idx, float(probabilities[idx])) for idx in valid_moves_list]
     top_actions = [p[0] for p in sorted(prob_pairs, key=lambda x: x[1], reverse=True)[:2]]
+    if preferred_action is not None:
+        try:
+            pref_idx = int(preferred_action)
+            top_actions = list(dict.fromkeys([pref_idx] + top_actions))
+        except (TypeError, ValueError):
+            pass
 
     all_entries = []
     for action_idx in valid_moves_list:
@@ -109,15 +121,15 @@ def get_preference_pair(
     dialog_acts,
     valid_moves,
     realizations_vs,
+    selected_action: Optional[int] = None,
 ):
     """
-    Select the best/worst realization for the most likely action from an OpenLoopMCTS search.
+    Select the best/worst realization for a chosen action (if provided) or the most likely action.
     Returns (action_idx, best_pair, worst_pair) where each pair is (utterance, value).
     """
     if not realizations_vs:
         return None
 
-    probabilities = probabilities
     if probabilities is None or len(probabilities) == 0:
         return None
 
@@ -125,13 +137,27 @@ def get_preference_pair(
     if not valid_moves_list:
         return None
 
-    best_prob = -float("inf")
-    target_idx = None
-    for action_idx in valid_moves_list:
-        prob_val = float(probabilities[action_idx])
-        if prob_val > best_prob:
-            best_prob = prob_val
-            target_idx = action_idx
+    target_idx: Optional[int] = None
+    if selected_action is not None:
+        try:
+            candidate_idx = int(selected_action)
+        except (TypeError, ValueError):
+            candidate_idx = None
+        if candidate_idx is not None and 0 <= candidate_idx < len(probabilities):
+            if candidate_idx in valid_moves_list:
+                target_idx = candidate_idx
+            else:
+                logger.debug("Selected action {} not in valid moves; falling back to probabilities.", selected_action)
+        else:
+            logger.debug("Selected action {} is out of bounds; falling back to probabilities.", selected_action)
+
+    if target_idx is None:
+        best_prob = -float("inf")
+        for action_idx in valid_moves_list:
+            prob_val = float(probabilities[action_idx])
+            if prob_val > best_prob:
+                best_prob = prob_val
+                target_idx = action_idx
 
     if target_idx is None:
         return None
@@ -143,7 +169,7 @@ def get_preference_pair(
         return single_action_pair
     logger.info("No single-action pair found for action {}, trying cross-action.", target_idx)
     # Fallback: cross-action using top-2 actions.
-    return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves, realizations_vs)
+    return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves_list, realizations_vs, preferred_action=target_idx)
 
 
 def coerce_to_float(value, default):
@@ -158,3 +184,150 @@ def coerce_to_float(value, default):
         if re.fullmatch(r"[+-]?\\d*\\.?\\d+(e[+-]?\\d+)?", s, re.IGNORECASE):
             return float(s)
     return default
+
+def load_model(trainer, load_file_path: str, device: Optional[torch.device] = None):
+    if device is None:
+        device = getattr(
+            trainer,
+            "device",
+            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
+
+    if not os.path.isfile(load_file_path):
+        raise FileNotFoundError(f"Checkpoint not found: {load_file_path}")
+
+    logger.info("Loading checkpoint from {} to {}", load_file_path, device)
+
+    obj = torch.load(load_file_path, map_location="cpu")
+
+    if isinstance(obj, dict):
+        state_dict = obj
+        logger.info("Checkpoint type: state_dict (dict)")
+    elif isinstance(obj, nn.Module):
+        logger.info(
+            "Checkpoint type: full nn.Module ({}), extracting state_dict",
+            type(obj),
+        )
+        state_dict = obj.state_dict()
+    else:
+        raise TypeError(
+            f"Unexpected checkpoint type: {type(obj)}. "
+            "Expected dict (state_dict) or nn.Module."
+        )
+
+    model = getattr(trainer, "model", None)
+    if model is None:
+        raise RuntimeError(
+            "trainer.model is None in load_model. "
+            "Ensure model architecture is built before calling load_model."
+        )
+
+    if hasattr(model, "module"):
+        model_to_load = model.module
+    else:
+        model_to_load = model
+
+    missing, unexpected = model_to_load.load_state_dict(state_dict, strict=False)
+    if missing:
+        logger.warning("Missing keys when loading: {}", missing)
+    if unexpected:
+        logger.warning("Unexpected keys when loading: {}", unexpected)
+
+    model.to(device)
+    trainer.model = model
+    return trainer.model
+
+def has_meta_checkpoint(save_dir: str) -> bool:
+    meta_path = os.path.join(save_dir, "meta.pt")
+    return os.path.exists(meta_path)
+
+def _load_plm_from_meta(base_model, save_dir: str, saved_format: str):
+    if saved_format == "lora_adapter":
+        adapter_dir = os.path.join(save_dir, "lora_adapter")
+        if not os.path.isdir(adapter_dir):
+            raise FileNotFoundError(f"LoRA adapter dir not found: {adapter_dir}")
+
+        plm = PeftModel.from_pretrained(
+            base_model,
+            adapter_dir,
+            device_map={"": "cpu"},
+        )
+        return plm
+
+    if saved_format == "full_state_dict":
+        ckpt_path = os.path.join(save_dir, "model.pth")
+        if not os.path.exists(ckpt_path):
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
+
+        state_dict = torch.load(ckpt_path, map_location="cpu")
+        base_model.load_state_dict(state_dict, strict=False)
+        return base_model
+
+    raise ValueError(f"Unknown saved_format in meta.pt: {saved_format}")
+
+def load_legacy_checkpoint(self, save_dir: str, is_rl: bool) -> None:
+    ckpt_name = "rl_model.pth" if is_rl else "model.pth"
+    ckpt_path = os.path.join(save_dir, ckpt_name)
+
+    if not os.path.exists(ckpt_path):
+        raise FileNotFoundError(f"No pretrained model found at {ckpt_path}")
+
+    self.trainer.model = self.model
+
+    device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    self.model = load_model(self.trainer, ckpt_path, device=device)
+
+def load_from_meta_checkpoint(self, save_dir: str) -> None:
+    meta_path = os.path.join(save_dir, "meta.pt")
+    meta = torch.load(meta_path, map_location="cpu")
+
+    # use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
+    saved_format = meta.get("saved_format", "full_state_dict")
+    # device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    # bf16 = bool(getattr(self.model_config, "bf16", True))
+    base_model = getattr(self.model, "plm", None)
+
+    plm = _load_plm_from_meta(base_model, save_dir, saved_format)
+    # plm.to(device)
+
+    if hasattr(self.model, "plm"):
+        self.model.plm = plm
+    else:
+        # Nếu self.model chính là backbone
+        self.model = plm
+
+    self.trainer.model = self.model
+
+def save_finetuned_model(self, save_dir: Optional[str] = None) -> None:
+    if save_dir is None:
+        save_dir = self.model_config.saved_dir
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    if getattr(self, "tokenizer", None) is not None:
+        self.tokenizer.save_pretrained(save_dir)
+
+    plm = getattr(self.model, "plm", self.model)
+
+    meta = {
+        "base_model_name": getattr(self.model_config, "model_name", None),
+        "use_lora": bool(getattr(self.model_config, "use_lora", False)),
+        "saved_format": None,  
+    }
+
+    if meta["use_lora"] and isinstance(plm, PeftModel):
+        adapter_dir = os.path.join(save_dir, "lora_adapter")
+        plm.save_pretrained(adapter_dir)  
+
+        meta["saved_format"] = "lora_adapter"
+        torch.save(meta, os.path.join(save_dir, "meta.pt"))
+
+    else:
+        ckpt_path = os.path.join(save_dir, "model.pth")
+        torch.save(plm.state_dict(), ckpt_path)
+
+        meta["saved_format"] = "full_state_dict"
+        torch.save(meta, os.path.join(save_dir, "meta.pt"))
+
+    logger.info("Saved finetuned model to {} (format: {})", save_dir, meta["saved_format"])
+

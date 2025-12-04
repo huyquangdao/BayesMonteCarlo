@@ -4,14 +4,14 @@
 ###
 
 # Backbone (reduced for 8GB GPU)
-tokenizer: roberta-base
-plm: roberta-base
+tokenizer: meta-llama/Meta-Llama-3.1-8B-Instruct
+plm: meta-llama/Meta-Llama-3.1-8B-Instruct
 lm_size: 768
 cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
-saved_dir: checkpoints/sft_p4g
-model_name_or_path: checkpoints/sft_p4g   # nếu cần để pipeline/generation biết đường dẫn
+saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1
+model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu cần để pipeline/generation biết đường dẫn
 
 
 # Training toggles
@@ -25,7 +25,7 @@ max_gen_tokens: 256
 
 # SFT hyperparameters (memory-friendly)
 batch_size: 1
-gradient_accumulation: 4
+gradient_accumulation: 8
 learning_rate: 3e-5
 warmup_ratio: 0.05
 weight_decay: 0.01
@@ -33,19 +33,21 @@ num_train_epochs: 3
 logging_steps: 10
 save_total_limit: 2
 max_grad_norm: 1.0
-max_sequence_length: 256
+max_sequence_length: 768
 
 # DPO-specific
 dpo_beta: 0.1
-max_length: 256
-max_prompt_length: 256
+max_length: 768
+max_prompt_length: 768
+dpo_batch_size: 1
 fp16: true
 bf16: false
 gradient_checkpointing: true
 # Path to preference pairs (jsonl) used for DPO; each row should include
 # dialog_id, prompt, chosen, rejected, and an optional persona_hint with
 # personality/decision_making_style.
-preference_pairs_path: "data/preference_pairs_qwen.jsonl"
+# preference_pairs_path: "data/preference_pairs_qwen.jsonl"
+preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 # Special tokens for persuasion (same as TRIP/PPDPP PG)
 special_tokens_dict:

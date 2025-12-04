@@ -5,15 +5,13 @@ and later plug in MCTS-based preference generation plus DPO training.
 """
 
 import os
-import json
-import random
-from datetime import datetime
-from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
 
+from bayes_adaptive_llm.utils import load_legacy_checkpoint, has_meta_checkpoint, load_from_meta_checkpoint
+import torch
 import numpy as np
 from loguru import logger
 from sklearn.model_selection import train_test_split
@@ -23,20 +21,14 @@ from base.pipeline import Pipeline
 
 class BayesAdaptiveLLMPipeline(Pipeline):
 
-    def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False):
-        """
-        Load the latest supervised/DPO checkpoint.
-        RL support is not wired yet but the signature mirrors TRIP/PPDPP.
-        """
-        if is_rl:
-            saved_model_path = os.path.join(self.model_config.saved_dir, "rl_model.pth")
+    def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False) -> None:
+        save_dir = self.model_config.saved_dir
+        if has_meta_checkpoint(save_dir):
+            load_from_meta_checkpoint(self, save_dir)
         else:
-            saved_model_path = os.path.join(self.model_config.saved_dir, "model.pth")
+            load_legacy_checkpoint(self, save_dir, is_rl)
 
-        if not os.path.exists(saved_model_path):
-            raise FileNotFoundError("No pretrained model found at {}".format(saved_model_path))
 
-        self.model = self.trainer.load_model(saved_model_path)
 
     def execute(self):
         """
@@ -53,13 +45,14 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
+            self.load_pretrained_model(is_rl=False)
             logger.info("Generating preference pairs with MCTS loop ...")
             preference_pairs = self.generate_preference_data()
 
         if getattr(self.model_config, "run_dpo", False):
             logger.info("Training with DPO on preference pairs ...")
             # assuming dataset already carries preference data or was just generated
-            self.load_pretrained_model(is_rl=False)
+            # self.load_pretrained_model(is_rl=False)
             pref_path = getattr(self.model_config, "preference_pairs_path", None)
             if not pref_path or not os.path.exists(pref_path):
                 logger.warning("No preference pairs found or path does not exist; skipping DPO.")

@@ -6,21 +6,24 @@ so later we can port the actual logic with minimal friction.
 
 from __future__ import annotations
 
-import math
 import os
 import random
-import warnings
 import json
 import copy
 import inspect
+import torch.distributed as dist
+import random
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from tqdm import tqdm
+from bayes_adaptive_llm.utils import save_finetuned_model
 
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 from loguru import logger
+from datasets import Dataset, DatasetDict
+from multiprocessing import cpu_count
 from itertools import count
 
 import numpy as np
@@ -32,14 +35,16 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
-
+from peft import LoraConfig
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
-    from trl import DPOConfig, DPOTrainer
+    from trl import DPOConfig, DPOTrainer, SFTConfig, SFTTrainer
 except Exception:  # pragma: no cover
     DPOConfig = None
     DPOTrainer = None
+    SFTConfig = None
+    SFTTrainer = None
 
 from base.trainer import Trainer
 
@@ -124,33 +129,151 @@ class BayesAdaptiveLLMTrainer(Trainer):
     """
 
     def __init__(self,
-                 game_config,
-                 model_config,
-                 accelerator,
-                 game,
-                 model,
-                 offline_evaluator,
-                 online_evaluator,
-                 loggers,
-                 generation_method=None) -> None:
+                game_config,
+                model_config,
+                accelerator,
+                game,
+                model,
+                offline_evaluator,
+                online_evaluator,
+                loggers,
+                generation_method=None) -> None:
         super().__init__(game_config, model_config, accelerator, game, model, offline_evaluator,
-                         online_evaluator, loggers)
+                        online_evaluator, loggers)
         self.generation_method = generation_method
         self.tokenizer = getattr(self.model, "tokenizer", None)
         loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
 
+    def _instance_to_messages_for_persuasion(self, inst):
+        """
+        Convert a persuasion instance to chat messages for SFT.
+        Support:
+        - P4G-style: inst["dialog"] = [{"er": [...], "ee": [...]}, ...]
+        - generic:   inst["messages"]
+        """
+        def _get(obj, key, default=None):
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+
+        system_content = "You are a Persuader trying to persuade the user to donate to a charity."
+        if persona:
+            system_content += f" The current user's profile is: {persona}"
+
+        messages = [{"role": "system", "content": system_content}]
+
+        dialog = _get(inst, "dialog")
+        if dialog is not None:
+            for turn in dialog:
+                # er = persuader → assistant
+                for utt in turn.get("er", []):
+                    utt = (utt or "").strip()
+                    if utt:
+                        messages.append({"role": "assistant", "content": utt})
+                # ee = persuadee → user
+                for utt in turn.get("ee", []):
+                    utt = (utt or "").strip()
+                    if utt:
+                        messages.append({"role": "user", "content": utt})
+            return {"messages": messages}
+
+        dialogue_context = _get(inst, "dialogue_context")
+        target_resp = _get(inst, "response")
+        if dialogue_context:
+            for utt in dialogue_context:
+                content = (utt.get("content") or "").strip()
+                if not content:
+                    continue
+                role = "assistant" if utt.get("role", "user") == "assistant" else "user"
+                messages.append({"role": role, "content": content})
+            if target_resp:
+                messages.append({"role": "assistant", "content": target_resp})
+            return {"messages": messages}
+
+        maybe_msgs = _get(inst, "messages")
+        if maybe_msgs is not None:
+            return {"messages": maybe_msgs}
+
+        raise ValueError(
+            "Cannot infer conversation structure from instance. "
+            "Please adapt _instance_to_messages_for_persuasion."
+        )
+
+    def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
+        if self.tokenizer is None:
+            raise ValueError("self.model.tokenizer is None; cannot run SFT.")
+
+        tokenizer = self.tokenizer
+        train_records = [
+            self._instance_to_messages_for_persuasion(inst)
+            for inst in train_instances
+        ]
+        dev_records = [
+            self._instance_to_messages_for_persuasion(inst)
+            for inst in dev_instances
+        ]
+
+        raw_datasets = DatasetDict(
+            {
+                "train": Dataset.from_list(train_records),
+                "eval": Dataset.from_list(dev_records),
+            }
+        )
+
+        def apply_chat_template(example):
+            messages = list(example["messages"])
+            if len(messages) == 0:
+                messages = [{"role": "system", "content": ""}]
+            elif messages[0]["role"] != "system":
+                messages.insert(0, {"role": "system", "content": ""})
+
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+            )
+            return {"text": text}
+
+        if dist.is_available() and dist.is_initialized():
+            num_proc = 1
+        else:
+            num_proc = min(4, cpu_count())
+
+        raw_datasets = raw_datasets.map(
+            apply_chat_template,
+            num_proc=num_proc,
+            remove_columns=raw_datasets["train"].column_names,
+            desc="Applying chat template for SFT",
+        )
+        # For debugging: print a random sample
+        # if self.accelerator.is_local_main_process:
+        #     for idx in random.sample(range(min(1, len(train_records))), k=1):
+        #         print("\n=== RAW INSTANCE ===")
+        #         print(train_instances[idx])
+        #         print("\n=== MESSAGES ===")
+        #         msgs = self._instance_to_messages_for_persuasion(train_instances[idx])["messages"]
+        #         for m in msgs:
+        #             print(m["role"], ":", m["content"])
+        #         print("=== TEMPLATE TEXT (first 400) ===")
+        #         print(raw_datasets["train"][idx]["text"][:400])
+        #         print("\n")
+
+        return raw_datasets["train"], raw_datasets["eval"]
+
+#region abstract methods
     def process_dataset(self, dataset) -> Tuple[Any, Any, Any]:
         """
         Process the raw dataset and return the training/validation/test splits.
         """
         return dataset.train_instances, dataset.dev_instances, dataset.test_instances
-
+    
     def construct_dataloaders(self,
-                              data_instances: Sequence[Any],
-                              batch_size: int,
-                              goal2id: Dict[str, int],
-                              shuffle: bool = True,
-                              num_workers: int = 1) -> DataLoader:
+                            data_instances: Sequence[Any],
+                            batch_size: int,
+                            goal2id: Dict[str, int],
+                            shuffle: bool = True,
+                            num_workers: int = 1) -> DataLoader:
         """
         Build task-specific datasets and dataloaders.
         """
@@ -227,12 +350,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         optimizer_grouped_parameters = [
             {
                 "params": [p for model in modules for n, p in model.named_parameters()
-                           if not any(nd in n for nd in no_decay) and p.requires_grad],
+                        if not any(nd in n for nd in no_decay) and p.requires_grad],
                 "weight_decay": self.model_config.weight_decay,
             },
             {
                 "params": [p for model in modules for n, p in model.named_parameters()
-                           if any(nd in n for nd in no_decay) and p.requires_grad],
+                        if any(nd in n for nd in no_decay) and p.requires_grad],
                 "weight_decay": 0.0,
             },
         ]
@@ -310,7 +433,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
-#region Preparation for DPO training
 #endregion
 
     def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:
@@ -318,94 +440,91 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Supervised fine-tuning aligned with the TRIP trainer structure but using
         the configuration schema from the reference Hugging Face script.
         """
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         train_instances, dev_instances, _ = self.process_dataset(dataset)
 
-        action_mapping = dataset.construct_action_mapping(
-            combine=self.model_config.combined_action if not self.game_config.is_so_game else False
+        train_dataset, eval_dataset = self._build_sft_datasets_from_instances(
+            train_instances, dev_instances
         )
 
-        num_workers = getattr(self.model_config, "num_workers", 0)
-
-        train_loader = self.construct_dataloaders(
-            train_instances,
-            batch_size=self.model_config.batch_size,
-            goal2id=action_mapping,
-            shuffle=True,
-            num_workers=num_workers,
-        )
-
-        dev_loader = self.construct_dataloaders(
-            dev_instances,
-            batch_size=self.model_config.batch_size,
-            goal2id=action_mapping,
-            shuffle=False,
-            num_workers=num_workers,
-        )
-
-        best_loss = math.inf
-        optimizer = self.create_optimizer(self.model, self.model_config.learning_rate)
-
-        self.model, optimizer, train_dataloader = self.accelerator.prepare(self.model, optimizer, train_loader)
-
-        num_update_steps_per_epoch = math.ceil(len(train_dataloader) / self.model_config.gradient_accumulation)
-        max_train_steps = self.model_config.num_train_epochs * num_update_steps_per_epoch
-
-        warmup_steps = int(self.model_config.warmup_ratio * max_train_steps)
-        lr_scheduler = self.create_scheduler(optimizer, warmup_steps, max_train_steps)
-
-        self.criterion = self.create_criterion()
-        self.progress_bar = tqdm(range(max_train_steps), disable=not self.accelerator.is_local_main_process)
-
-        self.model.to(device)
-        for epoch in range(self.model_config.num_train_epochs):
-            self.model.train()
-            self.offline_evaluator.reset()
-
-            train_loss, stop = self.train_epoch(
-                data_loader=train_dataloader,
-                optimizer=optimizer,
-                lr_scheduler=lr_scheduler,
-                criterion=self.criterion,
-                max_train_steps=max_train_steps,
+        base_model = getattr(self.model, "plm", self.model)
+        base_model.to(device)
+        use_lora = getattr(self.model_config, "use_lora", True)
+        peft_config = None
+        if use_lora:
+            peft_config = LoraConfig(
+                r=getattr(self.model_config, "lora_r", 16),
+                lora_alpha=getattr(self.model_config, "lora_alpha", 32),
+                lora_dropout=getattr(self.model_config, "lora_dropout", 0.05),
+                bias="none",
+                task_type="CAUSAL_LM",
+                target_modules=getattr(
+                    self.model_config,
+                    "lora_target_modules",
+                    ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+                ),
             )
 
-            results = self.eval_epoch(dev_loader, self.criterion)
-            for logger in self.loggers:
-                logger.record(results, epoch + 1)
+        sft_config = SFTConfig(
+            ddp_find_unused_parameters=False,
+            output_dir=self.model_config.saved_dir,
+            num_train_epochs=self.model_config.num_train_epochs,
+            per_device_train_batch_size=self.model_config.batch_size,
+            per_device_eval_batch_size=self.model_config.batch_size,
+            gradient_accumulation_steps=getattr(
+                self.model_config, "gradient_accumulation", 4
+            ),
+            learning_rate=float(self.model_config.learning_rate),
+            warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
+            weight_decay=getattr(self.model_config, "weight_decay", 0.0),
+            max_seq_length=self.model_config.max_sequence_length,
+            lr_scheduler_type=getattr(
+                self.model_config, "lr_scheduler_type", "cosine"
+            ),
+            logging_steps=getattr(self.model_config, "logging_steps", 10),
+            save_steps=getattr(self.model_config, "save_steps", 500),
+            eval_steps=getattr(self.model_config, "eval_steps", 500),
+            eval_strategy="steps",
+            save_total_limit=getattr(self.model_config, "save_total_limit", 3),
+            bf16=getattr(self.model_config, "bf16", True),
+            fp16=getattr(self.model_config, "fp16", False),
+            gradient_checkpointing=getattr(
+                self.model_config, "gradient_checkpointing", False
+            ),
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+            optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
+            packing=False,
+            dataset_text_field="text",
+            report_to=["none"],
+        )
 
-            if results['loss'] < best_loss:
-                loguru_logger.info("Performance improved. Saving the model .....")
-                best_loss = results['loss']
+        loguru_logger.info("Initializing TRL SFTTrainer for persuasion SFT...")
 
-                if self.game_config.name == RECOMMENDATION:
-                    file_path = os.path.join(self.model_config.saved_dir, f"model_{self.model_config.domain}.pth")
-                    
-                elif self.game_config.name == NEGOTIATION:
-                    file_path = os.path.join(self.model_config.saved_dir, f"model.pth")
-                
-                elif self.game_config.name == EMOTIONAL_SUPPORT:
-                    file_path = os.path.join(self.model_config.saved_dir, f"model.pth")
-                
-                elif self.game_config.name == PERSUATION:
-                    file_path = os.path.join(self.model_config.saved_dir, f"model.pth")
-                self.save_model(file_path)
+        sft_trainer = SFTTrainer(
+            model=base_model,
+            args=sft_config,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=self.tokenizer,
+            peft_config=peft_config,
+        )
 
-                if getattr(self.model_config, "save_hf_checkpoint", False):
-                    hf_subdir = getattr(self.model_config, "hf_checkpoint_subdir", "hf_checkpoint") or "hf_checkpoint"
-                    hf_dir = os.path.join(self.model_config.saved_dir, hf_subdir)
-                    os.makedirs(hf_dir, exist_ok=True)
-                    try:
-                        if hasattr(self.model, "plm"):
-                            self.model.plm.save_pretrained(hf_dir)
-                        if hasattr(self.model, "tokenizer"):
-                            self.model.tokenizer.save_pretrained(hf_dir)
-                        loguru_logger.info("Saved HF-format checkpoint for DPO at {}", hf_dir)
-                    except Exception as exc:
-                        loguru_logger.warning("Failed to export HF-format checkpoint to %s: %s", hf_dir, exc)
+        sft_trainer.train()
 
-            if stop:
-                loguru_logger.info("Training process is completed.")
-                break
+        # sft_trainer.save_model(self.model_config.saved_dir)
+        if self.tokenizer is not None:
+            self.tokenizer.save_pretrained(self.model_config.saved_dir)
+
+        trained_plm = sft_trainer.model
+        if hasattr(self.model, "plm"):
+            self.model.plm = trained_plm
+        else:
+            self.model = trained_plm
+
+        save_finetuned_model(self)
+        loguru_logger.info("SFT training completed. Updated backbone LM with SFT weights.")
 
     def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
         """
@@ -413,7 +532,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Loads the preference json/jsonl, feeds it directly to DPOTrainer (no custom collator),
         logs epoch losses, and saves a checkpoint.
         """
-        device = device or getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        # device = device or getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         if DPOTrainer is None or DPOConfig is None:
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
@@ -445,9 +564,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         beta = getattr(self.model_config, "dpo_beta", 0.1)
         warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio", getattr(self.model_config, "warmup_ratio", 0.1))
         grad_accum = max(
-            1, int(getattr(self.model_config, "dpo_gradient_accumulation", getattr(self.model_config, "gradient_accumulation", 1)))
+            1, int(getattr(self.model_config, "dpo_gradient_accumulation", getattr(self.model_config, "gradient_accumulation", 4)))
         )
-        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", False)))
+        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", True)))
         use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", False)))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
@@ -469,6 +588,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             remove_unused_columns=False,
             logging_steps=getattr(self.model_config, "logging_steps", 10),
         )
+        
         trainer_kwargs = dict(
             model=model_path,
             loss_type=loss_type,
@@ -484,14 +604,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except TypeError:
             dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
 
-        # ensure models are on the requested device (Trainer will handle wrapping later)
-        try:
-            dpo_trainer.model.to(device)
-            if hasattr(dpo_trainer, "ref_model"):
-                dpo_trainer.ref_model.to(device)
-        except Exception as exc:
-            loguru_logger.warning("Could not move DPO models to device %s: %s", device, exc)
-
         loguru_logger.info(
             f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
             f"batch_size={batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
@@ -504,15 +616,22 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 loss_val = log_row.get("train_loss")
                 loguru_logger.info("DPO epoch {} train_loss={:.4f}", epoch_val, float(loss_val))
 
-        adapter_dir = getattr(self.model_config, "dpo_adapter_path", None)
-        if not adapter_dir:
-            adapter_dir = os.path.join(save_dir, "dpo_adapter")
-        os.makedirs(adapter_dir, exist_ok=True)
-        dpo_trainer.save_model(adapter_dir)
-        tokenizer.save_pretrained(adapter_dir)
-        file_path = os.path.join(self.model_config.saved_dir, f"model_dpo.pth")
-        self.save_model(file_path)
-        loguru_logger.info("Saved DPO checkpoint to {}", adapter_dir)
+        trained_plm = dpo_trainer.model
+        if hasattr(self.model, "plm"):
+            self.model.plm = trained_plm
+        else:
+            self.model = trained_plm
+
+        base_save_dir = self.model_config.saved_dir
+        dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
+        if not dpo_save_dir:
+            dpo_save_dir = os.path.join(base_save_dir, "dpo")
+
+        self.save_finetuned_model(dpo_save_dir)
+        loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
+
+
+
 
     def predict(self,
                 instance: Dict[str, Any],
@@ -584,18 +703,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # MCTS configuration
         num_MCTS_sims = getattr(self.model_config, "num_mcts_sims", 30)
         max_realizations = getattr(self.model_config, "max_realizations", 3)
-        # max_turns = getattr(self.model_config, "max_turns", 12)
         mcts_cfg = SimpleNamespace(
             cpuct=1.0,
             Q_0=getattr(self.model_config, "Q_0", 0.25),
             max_realizations=max_realizations,
         )
-
-        # Dialog seeds
-        # cases = train_cases
-        # max_cases = getattr(self.model_config, "mcts_num_evaluate", None)
-        # if max_cases is not None and max_cases > 0:
-        #     cases = cases[:max_cases]
 
         preference_pairs: List[Dict[str, Any]] = []
         preference_path: Optional[Path] = None
@@ -618,7 +730,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             dialog_game = PersonaDialogGame(self.game, 
                                             self.generation_method, 
                                             simulator,
-                                            
                                             #### 
                                             llm_pipeline = self.game_config.llm_pipeline, 
                                             terminators = self.game_config.terminators
@@ -734,6 +845,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     dialog_acts,
                     valid_moves,
                     planner.realizations_Vs,
+                    selected_action=best_action
                 )
                 if pair is None:
                     logger.info("Not enough realizations to form preference pair; skipping turn.")
