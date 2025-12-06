@@ -4,6 +4,7 @@ import math
 import time
 import copy
 from abc import ABC, abstractmethod
+from pathlib import Path
 from loguru import logger
 
 from config.constants import DURECDIAL, INSPIRED, CRAIGSLIST_BARGAIN, ES_CONV
@@ -11,6 +12,7 @@ from utils.prompt import get_llm_based_assessment_for_recommendation, get_llm_ba
     get_llm_based_assessment_for_emotional_support, get_toxicity_assessment_for_emotional_support, \
     get_user_sentiment_for_item_recommendation, get_llm_based_assessment_for_persuation
 from config.constants import SUCCESS_RATE, ITEM_FREQ, AVG_TURN, SL_RATIO, FAIRNESS, TOXICITY, USER_REWARD, PERSUATION4GOOD
+from utils.logging_utils import append_to_log
 
 
 class Game(ABC):
@@ -68,6 +70,26 @@ class Game(ABC):
         :return: None
         """
         raise NotImplementedError("This method needs to be implemented")
+
+    def _log_line(self, text: str, log_filename: str = "game_prompts.log") -> None:
+        """
+        Append a single log line to the prompt log file for this scenario.
+        """
+        log_dir = Path(self.game_config.log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / log_filename
+        append_to_log(log_file, [text])
+
+    def _format_prompt(self, dialogue_context):
+        """
+        Convert a dialogue context list into a readable prompt string with role labels.
+        """
+        lines = []
+        for turn in dialogue_context:
+            role = turn.get("role", "unknown").upper()
+            content = turn.get("content", "")
+            lines.append(f"{role}: {content}")
+        return "\n".join(lines)
 
 class RecommendationGame(Game):
 
@@ -449,10 +471,19 @@ class NegotiationGame(Game):
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
 
         # generate user response with LLM
+        context_labels = []
+        if "dialog_id" in state:
+            context_labels.append(f"Dialog {state['dialog_id']}")
+        if "turn_id" in state:
+            context_labels.append(f"Turn {state['turn_id']}")
+        prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
+        self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
+
         user_response = simulator.respond(state,
                                           llm_pipeline = self.game_config.llm_pipeline, 
                                           terminators = self.game_config.terminators
                                           )
+        self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
 
         # construct the new state
         # prepend the system and user reponse to the dialogue context
@@ -717,6 +748,14 @@ class EmotionalSupportGame(Game):
         # state['goal'] = goal
 
         # generate the system response
+        context_labels = []
+        if "dialog_id" in state:
+            context_labels.append(f"Dialog {state['dialog_id']}")
+        if "turn_id" in state:
+            context_labels.append(f"Turn {state['turn_id']}")
+        prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
+        self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
+
         system_response = generation_model.generate_response(res_state,
                                                              llm_pipeline = self.game_config.llm_pipeline, 
                                                              terminators = self.game_config.terminators
@@ -727,6 +766,8 @@ class EmotionalSupportGame(Game):
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
 
         # generate user response with LLM
+        self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
+
         user_response = simulator.respond(state,
                                           llm_pipeline = self.game_config.llm_pipeline, 
                                           terminators = self.game_config.terminators
@@ -737,9 +778,6 @@ class EmotionalSupportGame(Game):
         # prepend the predicted goal, topic to the previous goals, topics
         state['dialogue_context'].append({'role': 'user', 'content': user_response})
         state['pre_goals'].append(goal)
-
-        logger.info(f"[System]: {system_response}")
-        logger.info(f"[USER]: {user_response}")
 
         # compute the reward
         reward, done, o_done = self.compute_reward(state, action, system_response, simulator.user_profile_description)
@@ -1149,6 +1187,14 @@ class PersuationGame(Game):
         state['goal'] = goal
 
         # generate the system response
+        context_labels = []
+        if "dialog_id" in state:
+            context_labels.append(f"Dialog {state['dialog_id']}")
+        if "turn_id" in state:
+            context_labels.append(f"Turn {state['turn_id']}")
+        prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
+        self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
+
         system_response = generation_model.generate_response(res_state,
                                                              llm_pipeline = self.game_config.llm_pipeline, 
                                                              terminators = self.game_config.terminators
@@ -1159,6 +1205,8 @@ class PersuationGame(Game):
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
 
         # generate user response with LLM
+        self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
+
         user_response = simulator.respond(state,
                                           llm_pipeline = self.game_config.llm_pipeline, 
                                           terminators = self.game_config.terminators
