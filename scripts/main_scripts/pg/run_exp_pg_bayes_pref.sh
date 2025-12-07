@@ -23,6 +23,7 @@ CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 8081 --gpu_ids 1 --
   --model_type qwen \
   --is_so_game \
   --use_persona \
+  --rewrite_action \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 
