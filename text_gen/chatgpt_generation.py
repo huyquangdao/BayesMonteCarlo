@@ -6,7 +6,6 @@ from utils.generation import construct_prompt_for_chat_gpt_response_generation_n
     construct_prompt_for_chat_gpt_response_generation_emotional_support, \
     construct_prompt_for_chat_gpt_response_generation_recommendation, construct_prompt_for_chat_gpt_response_generation_persuation
 from utils.prompt import call_llm
-from utils.logging_utils import append_to_log
 
 from config.constants import EMOTIONAL_SUPPORT, RECOMMENDATION, NEGOTIATION, PERSUATION
 
@@ -85,18 +84,6 @@ class ChatGPTGeneration(LLMGeneration):
                                         'Please reply with only one short and succinct sentence.'}
         )
 
-        # log prompt for debugging preference generation
-        log_dir = Path(__file__).resolve().parents[1] / "bayes_adaptive_llm" / "logs"
-        log_file = log_dir / "prompts.log"
-        header = f"===== Dialogue {dialog_id} =====" if turn_id == 0 else None
-        log_lines = []
-        if header:
-            log_lines.append(header)
-        log_lines.append(f"[Turn {turn_id}] SYSTEM prompt:")
-        for m in messages:
-            log_lines.append(f"{m.get('role')}: {m.get('content')}")
-        log_lines.append("===== End Turn =====")
-        append_to_log(log_file, log_lines)
 
         response = call_llm(messages,
                             n=1,

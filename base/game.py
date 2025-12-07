@@ -199,7 +199,15 @@ class RecommendationGame(Game):
         state['pred_goal'] = goal
         state['pred_topic'] = ""
 
-        # generate the system response
+        # # generate the system response
+        # context_labels = []
+        # if "dialog_id" in state:
+        #     context_labels.append(f"Dialog {state['dialog_id']}")
+        # if "turn_id" in state:
+        #     context_labels.append(f"Turn {state['turn_id']}")
+        # prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
+        # self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
+
         system_response = generation_model.generate_response(res_state,
                                                             llm_pipeline = self.game_config.llm_pipeline, 
                                                             terminators = self.game_config.terminators
@@ -209,6 +217,8 @@ class RecommendationGame(Game):
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
 
         # generate user response with LLM
+        # self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
+
         user_response = simulator.respond(state, 
                                           dataset=self.dataset_config.dataset_name,
                                           llm_pipeline = self.game_config.llm_pipeline, 
@@ -471,19 +481,10 @@ class NegotiationGame(Game):
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
 
         # generate user response with LLM
-        context_labels = []
-        if "dialog_id" in state:
-            context_labels.append(f"Dialog {state['dialog_id']}")
-        if "turn_id" in state:
-            context_labels.append(f"Turn {state['turn_id']}")
-        prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
-        self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
-
         user_response = simulator.respond(state,
                                           llm_pipeline = self.game_config.llm_pipeline, 
                                           terminators = self.game_config.terminators
                                           )
-        self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
 
         # construct the new state
         # prepend the system and user reponse to the dialogue context
@@ -748,14 +749,6 @@ class EmotionalSupportGame(Game):
         # state['goal'] = goal
 
         # generate the system response
-        context_labels = []
-        if "dialog_id" in state:
-            context_labels.append(f"Dialog {state['dialog_id']}")
-        if "turn_id" in state:
-            context_labels.append(f"Turn {state['turn_id']}")
-        prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
-        self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
-
         system_response = generation_model.generate_response(res_state,
                                                              llm_pipeline = self.game_config.llm_pipeline, 
                                                              terminators = self.game_config.terminators
@@ -764,9 +757,6 @@ class EmotionalSupportGame(Game):
 
         # update the dialogue context
         state['dialogue_context'].append({"role": "assistant", "content": system_response})
-
-        # generate user response with LLM
-        self._log_line(f"{prefix}USER_PROMPT:\n{self._format_prompt(state['dialogue_context'])}")
 
         user_response = simulator.respond(state,
                                           llm_pipeline = self.game_config.llm_pipeline, 

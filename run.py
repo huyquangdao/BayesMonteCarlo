@@ -35,6 +35,33 @@ from baselines.Proactive.config import ProactiveConfig
 # load variables from the .env file
 load_dotenv()
 
+
+def debug_print_generation_context(gen_name, generation_config, game_config, dataset_config):
+    """Print key generation/game config fields for quick inspection."""
+    print("\n[GenerationConfig Debug]")
+    print(f"gen_model: {gen_name.strip()}")
+    print(f"prompt: {getattr(generation_config, 'prompt', None)}")
+    print(f"context: {getattr(generation_config, 'context', None)}")
+    print(f"generation_config: {vars(generation_config)}")
+    print(
+        "game_context:",
+        {
+            "name": getattr(game_config, "name", None),
+            "model_type": getattr(game_config, "model_type", None),
+            "max_horizon": getattr(game_config, "max_horizon", None),
+            "epsilon": getattr(game_config, "epsilon", None),
+            "seed": getattr(game_config, "seed", None),
+        },
+    )
+    print(
+        "dataset_context:",
+        {
+            "dataset_name": getattr(dataset_config, "dataset_name", None),
+            "domain": getattr(dataset_config, "domain", None),
+        },
+    )
+
+
 if __name__ == '__main__':
     ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
     # the current local time
@@ -323,6 +350,7 @@ if __name__ == '__main__':
                             'special_tokens_dict': model_config.special_tokens_dict
                         }
                     )
+                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config)
 
                     # construct the generation model
                     generation_model = generation_model_class(generation_config)
@@ -378,6 +406,7 @@ if __name__ == '__main__':
                                 "max_gpu_memory": args["max_gpu_memory"]
                             }
                         )
+                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config)
 
                     # construct the generation method
                     generation_method = generation_class(generation_config, None, None)
