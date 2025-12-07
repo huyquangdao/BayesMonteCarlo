@@ -329,11 +329,13 @@ def construct_prompt_for_chat_gpt_response_generation_persuation(state, prompt):
     # PPDPP, ProCOT, MODPL, etc.
     if pred_goal in P4G_GOAL2DESCRIPTION:
         goal_description = P4G_GOAL2DESCRIPTION[pred_goal]
-    # other model using dialogue-level strategies such as ICL-AIF
     else:
-        goal_description = pred_goal
+        goal_description = pred_goal  # fallback: raw label
 
-    new_prompt[1]['content'] = new_prompt[1]['content'].format(goal_description)
+    new_prompt[1]['content'] = new_prompt[1]['content'].format(
+        goal_description=goal_description
+    )
+
     return new_prompt, goal_description
 
 
