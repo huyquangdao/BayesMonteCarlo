@@ -67,6 +67,7 @@ P4G_GOALS = [
     "personal-story",
 	"credibility-appeal",
 	"emotion-appeal",
+    "proposition-of-donation",
 	"donation-information",
 	"foot-in-the-door",
 	"logical-appeal",
