@@ -84,6 +84,10 @@ class ChatGPTGeneration(LLMGeneration):
                                         'Please reply with only one short and succinct sentence.'}
         )
 
+        # debug: print the prompt used for system generation
+        print("\n[SYS_GEN_PROMPT][chatgpt]")
+        for msg in messages:
+            print(f"{msg.get('role','').upper()}: {msg.get('content','')}")
 
         response = call_llm(messages,
                             n=1,

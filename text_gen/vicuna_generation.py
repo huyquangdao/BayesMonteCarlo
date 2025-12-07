@@ -75,6 +75,9 @@ class VicunaGeneration(LLMGeneration):
         # construct the input ids
         input_ids = self.vicuna_tokenizer([prompt]).input_ids
         # generate the response
+        # debug: print the prompt used for system generation
+        print("\n[SYS_GEN_PROMPT][vicuna]")
+        print(prompt)
 
         # using the vicuna model
         output_ids = self.vicuna_model.generate(
