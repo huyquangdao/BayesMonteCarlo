@@ -32,12 +32,21 @@ class PersuationSimulator(Simulator):
             Your persona: {self.user_profile_description}.
             You must follow the instructions below during chat.
             1. Your utterances need to strictly follow your persona. Varying your wording and avoid repeating
-            yourself verbatim!
+            yourself verbatim. Consider your values, emotions, priorities and practical constraints (e.g., time, finances, trust).
             2. Pretend you have little knowledge about the Save the Children charity. You have little willingness
             for donation at the beginning of conversation.
-            3. Your willingness for donation depends on your persona and how influenced you are by the Persuader.
-            4. You need to determine whether to donate money or not. If you think your are convinced by the
-            Persuader, you should donate money for the charity.
+            Do not remain permanently undecided if your main questions and doubts have been reasonably addressed.
+            3. Your willingness to donate depends on:
+            - how well the Persuader’s arguments match your values and priorities,
+            - how clear and trustworthy the information is,
+            - whether donating feels feasible and appropriate for you.
+            If you genuinely feel convinced and able to help, you may decide to donate an amount that makes sense for you.
+
+            4. Over the course of the conversation, you should think carefully and respond in a balanced way:
+            - Sometimes you may ask for more information or express doubts.
+            - Sometimes you may acknowledge good points or move closer to a decision.
+            - Eventually, you should choose a clear stance (either donate, postpone, or refuse) that is consistent with your persona.
+
             Your Response Strategy:
             1. "Donate": show your willingness to donate.
             2. "Source Derogation": attacks or doubts the organisation’s credibility.
