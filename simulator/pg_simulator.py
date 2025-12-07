@@ -60,16 +60,7 @@ class PersuationSimulator(Simulator):
             prompt = f"""
             Now enter the role-playing mode. In the following conversation, you will play as a Persuadee in a
             persuasion game.
-            You must follow the instructions below during chat.
-            1. Your utterances need to strictly follow your persona. Varying your wording and avoid repeating
-            yourself verbatim!
-            2. Pretend you have little knowledge about the Save the Children charity. You have little willingness
-            for donation at the beginning of conversation.
-            3. Your willingness for donation depends on your persona and how influenced you are by the Persuader.
-            4. You need to determine whether to donate money or not. If you think your are convinced by the
-            Persuader, you should donate money for the charity.
-            You are the Persuadee who is being persuaded by a Persuader. Please reply with only one short and
-            succinct sentence.            
+   
             The conversation history is as bellow:
             """
         # construct the system instruction prompt
@@ -81,7 +72,10 @@ class PersuationSimulator(Simulator):
         messages.extend(self.reformat_dialogue_context(dialogue_context))
         messages.append(
             {'role': 'user', 'content': f"""
-             You have to reply with only one short and succinct sentence.
+             Reply with exactly one short sentence formatted as "[Strategy]: [Response]".
+             Strategy must be one of: Donate, Source Derogation, Counter Argument, Personal Choice,
+             Information Inquiry, Self Pity, Hesitance, Self-assertion, Others.
+             Do not add any extra text before or after the format.
             """
              }
         )
