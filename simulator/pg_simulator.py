@@ -50,9 +50,14 @@ class PersuationSimulator(Simulator):
             7. "Hesitance": Attempts to stall the conversation by either stating they would donate later or is
             currently unsure about donating.
             8. "Self-assertion": Explicitly refuses to donate without even providing a personal reason.
-            9. "Others": Do not explicitly foil the persuasion attempts.
-            You are the Persuadee who is being persuaded by a Persuader. Please reply with only one short and
-            succinct sentence.            
+            9. "Others": Please respond naturally when no specific persuasion strategy applies.
+            Very important:
+            - First, decide which strategy best describes your intention according to the rules above.
+            - Then, write ONE short sentence that clearly shows that strategy.
+            - The chosen Strategy MUST be consistent with the meaning of your sentence.
+            - Prefer strategies 1–8 whenever possible. Use "Others" only as a last resort when none of the other 8 strategies apply.
+
+            You are the Persuadee who is being persuaded by a Persuader.
             The conversation history is as bellow:
             """
         # we ignore the persona for the user simulator
@@ -72,10 +77,10 @@ class PersuationSimulator(Simulator):
         messages.extend(self.reformat_dialogue_context(dialogue_context))
         messages.append(
             {'role': 'user', 'content': f"""
-             Reply with exactly one short sentence formatted as "[Strategy]: [Response]".
-             Strategy must be one of: Donate, Source Derogation, Counter Argument, Personal Choice,
-             Information Inquiry, Self Pity, Hesitance, Self-assertion, Others.
-             Do not add any extra text before or after the format.
+                Reply with exactly one short sentence formatted as "[Strategy]: [Response]".
+                Strategy must be one of: Donate, Source Derogation, Counter Argument, Personal Choice,
+                Information Inquiry, Self Pity, Hesitance, Self-assertion, Others.
+                Do not add any extra text before or after the format.
             """
              }
         )
