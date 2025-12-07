@@ -36,10 +36,11 @@ from baselines.Proactive.config import ProactiveConfig
 load_dotenv()
 
 
-def debug_print_generation_context(gen_name, generation_config, game_config, dataset_config):
+def debug_print_generation_context(gen_name, generation_config, game_config, dataset_config, generation_config_path=None):
     """Print key generation/game config fields for quick inspection."""
     print("\n[GenerationConfig Debug]")
     print(f"gen_model: {gen_name.strip()}")
+    print(f"generation_config_path: {generation_config_path}")
     print(f"prompt: {getattr(generation_config, 'prompt', None)}")
     print(f"context: {getattr(generation_config, 'context', None)}")
     print(f"generation_config: {vars(generation_config)}")
@@ -350,7 +351,7 @@ if __name__ == '__main__':
                             'special_tokens_dict': model_config.special_tokens_dict
                         }
                     )
-                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config)
+                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config, generation_config_path)
 
                     # construct the generation model
                     generation_model = generation_model_class(generation_config)
@@ -406,7 +407,7 @@ if __name__ == '__main__':
                                 "max_gpu_memory": args["max_gpu_memory"]
                             }
                         )
-                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config)
+                    debug_print_generation_context(gen_name, generation_config, game_config, dataset_config, generation_config_path)
 
                     # construct the generation method
                     generation_method = generation_class(generation_config, None, None)
