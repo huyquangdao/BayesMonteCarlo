@@ -65,9 +65,9 @@ class Llama3Generation(LLMGeneration):
         # )
         
         # debug: print the prompt used for system generation
-        print("\n[SYS_GEN_PROMPT][llama3]")
-        for msg in messages:
-            print(f"{msg.get('role','').upper()}: {msg.get('content','')}")
+        # print("\n[SYS_GEN_PROMPT][llama3]")
+        # for msg in messages:
+        #     print(f"{msg.get('role','').upper()}: {msg.get('content','')}")
         
         # calling the llm for response generation
         t = time.time()
