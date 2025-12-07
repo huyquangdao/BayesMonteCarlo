@@ -475,11 +475,11 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
             "{dialogue_context}\n\n"
             "When you answer, follow these general rules:\n"
-            "- Directly respond to the Persuadee's last message (address their question, concern, or hesitation).\n"
+            "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
             "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
             "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
-            "Now reply with exactly one short and succinct sentence as the Persuader.\n"
+            "Always respond with one or more complete sentences that clearly advance the persuasion goal.\n"
         )
      }
 ]

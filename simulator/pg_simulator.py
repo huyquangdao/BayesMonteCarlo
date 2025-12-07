@@ -105,7 +105,7 @@ class PersuationSimulator(Simulator):
         # calling the llm for response generation
         response = call_llm(messages, 
                             n=1, 
-                            temperature=0.7, 
+                            temperature=0.2, 
                             max_token=self.max_gen_token, 
                             model_type=self.model_type,
                             **kwargs
