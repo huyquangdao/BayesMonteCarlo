@@ -473,9 +473,14 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
             "Your high-level strategy for this turn is:\n"
             "{goal_description}\n\n"
-            "Based on the above conversation history and this strategy,\n"
-            "reply with exactly ONE short and succinct sentence as the Persuader.\n"
-            "Do NOT greet the user again unless the strategy is explicitly about greeting and this is the first turn.\n"
+            "The conversation history between you (Persuader) and the Persuadee is given above this instruction.\n"
+            "The Persuadee's LAST message expresses their current concern, question, or hesitation.\n\n"
+            "Follow these rules when you answer:\n"
+            "1. FIRST, directly address the Persuadee's last message "
+            "(e.g., answer their question, acknowledge their hesitation, or respond to their concern such as trust).\n"
+            "2. THEN, apply the strategy described above in a natural way within the SAME sentence, if possible.\n"
+            "3. Do NOT ignore or sidestep the Persuadee's last message.\n"
+            "Now reply with exactly ONE short and succinct sentence as the Persuader.\n"
         )
      }
 ]
