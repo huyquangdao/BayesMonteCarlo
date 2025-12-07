@@ -54,9 +54,7 @@ class Llama3Generation(LLMGeneration):
         else:
             raise Exception("Invalid Scenario ...")
         
-        if self.generation_config.scenario_name in [PERSUATION]:
-            messages.format(dialogue_context=dialogue_context)
-        else:
+        if self.generation_config.scenario_name != PERSUATION:
             messages.extend(dialogue_context)
         
         # Incorporating strategy description at the later of the prompt improve the alignment
