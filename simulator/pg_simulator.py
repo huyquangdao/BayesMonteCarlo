@@ -65,6 +65,7 @@ class PersuationSimulator(Simulator):
             - Then, write ONE short sentence that clearly shows that strategy.
             - The chosen Strategy MUST be consistent with the meaning of your sentence.
             - Prefer strategies 1–8 whenever possible. Use "Others" only as a last resort when none of the other 8 strategies apply.
+            - Do NOT output labels like "Donate:", "Hesitance:" or any other strategy name in your response; just speak naturally as the Persuadee.
 
             You are the Persuadee who is being persuaded by a Persuader.
             The conversation history is as bellow:

@@ -479,7 +479,7 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "- Apply the given strategy in a natural way within the same sentence.\n"
             "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
             "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
-            "Always respond with one or more complete sentences that clearly advance the persuasion goal.\n"
+            "Please reply with only one short and succinct sentence.\n"
         )
      }
 ]
