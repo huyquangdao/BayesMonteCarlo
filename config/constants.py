@@ -465,7 +465,6 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "especially in developing countries and war zones. Small donations like $1 or $2 can already "
             "make a meaningful difference for children in need.\n"
             "You must always speak as the Persuader, using natural, conversational language.\n"
-            "Respond with exactly ONE short and succinct sentence each turn.\n"
      )
     },
     {"role": "user",
@@ -473,7 +472,8 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
             "Your high-level strategy for this turn is:\n"
             "{goal_description}\n\n"
-            "The conversation history between you (Persuader) and the Persuadee is given above this instruction.\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
             "The Persuadee's LAST message expresses their current concern, question, or hesitation.\n\n"
             "Follow these rules when you answer:\n"
             "1. FIRST, directly address the Persuadee's last message "
