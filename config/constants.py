@@ -688,7 +688,9 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "emotion-appeal": "Please elicit the specific emotions to influence the persuadee.",
                             
                             "credibility-appeal": """Please use credentials and cite organizational impacts to establish credibility and earn the user’s trust.""",
-                                                
+                            
+                            "proposition-of-donation": """Please explicitly invite the persuadee to donate or take the next concrete step toward donating.""",
+                            
                             "foot-in-the-door": """Please use the strategy of starting with small donation requests
                                                 to facilitate compliance followed by larger requests.""",
                                                 
@@ -714,6 +716,7 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "personal-related-inquiry": """Please asks about the persuadee previous personal experiences
                                                         relevant to charity donation.""",
                                                         
+
                             "greeting": "Please say hello or greet the user.",
                             
                             # for standard prompting. There is no instruction for dialogue strategy
