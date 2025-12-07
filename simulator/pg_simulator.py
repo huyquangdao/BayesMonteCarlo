@@ -77,7 +77,7 @@ class PersuationSimulator(Simulator):
         messages.extend(self.reformat_dialogue_context(dialogue_context))
         messages.append(
             {'role': 'user', 'content': f"""
-                Reply with exactly one short sentence formatted as "[Strategy]: [Response]".
+                Reply with exactly one short sentence formatted as "[Strategy] - [Response]".
                 Strategy must be one of: Donate, Source Derogation, Counter Argument, Personal Choice,
                 Information Inquiry, Self Pity, Hesitance, Self-assertion, Others.
                 Do not add any extra text before or after the format.
