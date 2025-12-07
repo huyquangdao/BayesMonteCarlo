@@ -61,6 +61,16 @@ class Simulator(ABC):
         output = call_llm(messages, n=1, temperature=self.temperature, max_token=self.max_description_tokens)
         return output[0]
 
+    def log_prompt(self, messages, prefix="USER_SIM_PROMPT"):
+        """
+        helper to print the prompt sent to the simulator LLM
+        """
+        print(f"\n[{prefix}]")
+        for msg in messages:
+            role = msg.get("role", "").upper()
+            content = msg.get("content", "")
+            print(f"{role}: {content}")
+
     def set_model_type(self, model_type):
         """
         set the model type can be either llama3 or chatgpt

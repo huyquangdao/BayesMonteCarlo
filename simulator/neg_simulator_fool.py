@@ -71,6 +71,8 @@ class NegotiationSimulator(Simulator):
 
         # reformating and prepending the dialogue context to the current prompt
         messages.extend(self.reformat_dialogue_context(dialogue_context))
+        # print the prompt used for simulator response
+        self.log_prompt(messages, prefix="NEG_FOOL_USER_SIM_PROMPT")
         # print(messages)
         # assert 1 == 0
         

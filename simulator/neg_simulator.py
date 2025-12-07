@@ -102,6 +102,8 @@ class NegotiationSimulator(Simulator):
             """
              }
         )
+        # print the prompt used for simulator response
+        self.log_prompt(messages, prefix="NEG_USER_SIM_PROMPT")
         # messages.extend(dialogue_context)
         t = time.time()
 

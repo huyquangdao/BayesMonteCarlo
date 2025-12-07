@@ -86,6 +86,9 @@ class PersuationSimulator(Simulator):
              }
         )
         
+        # print the prompt used for simulator response
+        self.log_prompt(messages, prefix="PG_USER_SIM_PROMPT")
+        
         # print(messages)
                         
         # messages.extend(dialogue_context)
