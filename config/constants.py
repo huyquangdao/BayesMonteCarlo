@@ -474,7 +474,6 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "{goal_description}\n\n"
             "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
             "{dialogue_context}\n\n"
-            "The Persuadee's LAST message expresses their current concern, question, or hesitation.\n\n"
             "Follow these rules when you answer:\n"
             "1. FIRST, directly address the Persuadee's last message "
             "(e.g., answer their question, acknowledge their hesitation, or respond to their concern such as trust).\n"
