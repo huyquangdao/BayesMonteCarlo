@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+from utils.utils import build_dialogue_context_string
 
 from config.constants import *
 
@@ -332,11 +333,14 @@ def construct_prompt_for_chat_gpt_response_generation_persuation(state, prompt):
     else:
         goal_description = pred_goal  # fallback: raw label
 
-    dialogue_context = state['dialogue_context']
+    dialogue_context_str = build_dialogue_context_string(
+        state,
+        speaker_alias=None
+    )
 
     new_prompt[1]['content'] = new_prompt[1]['content'].format(
         goal_description=goal_description,
-        dialogue_context=dialogue_context
+        dialogue_context=dialogue_context_str
     )
 
     return new_prompt, goal_description
