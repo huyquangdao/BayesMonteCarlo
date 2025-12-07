@@ -207,35 +207,6 @@ from logger.wandb_logger import WanDBLogger
 
 import copy
 
-def build_dialogue_context_string(state, speaker_alias=None):
-    raw_context = state.get("dialogue_context", "")
-
-    if speaker_alias is None:
-        speaker_alias = {}
-
-    if isinstance(raw_context, list):
-        lines = []
-        for turn in raw_context:
-            role = (turn.get("role") or "").lower()
-            content = (turn.get("content") or "").strip()
-            if not content:
-                continue
-            if role in speaker_alias:
-                speaker = speaker_alias[role]
-            elif role:
-                speaker = role.capitalize()
-            else:
-                speaker = "Speaker"
-            lines.append(f"{speaker}: {content}")
-        dialogue_context_str = "\n".join(lines)
-    elif isinstance(raw_context, str):
-        dialogue_context_str = raw_context.strip()
-    else:
-        dialogue_context_str = ""
-
-    return dialogue_context_str
-
-
 def set_seed(seed):
     """
     control the random seed for each run

@@ -24,6 +24,34 @@ def convert_list_to_str(knowledge):
         return ""
     return f"{knowledge[0]} {knowledge[1]} {knowledge[2]}"
 
+def _build_dialogue_context_string(state, speaker_alias=None):
+    raw_context = state.get("dialogue_context", "")
+
+    if speaker_alias is None:
+        speaker_alias = {}
+
+    if isinstance(raw_context, list):
+        lines = []
+        for turn in raw_context:
+            role = (turn.get("role") or "").lower()
+            content = (turn.get("content") or "").strip()
+            if not content:
+                continue
+            if role in speaker_alias:
+                speaker = speaker_alias[role]
+            elif role:
+                speaker = role.capitalize()
+            else:
+                speaker = "Speaker"
+            lines.append(f"{speaker}: {content}")
+        dialogue_context_str = "\n".join(lines)
+    elif isinstance(raw_context, str):
+        dialogue_context_str = raw_context.strip()
+    else:
+        dialogue_context_str = ""
+
+    return dialogue_context_str
+
 
 def convert_example_to_feature_for_generation_recommendation(tokenizer, instance, max_sequence_length=512,
                                                              max_target_length=50,
@@ -333,7 +361,7 @@ def construct_prompt_for_chat_gpt_response_generation_persuation(state, prompt):
     else:
         goal_description = pred_goal  # fallback: raw label
 
-    dialogue_context_str = build_dialogue_context_string(
+    dialogue_context_str = _build_dialogue_context_string(
         state,
         speaker_alias=None
     )
