@@ -802,29 +802,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
+                prompt_dialogue_context = stringify_dialogue_context(state["dialogue_context"])
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
-                # response_mode = getattr(self.model_config, "response_mode", "preview")
-                # if response_mode == "preview":
-                #     sys_utt = planner.get_best_realization(state, best_action)
-                #     user_utt = simulator.respond(
-                #         state,
-                #         llm_pipeline=self.game_config.llm_pipeline,
-                #         terminators=self.game_config.terminators,
-                #     )
-                #     # update the dialogue context
-                #     state['response'] = sys_utt
-                #     state['dialogue_context'].append({"role": "assistant", "content": sys_utt})
 
-                #     state['dialogue_context'].append({"role": "user", "content": user_utt})
-                #     state['pre_goals'].append(goal)
-
-                #     logger.info(f"[System]: {sys_utt}")
-                #     logger.info(f"[USER]: {user_utt}")
-                #     next_state = state
-
-                # else:
                 next_state, _, done, _ = self.game.step(state, 
                                                 goal, 
                                                 self.generation_method, 
@@ -835,9 +817,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 user_utt = next_state["dialogue_context"][-1]["content"]
                 print("done: ", done)
 
-                # print full history up to current turn
-                history_str = stringify_dialogue_context(next_state["dialogue_context"])
-
                 # construct the preference pair
                 pair = get_preference_pair(
                     action_prob,
@@ -847,6 +826,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     planner.realizations_Vs,
                     selected_action=best_action
                 )
+
+                # print full history up to current turn
+                history_str = stringify_dialogue_context(next_state["dialogue_context"])
+
                 if pair is None:
                     logger.info("Not enough realizations to form preference pair; skipping turn.")
                     state = next_state
@@ -879,7 +862,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 dialog_pairs.append(
                     {
-                        "prompt": stringify_dialogue_context(state["dialogue_context"]),
+                        "prompt": prompt_dialogue_context,
                         "chosen": best_pair[0],
                         "rejected": worst_pair[0],
                         "turn": turn,
