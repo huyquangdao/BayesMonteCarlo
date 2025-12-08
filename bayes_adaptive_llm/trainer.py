@@ -802,7 +802,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
-                prompt_dialogue_context = stringify_dialogue_context(state["dialogue_context"])
+                prompt_dialogue_context = "You are the Persuader. " \
+                "Generate the Persuader reply that advances persuasion in a way that persuades the Persuadee to donate to Save the Children.\n" \
+                "Conversation so far:\n" + stringify_dialogue_context(state["dialogue_context"])
+
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
@@ -859,7 +862,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
                     f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})"
                 )
-
+                
                 dialog_pairs.append(
                     {
                         "prompt": prompt_dialogue_context,
