@@ -862,7 +862,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
                     f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})"
                 )
-                
+
                 dialog_pairs.append(
                     {
                         "prompt": prompt_dialogue_context,
@@ -889,7 +889,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     break
 
             outcome = dialog_game.get_dialog_ended(state)
-            if outcome == 1.0:
+            if outcome > 0.0:
                 preference_pairs.extend(dialog_pairs)
                 # log full dialog transcript
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
@@ -899,13 +899,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     with preference_path.open("a", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    logger.info("Appended %d pairs from dialog %d to %s", len(dialog_pairs), dialog_idx, preference_path)
+                    logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
             else:
                 logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
 
         if preference_path and preference_pairs:
             # already appended per dialog; nothing more to write here.
-            logger.info("Total pairs written so far: %d (path: %s)", len(preference_pairs), preference_path)
+            logger.info("Total pairs written so far: {} (path: {})", len(preference_pairs), preference_path)
 
         # Overwrite dataset splits so DPO trainer can consume them directly.
         if preference_pairs:
@@ -913,5 +913,5 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.dataset.dev_instances = []
             self.dataset.test_instances = []
 
-        logger.info("Generated %d preference pairs from %d dialogs.", len(preference_pairs), len(train_cases))
+        logger.info("Generated {} preference pairs from {} dialogs.", len(preference_pairs), len(train_cases))
         return preference_pairs
