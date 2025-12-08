@@ -364,16 +364,30 @@ CHATGPT_PROMPT_FOR_EMOTIONAL_SUPPORT = [
 
 CHATGPT_PROMPT_FOR_PERSUATION = [
     {"role": "system",
-     "content": """Now enter the role-playing mode. In the following conversation, you will play as a Persuader who is
-    trying to persuade the Persuadee to donate to the charity called Save the Children.
-    Save the Children is head-quartered in London, and they work to help fight poverty around the world.
-    Children need help in developing countries and war zones. Small donations like $1 or $2 go a long
-    way to help"""
+     "content":(
+            "Now enter role-playing mode. You are a Persuader in a persuasion game.\n"
+            "In this conversation, you try to persuade the Persuadee to donate to the charity 'Save the Children'.\n"
+            "Save the Children is headquartered in London and helps fight poverty around the world, "
+            "especially in developing countries and war zones. Small donations like $1 or $2 can already "
+            "make a meaningful difference for children in need.\n"
+            "You must always speak as the Persuader, using natural, conversational language.\n"
+     )
     },
     {"role": "user",
-     "content": "You are the Persuader who is trying to convince the Persuadee to donate to a charity called Save the Children. "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 # prompts for the llama 3 mode
 # including the recommendation, negotiation and emotional support
@@ -410,16 +424,30 @@ LLAMA3_PROMPT_FOR_EMOTIONAL_SUPPORT = [
 
 LLAMA3_PROMPT_FOR_PERSUATION = [
     {"role": "system",
-     "content": """Now enter the role-playing mode. In the following conversation, you will play as a Persuader who is
-    trying to persuade the Persuadee to donate to the charity called Save the Children.
-    Save the Children is head-quartered in London, and they work to help fight poverty around the world.
-    Children need help in developing countries and war zones. Small donations like $1 or $2 go a long
-    way to help"""
+     "content":(
+            "Now enter role-playing mode. You are a Persuader in a persuasion game.\n"
+            "In this conversation, you try to persuade the Persuadee to donate to the charity 'Save the Children'.\n"
+            "Save the Children is headquartered in London and helps fight poverty around the world, "
+            "especially in developing countries and war zones. Small donations like $1 or $2 can already "
+            "make a meaningful difference for children in need.\n"
+            "You must always speak as the Persuader, using natural, conversational language.\n"
+     )
     },
     {"role": "user",
-     "content": "You are the Persuader who is trying to convince the Persuadee to donate to a charity called Save the Children. "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 
@@ -482,7 +510,7 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
-     }
+    }
 ]
 
 # prompts for the wrapper class
