@@ -750,3 +750,16 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             
                             # for standard prompting. There is no instruction for dialogue strategy
                             "Standard": ""}
+
+#prompt for collect preference pairs
+PREFERENCE_PAIR_PROMPT_P4G = """
+        "You are the Persuader. " \
+        "Generate the Persuader reply that advances persuasion in a way that persuades the Persuadee to donate to Save the Children.\n" \
+        "Conversation so far:\n"
+"""
+# preference pair extraction for negotiation
+PREFERENCE_PAIR_PROMPT_NEGOTIATION = """
+        "You are the Buyer. " \
+        "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n" \
+        "Conversation so far:\n"
+"""
