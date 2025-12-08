@@ -46,8 +46,8 @@ gradient_checkpointing: true
 # Path to preference pairs (jsonl) used for DPO; each row should include
 # dialog_id, prompt, chosen, rejected, and an optional persona_hint with
 # personality/decision_making_style.
-# preference_pairs_path: "data/preference_pairs_qwen.jsonl"
-preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
+preference_pairs_path: "data/preference_pairs_llama3.1.jsonl"
+# preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 # Special tokens for persuasion (same as TRIP/PPDPP PG)
 special_tokens_dict:
