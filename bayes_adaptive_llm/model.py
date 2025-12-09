@@ -27,13 +27,13 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
             torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            # device_map={"": 0} if torch.cuda.is_available() else None,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
             torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            device_map="auto" if torch.cuda.is_available() else None,
+            device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
 
         # extend vocabulary with task-specific tokens
