@@ -14,9 +14,6 @@ from base.model import Model
 
 
 class BayesAdaptiveLLMModel(Model):
-    """
-    Classification-style policy head on top of a PLM.
-    """
 
     def __init__(self, model_config, **kwargs):
         super().__init__(model_config, **kwargs)
@@ -29,7 +26,7 @@ class BayesAdaptiveLLMModel(Model):
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
-            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
+            torch_dtype=torch.bfloat16,
             device_map="auto",
             # device_map={"": 1} if torch.cuda.is_available() else None,
         )

@@ -440,8 +440,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Supervised fine-tuning aligned with the TRIP trainer structure but using
         the configuration schema from the reference Hugging Face script.
         """
-        if device is None:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # if device is None:
+        #     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        device = self.accelerator.device
 
         train_instances, dev_instances, _ = self.process_dataset(dataset)
 
@@ -451,6 +453,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         base_model = getattr(self.model, "plm", self.model)
         base_model.to(device)
+        
         use_lora = getattr(self.model_config, "use_lora", True)
         peft_config = None
         if use_lora:
