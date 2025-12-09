@@ -11,7 +11,10 @@ import torch.nn as nn
 from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
 
 from base.model import Model
+import gc
 
+gc.collect()
+torch.cuda.empty_cache()
 
 class BayesAdaptiveLLMModel(Model):
     """
@@ -23,15 +26,14 @@ class BayesAdaptiveLLMModel(Model):
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
-            # torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
+            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
             # device_map={"": 0} if torch.cuda.is_available() else None,
         )
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
             torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            # device_map="cuda",
-            device_map={"": 1} if torch.cuda.is_available() else None,
+            device_map="auto" if torch.cuda.is_available() else None,
         )
 
         # extend vocabulary with task-specific tokens
