@@ -838,7 +838,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     break
 
                 
-
                 state_rep = planner._to_string_rep(state)
                 valid_moves = planner.valid_moves.get(state_rep, [])
 
