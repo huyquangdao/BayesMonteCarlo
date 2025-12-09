@@ -244,7 +244,7 @@ class OpenLoopMCTS(MCTS):
         # check if it is terminal node
         # failed or successfully recommending the target item.
         if terminated_v in [-1,1]:
-            logger.info("OpenLoopMCTS terminal leaf encountered | state=%s", hashable_state)
+            # logger.info("OpenLoopMCTS terminal leaf encountered | state=%s", hashable_state)
             return terminated_v
 
         # otherwise, if is nontermial leaf node, we initialize and return v

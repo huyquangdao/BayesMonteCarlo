@@ -41,32 +41,33 @@ class Llama3Generation(LLMGeneration):
         dialogue_context = instance['dialogue_context']
         # the recommendation scenario
         if self.generation_config.scenario_name == RECOMMENDATION:
-            messages, goal_description = construct_prompt_for_chat_gpt_response_generation_recommendation(instance,
-                                                                                                          self.generation_config.prompt)
+            messages, _ = construct_prompt_for_chat_gpt_response_generation_recommendation(instance, self.generation_config.prompt)
         # the negotiation scenario
         elif self.generation_config.scenario_name == NEGOTIATION:
-            messages, goal_description = construct_prompt_for_chat_gpt_response_generation_negotiation(instance,
-                                                                                                       self.generation_config.prompt)
+            messages, _ = construct_prompt_for_chat_gpt_response_generation_negotiation(instance, self.generation_config.prompt)
         # the emotional support conversation
         elif self.generation_config.scenario_name == EMOTIONAL_SUPPORT:
-            messages, goal_description = construct_prompt_for_chat_gpt_response_generation_emotional_support(instance,
-                                                                                                             self.generation_config.prompt)
+            messages, _ = construct_prompt_for_chat_gpt_response_generation_emotional_support(instance, self.generation_config.prompt)
         # the emotional support conversation
         elif self.generation_config.scenario_name == PERSUATION:
-            messages, goal_description = construct_prompt_for_chat_gpt_response_generation_persuation(instance,
-                                                                                                    self.generation_config.prompt
-                                                                                                    )
+            messages, _ = construct_prompt_for_chat_gpt_response_generation_persuation(instance, self.generation_config.prompt)
         else:
             raise Exception("Invalid Scenario ...")
-
-        messages.extend(dialogue_context)
+        
+        if self.generation_config.scenario_name != PERSUATION:
+            messages.extend(dialogue_context)
         
         # Incorporating strategy description at the later of the prompt improve the alignment
         # between the predicted dialogue strategy and the generated response.
-        messages.append(
-            {'role': 'user', 'content': f"{goal_description}. "
-                                        'Please reply with only one short and succinct sentence.'}
-        )
+        # messages.append(
+        #     {'role': 'user', 'content': f"{goal_description}. "
+        #                                 'Please reply with only one short and succinct sentence.'}
+        # )
+        
+        # debug: print the prompt used for system generation
+        # print("\n[SYS_GEN_PROMPT][llama3]")
+        # for msg in messages:
+        #     print(f"{msg.get('role','').upper()}: {msg.get('content','')}")
         
         # calling the llm for response generation
         t = time.time()

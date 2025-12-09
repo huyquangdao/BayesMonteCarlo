@@ -67,6 +67,7 @@ P4G_GOALS = [
     "personal-story",
 	"credibility-appeal",
 	"emotion-appeal",
+    "proposition-of-donation",
 	"donation-information",
 	"foot-in-the-door",
 	"logical-appeal",
@@ -363,16 +364,30 @@ CHATGPT_PROMPT_FOR_EMOTIONAL_SUPPORT = [
 
 CHATGPT_PROMPT_FOR_PERSUATION = [
     {"role": "system",
-     "content": """Now enter the role-playing mode. In the following conversation, you will play as a Persuader who is
-    trying to persuade the Persuadee to donate to the charity called Save the Children.
-    Save the Children is head-quartered in London, and they work to help fight poverty around the world.
-    Children need help in developing countries and war zones. Small donations like $1 or $2 go a long
-    way to help"""
+     "content":(
+            "Now enter role-playing mode. You are a Persuader in a persuasion game.\n"
+            "In this conversation, you try to persuade the Persuadee to donate to the charity 'Save the Children'.\n"
+            "Save the Children is headquartered in London and helps fight poverty around the world, "
+            "especially in developing countries and war zones. Small donations like $1 or $2 can already "
+            "make a meaningful difference for children in need.\n"
+            "You must always speak as the Persuader, using natural, conversational language.\n"
+     )
     },
     {"role": "user",
-     "content": "You are the Persuader who is trying to convince the Persuadee to donate to a charity called Save the Children. "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 # prompts for the llama 3 mode
 # including the recommendation, negotiation and emotional support
@@ -409,16 +424,30 @@ LLAMA3_PROMPT_FOR_EMOTIONAL_SUPPORT = [
 
 LLAMA3_PROMPT_FOR_PERSUATION = [
     {"role": "system",
-     "content": """Now enter the role-playing mode. In the following conversation, you will play as a Persuader who is
-    trying to persuade the Persuadee to donate to the charity called Save the Children.
-    Save the Children is head-quartered in London, and they work to help fight poverty around the world.
-    Children need help in developing countries and war zones. Small donations like $1 or $2 go a long
-    way to help"""
+     "content":(
+            "Now enter role-playing mode. You are a Persuader in a persuasion game.\n"
+            "In this conversation, you try to persuade the Persuadee to donate to the charity 'Save the Children'.\n"
+            "Save the Children is headquartered in London and helps fight poverty around the world, "
+            "especially in developing countries and war zones. Small donations like $1 or $2 can already "
+            "make a meaningful difference for children in need.\n"
+            "You must always speak as the Persuader, using natural, conversational language.\n"
+     )
     },
     {"role": "user",
-     "content": "You are the Persuader who is trying to convince the Persuadee to donate to a charity called Save the Children. "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 
@@ -458,16 +487,30 @@ QWEN_PROMPT_FOR_EMOTIONAL_SUPPORT = [
 
 QWEN_PROMPT_FOR_PERSUATION = [
     {"role": "system",
-     "content": """Now enter the role-playing mode. In the following conversation, you will play as a Persuader who is
-    trying to persuade the Persuadee to donate to the charity called Save the Children.
-    Save the Children is head-quartered in London, and they work to help fight poverty around the world.
-    Children need help in developing countries and war zones. Small donations like $1 or $2 go a long
-    way to help"""
+     "content":(
+            "Now enter role-playing mode. You are a Persuader in a persuasion game.\n"
+            "In this conversation, you try to persuade the Persuadee to donate to the charity 'Save the Children'.\n"
+            "Save the Children is headquartered in London and helps fight poverty around the world, "
+            "especially in developing countries and war zones. Small donations like $1 or $2 can already "
+            "make a meaningful difference for children in need.\n"
+            "You must always speak as the Persuader, using natural, conversational language.\n"
+     )
     },
     {"role": "user",
-     "content": "You are the Persuader who is trying to convince the Persuadee to donate to a charity called Save the Children. "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Persuader who is trying to convince the Persuadee to donate to Save the Children.\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Persuader) and the Persuadee is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 # prompts for the wrapper class
@@ -674,7 +717,9 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "emotion-appeal": "Please elicit the specific emotions to influence the persuadee.",
                             
                             "credibility-appeal": """Please use credentials and cite organizational impacts to establish credibility and earn the user’s trust.""",
-                                                
+                            
+                            "proposition-of-donation": """Please explicitly invite the persuadee to donate or take the next concrete step toward donating.""",
+                            
                             "foot-in-the-door": """Please use the strategy of starting with small donation requests
                                                 to facilitate compliance followed by larger requests.""",
                                                 
@@ -700,7 +745,18 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "personal-related-inquiry": """Please asks about the persuadee previous personal experiences
                                                         relevant to charity donation.""",
                                                         
+
                             "greeting": "Please say hello or greet the user.",
                             
                             # for standard prompting. There is no instruction for dialogue strategy
                             "Standard": ""}
+
+#prompt for collect preference pairs
+PREFERENCE_PAIR_PROMPT_P4G = "You are the Persuader. " \
+        "Generate the Persuader reply that advances persuasion in a way that persuades the Persuadee to donate to Save the Children.\n" \
+        "Conversation so far:\n"
+
+# preference pair extraction for negotiation
+PREFERENCE_PAIR_PROMPT_NEGOTIATION = "You are the Buyer. " \
+        "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n" \
+        "Conversation so far:\n"

@@ -23,6 +23,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
     def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False) -> None:
         save_dir = self.model_config.saved_dir
+        print("Loading pretrained model from:", save_dir)
         if has_meta_checkpoint(save_dir):
             load_from_meta_checkpoint(self, save_dir)
         else:

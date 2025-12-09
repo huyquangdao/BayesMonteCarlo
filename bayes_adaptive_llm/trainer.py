@@ -58,7 +58,7 @@ from bayes_adaptive_llm.data_processor import (
     BayesTorchDatasetForRecommendation,
 )
 from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
-from config.constants import RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
+from config.constants import PREFERENCE_PAIR_PROMPT_NEGOTIATION, PREFERENCE_PAIR_PROMPT_P4G, RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
     TOXICITY, ITEM_FREQ, USER_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
     P4G_GOAL2DESCRIPTION
 
@@ -200,20 +200,69 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Cannot infer conversation structure from instance. "
             "Please adapt _instance_to_messages_for_persuasion."
         )
+    
+    def _instance_to_messages_for_negotiation(self, inst):
+        """
+        Convert a negotiation instance to chat messages for SFT.
+        Support:
+        - generic:   inst["messages"]
+        """
+        def _get(obj, key, default=None):
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        system_content = "You are a Negotiator trying to reach an agreement with the other party."
+
+        messages = [{"role": "system", "content": system_content}]
+
+        dialogue_context = _get(inst, "dialogue_context")
+        target_resp = _get(inst, "response")
+        if dialogue_context:
+            for utt in dialogue_context:
+                content = (utt.get("content") or "").strip()
+                if not content:
+                    continue
+                role = "assistant" if utt.get("role", "user") == "assistant" else "user"
+                messages.append({"role": role, "content": content})
+            if target_resp:
+                messages.append({"role": "assistant", "content": target_resp})
+            return {"messages": messages}
+
+        maybe_msgs = _get(inst, "messages")
+        if maybe_msgs is not None:
+            return {"messages": maybe_msgs}
+
+        raise ValueError(
+            "Cannot infer conversation structure from instance. "
+            "Please adapt _instance_to_messages_for_negotiation."
+        )
 
     def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
         if self.tokenizer is None:
             raise ValueError("self.model.tokenizer is None; cannot run SFT.")
 
         tokenizer = self.tokenizer
-        train_records = [
-            self._instance_to_messages_for_persuasion(inst)
-            for inst in train_instances
-        ]
-        dev_records = [
-            self._instance_to_messages_for_persuasion(inst)
-            for inst in dev_instances
-        ]
+        if self.game_config.name == PERSUATION:
+            train_records = [
+                self._instance_to_messages_for_persuasion(inst)
+                for inst in train_instances
+            ]
+            dev_records = [
+                self._instance_to_messages_for_persuasion(inst)
+                for inst in dev_instances
+            ]
+        elif self.game_config.name == NEGOTIATION:
+            train_records = [
+                self._instance_to_messages_for_negotiation(inst)
+                for inst in train_instances
+            ]
+            dev_records = [
+                self._instance_to_messages_for_negotiation(inst)
+                for inst in dev_instances
+            ]
+        else:
+            raise NotImplementedError("SFT dataset construction not implemented for this scenario.")
 
         raw_datasets = DatasetDict(
             {
@@ -674,9 +723,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         The pairs are also written to disk if `model_config.preference_pairs_path` is provided,
         and the in-memory dataset is overwritten so DPO training can consume them directly.
         """
-        if self.game_config.name != PERSUATION:
-            logger.warning("Preference search is currently implemented for persuasion only; skipping.")
-            return []
+        if self.game_config.name == PERSUATION:
+            prompt_preference_by_game = PREFERENCE_PAIR_PROMPT_P4G
+        elif self.game_config.name == NEGOTIATION:
+            prompt_preference_by_game = PREFERENCE_PAIR_PROMPT_NEGOTIATION
+        else:
+            prompt_preference_by_game = ""
 
         if not dev_simulators:
             raise ValueError("User simulators are required for MCTS preference generation.")
@@ -687,15 +739,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)
-        if not hasattr(self.model_config, "user_dialog_acts"):
-            # default persuadee acts for persuasion setting
-            self.model_config.user_dialog_acts = [
-                "U_NoDonation",
-                "U_NegativeReaction",
-                "U_Neutral",
-                "U_PositiveReaction",
-                "U_Donate",
-            ]
         logger.info("Action mapping: {}", action_mapping)
         dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
         player = LLMPlayer(self.game_config, action_mapping, self.model_config)
@@ -727,7 +770,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             append_to_log(log_file, [text])
 
         for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
-            # fix persuadee (simulator/persona) per dialog, similar to TRIP
+            # skip to dialog_idx
+            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 40):
+                continue
+            # fix persuadee (simulator/persona) per dialog
             # sample a simulator from the simulator pool
             simulator = random.choice(simulators)
             dialog_game = PersonaDialogGame(self.game, 
@@ -775,10 +821,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 action_prob = planner.get_action_prob(state)
                 prob_trace = planner.get_action_prob_trace(state)
                 last_prob = prob_trace[-1]["prob"] if prob_trace else {}
-                _log_line(
-                    f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
-                    f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
-                )
+                # _log_line(
+                #     f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
+                #     f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
+                # )
                 logger.info(
                     "Dialog {} turn {} | sims={} | prob={}",
                     dialog_idx,
@@ -805,29 +851,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
+                prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
+
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
-                # response_mode = getattr(self.model_config, "response_mode", "preview")
-                # if response_mode == "preview":
-                #     sys_utt = planner.get_best_realization(state, best_action)
-                #     user_utt = simulator.respond(
-                #         state,
-                #         llm_pipeline=self.game_config.llm_pipeline,
-                #         terminators=self.game_config.terminators,
-                #     )
-                #     # update the dialogue context
-                #     state['response'] = sys_utt
-                #     state['dialogue_context'].append({"role": "assistant", "content": sys_utt})
 
-                #     state['dialogue_context'].append({"role": "user", "content": user_utt})
-                #     state['pre_goals'].append(goal)
-
-                #     logger.info(f"[System]: {sys_utt}")
-                #     logger.info(f"[USER]: {user_utt}")
-                #     next_state = state
-
-                # else:
                 next_state, _, done, _ = self.game.step(state, 
                                                 goal, 
                                                 self.generation_method, 
@@ -838,9 +867,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 user_utt = next_state["dialogue_context"][-1]["content"]
                 print("done: ", done)
 
-                # print full history up to current turn
-                history_str = stringify_dialogue_context(next_state["dialogue_context"])
-
                 # construct the preference pair
                 pair = get_preference_pair(
                     action_prob,
@@ -850,18 +876,22 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     planner.realizations_Vs,
                     selected_action=best_action
                 )
+
+                # print full history up to current turn
+                history_str = stringify_dialogue_context(next_state["dialogue_context"])
+
                 if pair is None:
                     logger.info("Not enough realizations to form preference pair; skipping turn.")
                     state = next_state
                     continue
                 
                 _, best_pair, worst_pair = pair
-                sample_scores = planner.get_realization_traces(state, best_action)
-                if sample_scores:
-                    _log_line(
-                        f"[Dialog {dialog_idx} | Turn {turn}] Sample scores (by realization): "
-                        f"{json.dumps(sample_scores, ensure_ascii=False)}"
-                    )
+                # sample_scores = planner.get_realization_traces(state, best_action)
+                # if sample_scores:
+                #     _log_line(
+                #         f"[Dialog {dialog_idx} | Turn {turn}] Sample scores (by realization): "
+                #         f"{json.dumps(sample_scores, ensure_ascii=False)}"
+                #     )
 
                 logger.info(
                     "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
@@ -882,7 +912,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 dialog_pairs.append(
                     {
-                        "prompt": stringify_dialogue_context(state["dialogue_context"]),
+                        "prompt": prompt_dialogue_context,
                         "chosen": best_pair[0],
                         "rejected": worst_pair[0],
                         "turn": turn,
@@ -906,7 +936,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     break
 
             outcome = dialog_game.get_dialog_ended(state)
-            if outcome == 1.0:
+            if outcome > 0.3:
                 preference_pairs.extend(dialog_pairs)
                 # log full dialog transcript
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
@@ -916,13 +946,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     with preference_path.open("a", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    logger.info("Appended %d pairs from dialog %d to %s", len(dialog_pairs), dialog_idx, preference_path)
+                    logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
             else:
                 logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
 
         if preference_path and preference_pairs:
             # already appended per dialog; nothing more to write here.
-            logger.info("Total pairs written so far: %d (path: %s)", len(preference_pairs), preference_path)
+            logger.info("Total pairs written so far: {} (path: {})", len(preference_pairs), preference_path)
 
         # Overwrite dataset splits so DPO trainer can consume them directly.
         if preference_pairs:
@@ -930,5 +960,5 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.dataset.dev_instances = []
             self.dataset.test_instances = []
 
-        logger.info("Generated %d preference pairs from %d dialogs.", len(preference_pairs), len(train_cases))
+        logger.info("Generated {} preference pairs from {} dialogs.", len(preference_pairs), len(train_cases))
         return preference_pairs

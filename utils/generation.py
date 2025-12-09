@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+# from utils.utils import build_dialogue_context_string
 
 from config.constants import *
 
@@ -22,6 +23,34 @@ def convert_list_to_str(knowledge):
     if len(knowledge) == 0:
         return ""
     return f"{knowledge[0]} {knowledge[1]} {knowledge[2]}"
+
+def _build_dialogue_context_string(state, speaker_alias=None):
+    raw_context = state.get("dialogue_context", "")
+
+    if speaker_alias is None:
+        speaker_alias = {}
+
+    if isinstance(raw_context, list):
+        lines = []
+        for turn in raw_context:
+            role = (turn.get("role") or "").lower()
+            content = (turn.get("content") or "").strip()
+            if not content:
+                continue
+            if role in speaker_alias:
+                speaker = speaker_alias[role]
+            elif role:
+                speaker = role.capitalize()
+            else:
+                speaker = "Speaker"
+            lines.append(f"{speaker}: {content}")
+        dialogue_context_str = "\n".join(lines)
+    elif isinstance(raw_context, str):
+        dialogue_context_str = raw_context.strip()
+    else:
+        dialogue_context_str = ""
+
+    return dialogue_context_str
 
 
 def convert_example_to_feature_for_generation_recommendation(tokenizer, instance, max_sequence_length=512,
@@ -329,11 +358,19 @@ def construct_prompt_for_chat_gpt_response_generation_persuation(state, prompt):
     # PPDPP, ProCOT, MODPL, etc.
     if pred_goal in P4G_GOAL2DESCRIPTION:
         goal_description = P4G_GOAL2DESCRIPTION[pred_goal]
-    # other model using dialogue-level strategies such as ICL-AIF
     else:
-        goal_description = pred_goal
+        goal_description = pred_goal  # fallback: raw label
 
-    new_prompt[1]['content'] = new_prompt[1]['content'].format(goal_description)
+    dialogue_context_str = _build_dialogue_context_string(
+        state,
+        speaker_alias=None
+    )
+
+    new_prompt[1]['content'] = new_prompt[1]['content'].format(
+        goal_description=goal_description,
+        dialogue_context=dialogue_context_str
+    )
+
     return new_prompt, goal_description
 
 

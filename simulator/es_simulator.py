@@ -56,6 +56,9 @@ class EmotionalSupportSimulator(Simulator):
         # reformating and prepending the dialogue context to the current prompt
         messages.extend(self.reformat_dialogue_context(dialogue_context))
 
+        # print the prompt used for simulator response
+        self.log_prompt(messages, prefix="ES_USER_SIM_PROMPT")
+
         t = time.time()
         
         # calling the llm for response generation

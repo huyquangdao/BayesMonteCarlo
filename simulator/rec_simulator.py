@@ -67,6 +67,9 @@ class RecommendationSimulator(Simulator):
             {'role': 'user', 'content': 'Please reply with only one short and succinct sentence.'}
         )
         
+        # print the prompt used for simulator response
+        self.log_prompt(messages, prefix="REC_USER_SIM_PROMPT")
+
         # calling the llm for response generation
         response = call_llm(messages,
                             n=1, 

@@ -205,6 +205,8 @@ from logger.terminal_logger import TerminalLogger
 from logger.wandb_logger import WanDBLogger
 
 
+import copy
+
 def set_seed(seed):
     """
     control the random seed for each run
