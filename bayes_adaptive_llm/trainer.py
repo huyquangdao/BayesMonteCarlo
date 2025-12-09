@@ -25,6 +25,7 @@ from loguru import logger
 from datasets import Dataset, DatasetDict
 from multiprocessing import cpu_count
 from itertools import count
+from json.decoder import JSONDecodeError
 
 import numpy as np
 import torch
@@ -482,6 +483,31 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
+    def _load_preference_pairs(pref_path: str) -> List[Dict[str, Any]]:
+        with open(pref_path, "r", encoding="utf-8") as handle:
+            if pref_path.endswith(".jsonl"):
+                return [json.loads(line) for line in handle if line.strip()]
+            content = handle.read().strip()
+            if not content:
+                return []
+
+            if content[0] == "[":
+                return json.loads(content)
+
+            try:
+                obj = json.loads(content)
+                if isinstance(obj, list):
+                    return obj
+                return [obj]
+            except JSONDecodeError as e:
+                lines = content.splitlines()
+                pairs = []
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    pairs.append(json.loads(line))
+                return pairs
 #endregion
 
     def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:
@@ -586,12 +612,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
 
-
-        with open(pref_path, "r", encoding="utf-8") as handle:
-            if pref_path.endswith(".jsonl"):
-                preference_pairs = [json.loads(line) for line in handle if line.strip()]
-            else:
-                preference_pairs = json.load(handle)
+        preference_pairs = self._load_preference_pairs(pref_path)
 
         required_keys = {"prompt", "chosen", "rejected"}
         preference_pairs = [row for row in preference_pairs if isinstance(row, dict) and required_keys.issubset(row)]
