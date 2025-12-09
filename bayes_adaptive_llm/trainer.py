@@ -483,7 +483,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
-    def _load_preference_pairs(pref_path: str) -> List[Dict[str, Any]]:
+    def _load_preference_pairs(self, pref_path: str) -> List[Dict[str, Any]]:
         with open(pref_path, "r", encoding="utf-8") as handle:
             if pref_path.endswith(".jsonl"):
                 return [json.loads(line) for line in handle if line.strip()]
