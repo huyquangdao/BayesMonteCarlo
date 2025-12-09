@@ -483,9 +483,39 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
-    def load_preference_pairs(self, pref_path: str):
-        with open(pref_path, "r", encoding="utf-8") as handle:
-            return [json.loads(line) for line in handle if line.strip()]
+    def load_preference_pairs(self, pref_path: str) -> List[Dict[str, Any]]:
+        with open(pref_path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+
+        if not text:
+            return []
+
+        if text[0] == "[":
+            return json.loads(text)
+
+        lines = text.splitlines()
+        if len(lines) > 1:
+            try:
+                return [json.loads(line) for line in lines if line.strip()]
+            except JSONDecodeError:
+                pass
+
+        decoder = json.JSONDecoder()
+        idx = 0
+        n = len(text)
+        objs = []
+
+        while idx < n:
+            while idx < n and text[idx].isspace():
+                idx += 1
+            if idx >= n:
+                break
+
+            obj, next_idx = decoder.raw_decode(text, idx)
+            objs.append(obj)
+            idx = next_idx
+
+        return objs
 
 #endregion
 
@@ -940,7 +970,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
                 # flush dialog pairs to disk incrementally if path provided
                 if preference_path and dialog_pairs:
-                    with preference_path.open("a", encoding="utf-8") as f:
+                    with preference_path.open("w", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
                     logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
