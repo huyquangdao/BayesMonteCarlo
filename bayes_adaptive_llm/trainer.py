@@ -159,14 +159,30 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
+        # persona
         persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
-        system_content = "You are a Persuader trying to persuade the user to donate to a charity."
+        # ===== ROLE / PERSONA / STYLE =====
+        lines = []
+        lines.append("ROLE:")
+        lines.append("You are a Persuader trying to persuade the user to donate to a charity.")
+
         if persona:
-            system_content += f" The current user's profile is: {persona}"
+            lines.append("")
+            lines.append("[USER PERSONA]")
+            lines.append("The current user's profile is: ")
+            lines.append(persona)
+
+        lines.append("")
+        lines.append("[RESPONSE STYLE]")
+        lines.append("- Always answer as the Persuader speaking to the user.")
+        lines.append("- Respond in 1–2 short sentences only.")
+
+        system_content = "\n".join(lines)
 
         messages = [{"role": "system", "content": system_content}]
 
+            # ===== DIALOGUE CONTEXT =====
         dialog = _get(inst, "dialog")
         if dialog is not None:
             for turn in dialog:
@@ -203,6 +219,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Cannot infer conversation structure from instance. "
             "Please adapt _instance_to_messages_for_persuasion."
         )
+
     
     def _instance_to_messages_for_negotiation(self, inst):
         """
@@ -215,7 +232,23 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        system_content = "You are a Negotiator trying to reach an agreement with the other party."
+        lines = []
+        lines.append("ROLE:")
+        lines.append("You are a Negotiator trying to reach a fair agreement with the other party.")
+
+        # persona
+        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+
+        if persona:
+            lines.append("")
+            lines.append("[USER PERSONA]")
+            lines.append(persona)
+        lines.append("")
+        lines.append("[RESPONSE STYLE]")
+        lines.append("- Answer as the Negotiator in the dialogue.")
+        lines.append("- Respond in 1–2 short sentences only.")
+
+        system_content = "\n".join(lines)
 
         messages = [{"role": "system", "content": system_content}]
 
