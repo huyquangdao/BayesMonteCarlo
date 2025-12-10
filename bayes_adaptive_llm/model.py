@@ -35,8 +35,8 @@ class BayesAdaptiveLLMModel(Model):
         )
 
         # extend vocabulary with task-specific tokens
-        # self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
-        # self.plm.resize_token_embeddings(len(self.tokenizer), mean_resizing=False)
+        self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
+        self.plm.resize_token_embeddings(len(self.tokenizer), mean_resizing=False)
 
         if getattr(self.tokenizer, "chat_template", None) is None:
             self.tokenizer.chat_template = (
