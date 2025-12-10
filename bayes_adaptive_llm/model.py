@@ -17,9 +17,6 @@ gc.collect()
 torch.cuda.empty_cache()
 
 class BayesAdaptiveLLMModel(Model):
-    """
-    Classification-style policy head on top of a PLM.
-    """
 
     def __init__(self, model_config, **kwargs):
         super().__init__(model_config, **kwargs)
@@ -71,18 +68,22 @@ class BayesAdaptiveLLMModel(Model):
         logits = self.out_layer(cls_token)
         return logits
     
-    def generate_text(self, prompt: str, max_new_tokens: int = 128, **gen_kwargs) -> str:
+    def post_processing_response(self, response: str):
+        return response.replace('assistant', '').strip()
+    
+    def generate_text(self, prompt: str, max_new_tokens: int = 50, **gen_kwargs) -> str:
         self.plm.eval()
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.plm.device)
         output_ids = self.plm.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=gen_kwargs.get("do_sample", True),
-            temperature=gen_kwargs.get("temperature", 0.7),
+            temperature=gen_kwargs.get("temperature", 0.1),
             top_p=gen_kwargs.get("top_p", 0.9),
             eos_token_id=self.tokenizer.eos_token_id,
         )
-        return self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        response = self.tokenizer.decode(output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True)
+        return self.post_processing_response(response)
 
     def score_candidates(self,
                          dialogue_context: Sequence[Dict[str, Any]],

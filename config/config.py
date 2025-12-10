@@ -155,6 +155,10 @@ class GameConfig(Config):
     # llm_pipeline
     llm_pipeline = None
     terminators = None
+    
+    # flag to indicate whether we are using utterance-based action
+    # default is false
+    is_utterance_based_action = False
 
     def __init__(self, params):
         """

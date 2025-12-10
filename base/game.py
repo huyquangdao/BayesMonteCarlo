@@ -1147,7 +1147,7 @@ class PersuationGame(Game):
         :return: the new state, reward, and flag indicating if the game is terminated
         """
         res_state = copy.deepcopy(state)
-        if isinstance(action, str):
+        if isinstance(action, str) and not self.game_config.is_utterance_based_action:
             goal = action
             logger.info(f"[Goal]: {goal}")
             # prepare state for the response generation
@@ -1168,10 +1168,10 @@ class PersuationGame(Game):
             # state for response generation
             res_state['pred_goal'] = rewriten_goal
             res_state['goal'] = rewriten_goal
-
-        
+        else:
+            goal = action
+            
         # logger.info(f"[Goal]: {goal}")
-
         # prepare state for the response generation
         state['pred_goal'] = goal
         state['goal'] = goal
@@ -1185,10 +1185,17 @@ class PersuationGame(Game):
         prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
         self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
 
-        system_response = generation_model.generate_response(res_state,
-                                                             llm_pipeline = self.game_config.llm_pipeline, 
-                                                             terminators = self.game_config.terminators
-                                                             )
+        # we're using categorical action
+        # then we need to generate an natural language utterance using the input action
+        if not self.game_config.is_utterance_based_action:
+            system_response = generation_model.generate_response(res_state,
+                                                                llm_pipeline = self.game_config.llm_pipeline, 
+                                                                terminators = self.game_config.terminators
+                                                                )
+        # we're using utterance-based action
+        else:
+            system_response = action
+
         state['response'] = system_response
 
         # update the dialogue context

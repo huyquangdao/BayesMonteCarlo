@@ -97,6 +97,7 @@ if __name__ == '__main__':
     game_config.set_params({
         'seed': args['seed'],
         'is_so_game': args['is_so_game'],
+        'is_utterance_based_action': args['is_utterance_based_action'],
         'model_type': args['model_type'], # type of the llm model
         'llm_pipeline': llm_pipeline,
         'terminators': terminators
