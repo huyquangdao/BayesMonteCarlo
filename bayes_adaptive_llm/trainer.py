@@ -27,6 +27,7 @@ from loguru import logger
 from datasets import Dataset, DatasetDict
 from multiprocessing import cpu_count
 from itertools import count
+from json.decoder import JSONDecodeError
 
 import numpy as np
 import torch
@@ -484,6 +485,40 @@ class BayesAdaptiveLLMTrainer(Trainer):
         results['loss'] = dev_loss
         return results
 
+    def load_preference_pairs(self, pref_path: str) -> List[Dict[str, Any]]:
+        with open(pref_path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+
+        if not text:
+            return []
+
+        if text[0] == "[":
+            return json.loads(text)
+
+        lines = text.splitlines()
+        if len(lines) > 1:
+            try:
+                return [json.loads(line) for line in lines if line.strip()]
+            except JSONDecodeError:
+                pass
+
+        decoder = json.JSONDecoder()
+        idx = 0
+        n = len(text)
+        objs = []
+
+        while idx < n:
+            while idx < n and text[idx].isspace():
+                idx += 1
+            if idx >= n:
+                break
+
+            obj, next_idx = decoder.raw_decode(text, idx)
+            objs.append(obj)
+            idx = next_idx
+
+        return objs
+
 #endregion
 
     def train_sft(self, dataset, device: Optional[torch.device] = None) -> None:
@@ -771,7 +806,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
             # skip to dialog_idx
-            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 40):
+            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 120):
                 continue
             # fix persuadee (simulator/persona) per dialog
             # sample a simulator from the simulator pool
