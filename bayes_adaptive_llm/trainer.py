@@ -970,7 +970,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
                 # flush dialog pairs to disk incrementally if path provided
                 if preference_path and dialog_pairs:
-                    with preference_path.open("w", encoding="utf-8") as f:
+                    with preference_path.open("a", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
                     logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
