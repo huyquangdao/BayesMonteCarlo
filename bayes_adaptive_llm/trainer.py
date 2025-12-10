@@ -798,7 +798,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
             # skip to dialog_idx
-            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 0):
+            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 80):
                 continue
             # fix persuadee (simulator/persona) per dialog
             # sample a simulator from the simulator pool
