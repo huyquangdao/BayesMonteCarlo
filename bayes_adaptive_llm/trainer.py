@@ -768,10 +768,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             [instance], [instance] 
         )
         input_prompt = train_dataset[0]['text']
-        print("Input prompt for generation:", input_prompt)
+        # print("Input prompt for generation:", input_prompt)
         response = self.model.generate_text(input_prompt, max_length=50)
         assert response is not None
-        print("Generated response:", response)
+        # print("Generated response:", response)
         return response
 
     def select_action(self, logits: torch.Tensor, is_test: bool = True) -> Tuple[Any, torch.Tensor]:
