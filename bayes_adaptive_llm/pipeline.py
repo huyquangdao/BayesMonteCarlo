@@ -21,13 +21,14 @@ from base.pipeline import Pipeline
 
 class BayesAdaptiveLLMPipeline(Pipeline):
 
-    def load_pretrained_model(self, is_rl: bool = False, is_last: bool = False) -> None:
-        save_dir = self.model_config.saved_dir
-        print("Loading pretrained model from:", save_dir)
-        if has_meta_checkpoint(save_dir):
-            load_from_meta_checkpoint(self, save_dir)
+    def load_pretrained_model(self, model_dir, is_rl: bool = False) -> None:
+        if model_dir is not None:
+            model_dir = self.model_config.saved_dir
+        print("Loading pretrained model from:", model_dir)
+        if has_meta_checkpoint(model_dir):
+            load_from_meta_checkpoint(self, model_dir)
         else:
-            load_legacy_checkpoint(self, save_dir, is_rl)
+            load_legacy_checkpoint(self, model_dir, is_rl)
 
 
     def execute(self):
@@ -66,7 +67,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_online_eval", False):
             logger.info("Online evaluation ...")
-            self.load_pretrained_model(is_rl=False)
+            self.load_pretrained_model(model_dir=self.model_config.dpo_adapter_path, is_rl=False)
             online_eval_results = self.run_online_test()
 
         return offline_eval_results, online_eval_results, preference_pairs
