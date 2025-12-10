@@ -10,7 +10,7 @@ do
 NCCL_IB_DISABLE=1
 NCCL_P2P_DISABLE=1
 NCCL_ASYNC_ERROR_HANDLING=1
-CUDA_VISIBLE_DEVICES=2,3 accelerate launch --main_process_port 8081 --gpu_ids 2,3 --num_processes 2 run.py \
+CUDA_VISIBLE_DEVICES=1 accelerate launch --main_process_port 8081 --gpu_ids 1 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
@@ -23,7 +23,7 @@ CUDA_VISIBLE_DEVICES=2,3 accelerate launch --main_process_port 8081 --gpu_ids 2,
   --model_type llama3 \
   --is_so_game \
   --use_persona \
-  --rewrite_action \
+  --is_utterance_based_action \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 

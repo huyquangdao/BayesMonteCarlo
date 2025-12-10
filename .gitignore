@@ -6,3 +6,8 @@ __pycache__/
 cache
 logs
 checkpoints
+simulator/__pycache__
+utils/__pycache__
+text_gen/__pycache__
+config/__pycache__
+base/__pycache__

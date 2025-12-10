@@ -5,7 +5,7 @@ and later plug in MCTS-based preference generation plus DPO training.
 """
 
 import os
-
+import random 
 from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
@@ -28,7 +28,6 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             load_from_meta_checkpoint(self, save_dir)
         else:
             load_legacy_checkpoint(self, save_dir, is_rl)
-
 
 
     def execute(self):
@@ -93,11 +92,58 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         return self.trainer.predict(instance, action_mapping=action_mapping)
 
 
-    def run_online_test(self):
+    def run_online_test(self, cases = None, simulators = None):
         """
         Stub for online evaluation with simulators.
         """
-        raise NotImplementedError("Online evaluation is not implemented for Bayes-Adaptive LLM.")
+                # if we wish to run the model on a different set of negotiation situations.
+        # and a set of given user simulators
+        if cases is not None:
+            test_cases = cases
+            test_simulators = simulators
+        else:
+            # creating the target item set
+            test_cases = create_cases(test_instances=self.dataset.test_instances,
+                                      num_cases=self.dataset_config.num_test_cases)
+
+            # get the simulators from the test set
+            test_simulators = self.test_simulators
+
+            # sample to make sure the number of test simulators equal to the number of test items
+            # please carefully managae the random seed for fair performance comparison
+            # test_simulators = random.sample(test_simulators, len(test_target_items))
+
+        # test_target_items = test_target_items
+        # construct the goal, topic mapping
+        action_mapping = self.dataset.construct_action_mapping(
+            # for single objective game we dont need to combine the goals and (bins/topics)
+            combine=self.model_config.combined_action if not self.game_config.is_so_game else False
+        )
+
+        # make sure the number of simulator equal to the number of target item
+        # this make the performance comparison fair.
+        # please manage the randon seed carefully.
+        if len(test_simulators) > len(test_cases):
+            test_simulators = random.sample(test_simulators, len(test_cases))
+
+        # make sure there is no gradient-relevant computation
+        with torch.no_grad():
+            # there should be two kinds of evaluation
+            # item centric: prompt 1 item to different users
+            # user centric: prompt different items to 1 users
+            # this should be implemented later
+            # make sure the test simulators is not None
+            assert self.test_simulators is not None
+            # run online evaluation
+            # run online test sequentially
+            # i.e using 1 process.
+            results = self.trainer.online_test(test_cases,
+                                               device=self.device,
+                                               simulators=test_simulators,
+                                               action_mapping=action_mapping)
+
+            return results
+        
 
     def generate_preference_data(self, dev_ratio = 0.2):
         """

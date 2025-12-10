@@ -247,6 +247,7 @@ def parse_args():
     parser.add_argument('--ablation', action = 'store_true', help='Running ablation study')
     parser.add_argument('--ablation_mode', type=str, default='', help='Testing mode')
     parser.add_argument('--rewrite_action', action='store_true', help='if we are using the re-written prompt')
+    parser.add_argument('--is_utterance_based_action', action='store_true', help='if we are using utterance-based actions')
     parser.add_argument('--is_ablation_prompt_optimization', action='store_true', help='if we are optimizing the meta prompt')
     parser.add_argument('--is_ablation_prompt_distribution', action='store_true', help='if we are using the uniform distribution for meta prompt sampling')
     parser.add_argument('--meta_prompt_path', type=str, default='', help='the path to the optimzied meta prompt')
