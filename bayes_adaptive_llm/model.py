@@ -30,7 +30,8 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
             torch_dtype=dtype,
-            device_map="auto" if torch.cuda.is_available() else None, 
+            # device_map="auto" if torch.cuda.is_available() else None, 
+            device_map="cuda" if torch.cuda.is_available() else None,
         )
 
         # extend vocabulary with task-specific tokens
