@@ -675,8 +675,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
 
-        model_path = getattr(self.model_config, "saved_dir", None) or getattr(self.model_config, "plm", "gpt2")
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # model_path = getattr(self.model_config, "saved_dir", None) 
+        # tokenizer = AutoTokenizer.from_pretrained(model_path)
+        base_plm = self.model.plm
+        tokenizer = self.tokenizer
         # base_plm = AutoModelForCausalLM.from_pretrained(
         #     self.model_config.plm,
         #     torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
@@ -734,7 +736,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         
         trainer_kwargs = dict(
-            model=model_path,
+            model=base_plm,
             loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
