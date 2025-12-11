@@ -684,9 +684,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         max_prompt_length = getattr(self.model_config, "max_prompt_length", max_length)
         batch_size = getattr(self.model_config, "dpo_batch_size", 1)
         epochs = getattr(self.model_config, "dpo_epochs", 3)
-        learning_rate = getattr(self.model_config, "dpo_learning_rate", 1e-5)
-        beta = getattr(self.model_config, "dpo_beta", 0.1)
-        warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio", 0.1)
+        learning_rate = float(getattr(self.model_config, "dpo_learning_rate", 1e-5))
+        beta = float(getattr(self.model_config, "dpo_beta", 0.1))
+        warmup_ratio = float(getattr(self.model_config, "dpo_warmup_ratio", 0.1))
         grad_accum = max(
             1, int(getattr(self.model_config, "dpo_gradient_accumulation", 8))
         )
