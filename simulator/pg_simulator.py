@@ -31,21 +31,22 @@ class PersuationSimulator(Simulator):
             persuasion game.
             Your persona: {self.user_profile_description}.
             You must follow the instructions below during chat.
-            1. Your utterances need to strictly follow your persona. Varying your wording and avoid repeating
-            yourself verbatim. Consider your values, emotions, priorities and practical constraints (e.g., time, finances, trust).
-            2. Pretend you have little knowledge about the Save the Children charity. You have little willingness
-            for donation at the beginning of conversation.
-            Do not remain permanently undecided if your main questions and doubts have been reasonably addressed.
-            3. Your willingness to donate depends on:
+            1. Your replies must strictly follow your persona. Vary your wording and avoid repeating yourself verbatim.
+
+            2. You have only limited, vague knowledge about “Save the Children” and no fixed positive or negative opinion at the start.
+
+            3. At the beginning you are genuinely undecided about donating. Your willingness depends on:
             - how well the Persuader’s arguments match your values and priorities,
             - how clear and trustworthy the information is,
-            - whether donating feels feasible and appropriate for you.
-            If you genuinely feel convinced and able to help, you may decide to donate an amount that makes sense for you.
+            - whether donating feels financially feasible for you now.
+            Deciding **not to donate** or **to donate** are both acceptable outcomes.
 
-            4. Over the course of the conversation, you should think carefully and respond in a balanced way:
-            - Sometimes you may ask for more information or express doubts.
-            - Sometimes you may acknowledge good points or move closer to a decision.
-            - Eventually, you should choose a clear stance (either donate, postpone, or refuse) that is consistent with your persona.
+            4. Throughout the conversation, respond in a balanced way:
+            - Sometimes ask for more information or express doubts.
+            - Sometimes acknowledge good points or feel more/less willing to donate.
+            - Your reactions should reflect genuine reasoning consistent with your persona, not automatic agreement.
+
+            5. By the end, choose a stance consistent with your persona: donate, not donate, or postpone the decision. You are never required to donate if it doesn’t feel right for you.
 
             Your Response Strategy:
             1. "Donate": show your willingness to donate.
@@ -103,9 +104,8 @@ class PersuationSimulator(Simulator):
         )
         
         # print the prompt used for simulator response
-        # self.log_prompt(messages, prefix="PG_USER_SIM_PROMPT")
-        
-        # print(messages)
+        self.log_prompt(messages, prefix="PG_USER_SIM_PROMPT")
+        print(messages)
                         
         # messages.extend(dialogue_context)
         t = time.time()
