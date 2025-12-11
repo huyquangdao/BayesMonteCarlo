@@ -6,6 +6,7 @@ so later we can port the actual logic with minimal friction.
 
 from __future__ import annotations
 
+import gc
 import os
 import random
 import json
@@ -654,6 +655,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Loads the preference json/jsonl, feeds it directly to DPOTrainer (no custom collator),
         logs epoch losses, and saves a checkpoint.
         """
+        del variables
+        gc.collect()
+        torch.cuda.memory_summary(device=None, abbreviated=False)
+
         # device = device or getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         if DPOTrainer is None or DPOConfig is None:
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
