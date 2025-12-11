@@ -11,13 +11,14 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1
-dpo_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/dpo
+dpo_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/dpo_adapter   # nếu cần để DPOTrainer biết đường dẫn
+sft_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/sft_adapter    # nếu cần để DPOTrainer biết đường dẫn
 model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu cần để pipeline/generation biết đường dẫn
 
 
 # Training toggles
-run_sft: true
-run_dpo: false
+run_sft: false
+run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: false

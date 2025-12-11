@@ -780,7 +780,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         base_save_dir = self.model_config.saved_dir
         dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
         if not dpo_save_dir:
-            dpo_save_dir = os.path.join(base_save_dir, "dpo")
+            dpo_save_dir = os.path.join(base_save_dir, "dpo_adapter")
 
         save_finetuned_model(self, save_dir=dpo_save_dir)
         loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
