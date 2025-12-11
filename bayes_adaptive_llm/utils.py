@@ -242,8 +242,13 @@ def has_meta_checkpoint(save_dir: str) -> bool:
     return os.path.exists(meta_path)
 
 def _load_plm_from_meta(base_model, save_dir: str, saved_format: str):
+    print(f"[META] _load_plm_from_meta called with saved_format={saved_format}")
+    print(f"[META] base_model type before load: {type(base_model)}")
+
     if saved_format == "lora_adapter":
         adapter_dir = os.path.join(save_dir, "lora_adapter")
+        print(f"[META] Trying to load LoRA adapter from: {adapter_dir}")
+
         if not os.path.isdir(adapter_dir):
             raise FileNotFoundError(f"LoRA adapter dir not found: {adapter_dir}")
 
@@ -252,51 +257,74 @@ def _load_plm_from_meta(base_model, save_dir: str, saved_format: str):
             adapter_dir,
             device_map={"": "cpu"},
         )
+        print(f"[META] LoRA adapter loaded. New plm type: {type(plm)}")
         return plm
 
     if saved_format == "full_state_dict":
         ckpt_path = os.path.join(save_dir, "model.pth")
+        print(f"[META] Trying to load full_state_dict from: {ckpt_path}")
+
         if not os.path.exists(ckpt_path):
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
         state_dict = torch.load(ckpt_path, map_location="cpu")
+        print(f"[META] Loaded state_dict with {len(state_dict)} keys")
         base_model.load_state_dict(state_dict, strict=False)
+        print(f"[META] State dict loaded into base_model, type now: {type(base_model)}")
         return base_model
 
     raise ValueError(f"Unknown saved_format in meta.pt: {saved_format}")
+
 
 def load_legacy_checkpoint(self, save_dir: str, is_rl: bool) -> None:
     ckpt_name = "rl_model.pth" if is_rl else "model.pth"
     ckpt_path = os.path.join(save_dir, ckpt_name)
 
+    print(f"[LEGACY] Trying to load legacy checkpoint from: {ckpt_path}")
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"No pretrained model found at {ckpt_path}")
 
     self.trainer.model = self.model
 
     device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    print(f"[LEGACY] Using device: {device}")
+
     self.model = load_model(self.trainer, ckpt_path, device=device)
+
+    print(f"[LEGACY] After load, self.model type: {type(self.model)}")
+    plm_obj = getattr(self.model, "plm", self.model)
+    print(f"[LEGACY] After load, self.model.plm type: {type(plm_obj)}")
+    print(f"[LEGACY] plm device: {getattr(plm_obj, 'device', 'unknown')}")
+
 
 def load_from_meta_checkpoint(self, save_dir: str) -> None:
     meta_path = os.path.join(save_dir, "meta.pt")
+    print(f"[META] Loading meta from: {meta_path}")
     meta = torch.load(meta_path, map_location="cpu")
 
-    # use_lora = bool(meta.get("use_lora", getattr(self.model_config, "use_lora", False)))
+    print(f"[META] meta content: {meta}")
     saved_format = meta.get("saved_format", "full_state_dict")
-    # device = getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-    # bf16 = bool(getattr(self.model_config, "bf16", True))
+    print(f"[META] saved_format = {saved_format}")
+
     base_model = getattr(self.model, "plm", None)
+    print(f"[META] base_model type before _load_plm_from_meta: {type(base_model)}")
 
     plm = _load_plm_from_meta(base_model, save_dir, saved_format)
-    # plm.to(device)
+
+    print(f"[META] plm type returned from _load_plm_from_meta: {type(plm)}")
 
     if hasattr(self.model, "plm"):
+        print("[META] Assigning loaded plm to self.model.plm")
         self.model.plm = plm
     else:
-        # Nếu self.model chính là backbone
+        print("[META] self.model has no 'plm', replacing self.model by plm backbone")
         self.model = plm
 
     self.trainer.model = self.model
+    print(f"[META] After meta load, self.trainer.model type: {type(self.trainer.model)}")
+    plm_obj = getattr(self.trainer.model, "plm", self.trainer.model)
+    print(f"[META] After meta load, plm device: {getattr(plm_obj, 'device', 'unknown')}")
+
 
 def save_finetuned_model(self, save_dir: Optional[str] = None) -> None:
     if save_dir is None:

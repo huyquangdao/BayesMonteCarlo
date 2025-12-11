@@ -24,11 +24,23 @@ class BayesAdaptiveLLMPipeline(Pipeline):
     def load_pretrained_model(self, model_dir, is_rl: bool = False) -> None:
         if model_dir is None:
             model_dir = self.model_config.saved_dir
-        print("Loading pretrained model from:", model_dir)
+
+        print(f"[LOAD] >>> Requested to load pretrained model from: {model_dir}")
+        print(f"[LOAD] >>> is_rl = {is_rl}")
+
         if has_meta_checkpoint(model_dir):
+            print(f"[LOAD] meta.pt FOUND in {model_dir}, using load_from_meta_checkpoint")
             load_from_meta_checkpoint(self, model_dir)
         else:
+            print(f"[LOAD] meta.pt NOT found in {model_dir}, using load_legacy_checkpoint")
             load_legacy_checkpoint(self, model_dir, is_rl)
+
+        # Sau khi load xong, log type model cho chắc
+        plm_obj = getattr(self.model, "plm", self.model)
+        print(f"[LOAD] Final self.model type      = {type(self.model)}")
+        print(f"[LOAD] Final self.model.plm type   = {type(plm_obj)}")
+        print(f"[LOAD] Device of plm (if any)      = {getattr(plm_obj, 'device', 'unknown')}")
+
 
 
     def execute(self):

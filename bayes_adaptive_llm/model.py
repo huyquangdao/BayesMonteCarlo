@@ -78,7 +78,7 @@ class BayesAdaptiveLLMModel(Model):
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=gen_kwargs.get("do_sample", True),
-            temperature=gen_kwargs.get("temperature", 0.1),
+            temperature=gen_kwargs.get("temperature", 0.7),
             top_p=gen_kwargs.get("top_p", 0.9),
             eos_token_id=self.tokenizer.eos_token_id,
         )
