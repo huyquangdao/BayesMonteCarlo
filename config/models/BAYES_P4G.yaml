@@ -41,8 +41,7 @@ dpo_max_length: 512
 dpo_beta: 0.1
 dpo_learning_rate: 1e-5
 dpo_gradient_accumulation: 8
-max_length: 768
-max_prompt_length: 256
+max_prompt_length: 128
 dpo_batch_size: 1
 dpo_epochs: 3
 fp16: true

@@ -742,6 +742,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             max_length=max_length,
             max_prompt_length=max_prompt_length,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
         )
         
         trainer_kwargs = dict(
