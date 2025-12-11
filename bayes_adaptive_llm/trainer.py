@@ -734,7 +734,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         
         trainer_kwargs = dict(
-            model=base_plm,
+            model=model_path,
             loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
