@@ -674,7 +674,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # model_path = getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "plm", "gpt2")
         # tokenizer = AutoTokenizer.from_pretrained(model_path)
         base_plm = self.model.plm
-        base_plm.to("cpu") 
+        # base_plm.to("cpu") 
         tokenizer = self.tokenizer
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
