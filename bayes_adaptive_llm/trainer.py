@@ -39,7 +39,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
@@ -675,11 +675,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
 
+        peft_config = LoraConfig(
+            r=64,
+            lora_alpha=16,
+            lora_dropout=0.1,
+            bias="none",
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                            "gate_proj", "up_proj", "down_proj"],
+            task_type="CAUSAL_LM",
+        )
         # model_path = getattr(self.model_config, "saved_dir", None) 
         # tokenizer = AutoTokenizer.from_pretrained(model_path)
         base_plm = self.model.plm
-        base_plm.to("cpu")          # đảm bảo model trên CPU trước khi DPOTrainer move sang GPU
-        torch.cuda.empty_cache()
+        base_plm = get_peft_model(base_plm, peft_config)
         tokenizer = self.tokenizer
         # base_plm = AutoModelForCausalLM.from_pretrained(
         #     self.model_config.plm,
