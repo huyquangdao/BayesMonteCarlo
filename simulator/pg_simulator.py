@@ -104,8 +104,7 @@ class PersuationSimulator(Simulator):
         )
         
         # print the prompt used for simulator response
-        self.log_prompt(messages, prefix="PG_USER_SIM_PROMPT")
-        print(messages)
+        # self.log_prompt(messages, prefix="PG_USER_SIM_PROMPT")
                         
         # messages.extend(dialogue_context)
         t = time.time()
@@ -113,7 +112,7 @@ class PersuationSimulator(Simulator):
         # calling the llm for response generation
         response = call_llm(messages, 
                             n=1, 
-                            temperature=0.2, 
+                            temperature=0.7, 
                             max_token=self.max_gen_token, 
                             model_type=self.model_type,
                             **kwargs
