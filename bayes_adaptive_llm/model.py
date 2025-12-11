@@ -20,17 +20,18 @@ class BayesAdaptiveLLMModel(Model):
 
     def __init__(self, model_config, **kwargs):
         super().__init__(model_config, **kwargs)
+        dtype = torch.bfloat16 if getattr(self.model_config, "bf16", False) else None
+
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
-            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            device_map="cuda" if torch.cuda.is_available() else "cpu",
         )
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
-            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            device_map="cuda:2" if torch.cuda.is_available() else "cpu",
+            torch_dtype=dtype,
+            device_map=None, 
+            low_cpu_mem_usage=True,
         )
 
         # extend vocabulary with task-specific tokens
