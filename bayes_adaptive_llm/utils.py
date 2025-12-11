@@ -326,36 +326,29 @@ def load_from_meta_checkpoint(self, save_dir: str) -> None:
     print(f"[META] After meta load, plm device: {getattr(plm_obj, 'device', 'unknown')}")
 
 
-def save_finetuned_model(self, save_dir: Optional[str] = None) -> None:
-    if save_dir is None:
-        save_dir = self.model_config.saved_dir
-
+def save_finetuned_model(self, save_dir=None):
+    save_dir = save_dir or self.model_config.saved_dir
     os.makedirs(save_dir, exist_ok=True)
 
-    if getattr(self, "tokenizer", None) is not None:
-        self.tokenizer.save_pretrained(save_dir)
-
-    plm = getattr(self.model, "plm", self.model)
+    model = getattr(self.model, "plm", self.model)
 
     meta = {
-        "base_model_name": getattr(self.model_config, "model_name", None),
-        "use_lora": bool(getattr(self.model_config, "use_lora", False)),
-        "saved_format": None,  
+        "base_model_name": getattr(self.model_config, "plm", None),
+        "use_lora": isinstance(model, PeftModel),
     }
 
-    if meta["use_lora"] and isinstance(plm, PeftModel):
+    if isinstance(model, PeftModel):
+        # chỉ lưu LoRA adapter
         adapter_dir = os.path.join(save_dir, "lora_adapter")
-        plm.save_pretrained(adapter_dir)  
-
+        model.save_pretrained(adapter_dir)
         meta["saved_format"] = "lora_adapter"
         torch.save(meta, os.path.join(save_dir, "meta.pt"))
-
+        print(f"[SAVE] LoRA adapter saved to {adapter_dir}")
     else:
+        # fallback: full state_dict
         ckpt_path = os.path.join(save_dir, "model.pth")
-        torch.save(plm.state_dict(), ckpt_path)
-
+        torch.save(model.state_dict(), ckpt_path)
         meta["saved_format"] = "full_state_dict"
         torch.save(meta, os.path.join(save_dir, "meta.pt"))
-
-    logger.info("Saved finetuned model to {} (format: {})", save_dir, meta["saved_format"])
+        print(f"[SAVE] Full model state_dict saved to {ckpt_path}")
 
