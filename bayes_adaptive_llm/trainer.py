@@ -679,15 +679,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
             tokenizer.pad_token = tokenizer.eos_token
 
         # Hyperparameters
-        max_length = getattr(self.model_config, "dpo_max_length", getattr(self.model_config, "max_length", 1024))
+        max_length = getattr(self.model_config, "dpo_max_length", 512)
         max_prompt_length = getattr(self.model_config, "max_prompt_length", max_length)
-        batch_size = getattr(self.model_config, "dpo_batch_size", getattr(self.model_config, "batch_size", 2))
-        epochs = getattr(self.model_config, "dpo_epochs", getattr(self.model_config, "num_train_epochs", 3))
-        learning_rate = getattr(self.model_config, "dpo_learning_rate", getattr(self.model_config, "learning_rate", 1e-5))
+        batch_size = getattr(self.model_config, "dpo_batch_size", 1)
+        epochs = getattr(self.model_config, "dpo_epochs", 3)
+        learning_rate = getattr(self.model_config, "dpo_learning_rate", 1e-5)
         beta = getattr(self.model_config, "dpo_beta", 0.1)
-        warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio", getattr(self.model_config, "warmup_ratio", 0.1))
+        warmup_ratio = getattr(self.model_config, "dpo_warmup_ratio", 0.1)
         grad_accum = max(
-            1, int(getattr(self.model_config, "dpo_gradient_accumulation", getattr(self.model_config, "gradient_accumulation", 4)))
+            1, int(getattr(self.model_config, "dpo_gradient_accumulation", 8))
         )
         use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", True)))
         use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", False)))
