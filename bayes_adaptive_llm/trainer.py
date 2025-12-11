@@ -674,6 +674,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # model_path = getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "plm", "gpt2")
         # tokenizer = AutoTokenizer.from_pretrained(model_path)
         base_plm = self.model.plm
+        base_plm.to("cpu") 
         tokenizer = self.tokenizer
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -710,6 +711,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
             report_to="none",
             remove_unused_columns=False,
             logging_steps=getattr(self.model_config, "logging_steps", 10),
+            max_length=max_length,
+            max_prompt_length=max_prompt_length,
+            reference_free=True,
         )
         
         trainer_kwargs = dict(
@@ -717,8 +721,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loss_type=loss_type,
             args=training_args,
             train_dataset=hf_dataset,
-            max_length=max_length,
-            max_prompt_length=max_prompt_length,
+
         )
 
         trainer_cls = PatchedDPOTrainer or DPOTrainer
