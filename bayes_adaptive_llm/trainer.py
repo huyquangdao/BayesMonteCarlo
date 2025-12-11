@@ -678,6 +678,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # model_path = getattr(self.model_config, "saved_dir", None) 
         # tokenizer = AutoTokenizer.from_pretrained(model_path)
         base_plm = self.model.plm
+        base_plm.to("cpu")          # đảm bảo model trên CPU trước khi DPOTrainer move sang GPU
+        torch.cuda.empty_cache()
         tokenizer = self.tokenizer
         # base_plm = AutoModelForCausalLM.from_pretrained(
         #     self.model_config.plm,
@@ -732,7 +734,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             max_length=max_length,
             max_prompt_length=max_prompt_length,
-            reference_free=True,
         )
         
         trainer_kwargs = dict(
