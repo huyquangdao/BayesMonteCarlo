@@ -655,7 +655,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Loads the preference json/jsonl, feeds it directly to DPOTrainer (no custom collator),
         logs epoch losses, and saves a checkpoint.
         """
-        del variables
         gc.collect()
         torch.cuda.memory_summary(device=None, abbreviated=False)
 
