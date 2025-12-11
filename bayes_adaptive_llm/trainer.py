@@ -656,7 +656,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         logs epoch losses, and saves a checkpoint.
         """
         gc.collect()
-        torch.cuda.memory_summary(device=None, abbreviated=False)
+        # torch.cuda.memory_summary(device=None, abbreviated=False)
 
         # device = device or getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         if DPOTrainer is None or DPOConfig is None:
@@ -675,26 +675,26 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
 
-        # model_path = getattr(self.model_config, "dpo_model_path", None) or getattr(self.model_config, "plm", "gpt2")
-        # tokenizer = AutoTokenizer.from_pretrained(model_path)
-        base_plm = AutoModelForCausalLM.from_pretrained(
-            self.model_config.plm,
-            torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-            device_map=None,
-            low_cpu_mem_usage=True,
-        )
+        model_path = getattr(self.model_config, "saved_dir", None) or getattr(self.model_config, "plm", "gpt2")
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        # base_plm = AutoModelForCausalLM.from_pretrained(
+        #     self.model_config.plm,
+        #     torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
+        #     device_map=None,
+        #     low_cpu_mem_usage=True,
+        # )
 
-        # nếu muốn start từ SFT ckpt:
-        sft_dir = getattr(self.model_config, "saved_dir", None)
-        if sft_dir:
-            ckpt_path = os.path.join(sft_dir, "model.pth")
-            if os.path.exists(ckpt_path):
-                state_dict = torch.load(ckpt_path, map_location="cpu")
-                base_plm.load_state_dict(state_dict, strict=False)
-                # base_plm.to("cpu") 
-                tokenizer = self.tokenizer
-                if tokenizer.pad_token is None:
-                    tokenizer.pad_token = tokenizer.eos_token
+        # # nếu muốn start từ SFT ckpt:
+        # sft_dir = getattr(self.model_config, "saved_dir", None)
+        # if sft_dir:
+        #     ckpt_path = os.path.join(sft_dir, "model.pth")
+        #     if os.path.exists(ckpt_path):
+        #         state_dict = torch.load(ckpt_path, map_location="cpu")
+        #         base_plm.load_state_dict(state_dict, strict=False)
+        #         # base_plm.to("cpu") 
+        #         tokenizer = self.tokenizer
+        #         if tokenizer.pad_token is None:
+        #             tokenizer.pad_token = tokenizer.eos_token
 
         # Hyperparameters
         max_length = getattr(self.model_config, "dpo_max_length", 512)
