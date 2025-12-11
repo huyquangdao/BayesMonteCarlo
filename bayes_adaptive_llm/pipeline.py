@@ -65,7 +65,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         if getattr(self.model_config, "run_dpo", False):
             logger.info("Training with DPO on preference pairs ...")
             # assuming dataset already carries preference data or was just generated
-            self.load_pretrained_model(model_dir=self.model_config.sft_adapter_path, is_rl=False)
+            self.load_pretrained_model(model_dir=self.model_config.saved_dir, is_rl=False)
             pref_path = getattr(self.model_config, "preference_pairs_path", None)
             if not pref_path or not os.path.exists(pref_path):
                 logger.warning("No preference pairs found or path does not exist; skipping DPO.")
