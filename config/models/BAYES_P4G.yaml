@@ -33,7 +33,7 @@ max_gen_tokens: 256
 
 #Collect Preference pairs hyperparameters
 preference_num_workers: 4
-skip_to_dialog_idx: 0
+skip_to_dialog_idx: 80
 
 
 # SFT hyperparameters (memory-friendly)
