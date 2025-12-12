@@ -632,7 +632,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.model.plm = trained_plm
         else:
             self.model = trained_plm
-        sft_save_dir = self.model_config.saved_dir + self.model_config.sft_adapter_folder
+        sft_save_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
         save_finetuned_model(self, save_dir=sft_save_dir)
         loguru_logger.info("SFT training completed. Updated backbone LM with SFT weights.")
         loguru_logger.info("Saved SFT checkpoint to {}", sft_save_dir)
@@ -644,6 +644,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         logs epoch losses, and saves a checkpoint.
         """
         gc.collect()
+        device = self.accelerator.device
         if DPOTrainer is None or DPOConfig is None:
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
@@ -673,7 +674,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if not isinstance(base_plm, PeftModel):
             base_plm = get_peft_model(base_plm, peft_config)
             self.model.plm = base_plm
-
+        base_plm.to(device)
         tokenizer = self.tokenizer
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -759,7 +760,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
-        dpo_save_dir = self.model_config.saved_dir + self.model_config.dpo_adapter_folder
+        dpo_save_dir = os.path.join(self.model_config.saved_dir, self.model_config.dpo_adapter_folder)
         save_finetuned_model(self, save_dir=dpo_save_dir)
         loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
 
