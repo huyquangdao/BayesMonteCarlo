@@ -26,7 +26,8 @@ max_gen_length: 256
 max_gen_tokens: 256
 
 # SFT hyperparameters (memory-friendly)
-batch_size: 1
+use_lora: true
+batch_size: 4
 gradient_accumulation: 8
 learning_rate: 3e-5
 warmup_ratio: 0.05
@@ -35,7 +36,8 @@ num_train_epochs: 3
 logging_steps: 10
 save_total_limit: 2
 max_grad_norm: 1.0
-max_sequence_length: 768
+max_sequence_length: 1024
+max_prompt_length: 512
 
 
 # ===== General precision / memory flags =====

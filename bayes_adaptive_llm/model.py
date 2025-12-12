@@ -25,7 +25,6 @@ class BayesAdaptiveLLMModel(Model):
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
-            torch_dtype=dtype,
         )
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,

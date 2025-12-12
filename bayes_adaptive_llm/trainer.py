@@ -580,7 +580,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if use_lora:
             peft_config = LoraConfig(
                 r=32,
-                lora_alpha=128,
+                lora_alpha=64,
                 lora_dropout=0.05,
                 bias="none",
                 target_modules="all-linear",
@@ -593,26 +593,21 @@ class BayesAdaptiveLLMTrainer(Trainer):
             num_train_epochs=self.model_config.num_train_epochs,
             per_device_train_batch_size=self.model_config.batch_size,
             per_device_eval_batch_size=self.model_config.batch_size,
-            gradient_accumulation_steps=getattr(
-                self.model_config, "gradient_accumulation", 4
-            ),
+            gradient_accumulation_steps=getattr(self.model_config, "gradient_accumulation", 8),
             learning_rate=float(self.model_config.learning_rate),
             warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
             weight_decay=getattr(self.model_config, "weight_decay", 0.0),
-            max_seq_length=self.model_config.max_sequence_length,
-            lr_scheduler_type=getattr(
-                self.model_config, "lr_scheduler_type", "cosine"
-            ),
+            max_seq_length=getattr(self.model_config, "max_sequence_length", 1024),
+            max_prompt_length=getattr(self.model_config, "max_prompt_length", 512),
+            lr_scheduler_type=getattr(self.model_config, "lr_scheduler_type", "cosine"),
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             save_steps=getattr(self.model_config, "save_steps", 500),
             eval_steps=getattr(self.model_config, "eval_steps", 500),
             eval_strategy="steps",
             save_total_limit=getattr(self.model_config, "save_total_limit", 3),
-            bf16=getattr(self.model_config, "bf16", True),
             fp16=getattr(self.model_config, "fp16", False),
-            gradient_checkpointing=getattr(
-                self.model_config, "gradient_checkpointing", False
-            ),
+            bf16=getattr(self.model_config, "bf16", True),
+            gradient_checkpointing=getattr(self.model_config, "gradient_checkpointing", False),
             gradient_checkpointing_kwargs={"use_reentrant": False},
             optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
             packing=False,
@@ -632,10 +627,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         sft_trainer.train()
-
-        # sft_trainer.save_model(self.model_config.saved_dir)
-        # if self.tokenizer is not None:
-        #     self.tokenizer.save_pretrained(self.model_config.saved_dir)
 
         trained_plm = sft_trainer.model
         if hasattr(self.model, "plm"):
