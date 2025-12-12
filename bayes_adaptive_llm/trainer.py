@@ -12,6 +12,8 @@ import random
 import json
 import copy
 import inspect
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 import torch.distributed as dist
 import random
 from collections import defaultdict
@@ -800,7 +802,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
         raise NotImplementedError("Test routine is not implemented.")
 
 
-    def generate_preference_pairs_with_mcts(self, train_cases, dev_simulators, action_mapping) -> Sequence[Dict[str, Any]]:
+    def generate_preference_pairs_with_mcts(
+        self,
+        train_cases,
+        dev_simulators,
+        action_mapping,
+        num_workers: Optional[int] = None,
+    ) -> Sequence[Dict[str, Any]]:
         """
         Simulate persuasion dialogues with OpenLoopMCTS to extract preference pairs.
         The pairs are also written to disk if `model_config.preference_pairs_path` is provided,
@@ -819,6 +827,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
         simulators = dev_simulators
         if simulators is None or len(simulators) == 0:
             raise ValueError("No simulators available for preference generation.")
+
+        worker_count = num_workers if num_workers is not None else getattr(self.model_config, "preference_num_workers", 1)
+        try:
+            worker_count = int(worker_count)
+        except Exception:
+            worker_count = 1
+        worker_count = max(1, worker_count)
+        skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 120)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)
@@ -849,25 +865,26 @@ class BayesAdaptiveLLMTrainer(Trainer):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"pref_gen_{timestamp}.log"
 
-        def _log_line(text: str) -> None:
-            append_to_log(log_file, [text])
+        log_lock = Lock()
+        write_lock = Lock()
 
-        for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
-            # skip to dialog_idx
-            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 120):
-                continue
-            # fix persuadee (simulator/persona) per dialog
-            # sample a simulator from the simulator pool
+        def _log_line(text: str) -> None:
+            with log_lock:
+                append_to_log(log_file, [text])
+
+        def simulate_dialog(dialog_idx: int, case) -> Tuple[int, List[Dict[str, Any]]]:
+            if dialog_idx < skip_to_dialog_idx:
+                return dialog_idx, []
+
             simulator = random.choice(simulators)
-            dialog_game = PersonaDialogGame(self.game, 
-                                            self.generation_method, 
-                                            simulator,
-                                            #### 
-                                            llm_pipeline = self.game_config.llm_pipeline, 
-                                            terminators = self.game_config.terminators
-                                            )
-                        
-            # reset the initial state            
+            dialog_game = PersonaDialogGame(
+                self.game,
+                self.generation_method,
+                simulator,
+                llm_pipeline=self.game_config.llm_pipeline,
+                terminators=self.game_config.terminators,
+            )
+
             state = self.game.reset(case, simulator)
             persona_history: List[Dict[str, str]] = []
             persona_hint = {}
@@ -878,36 +895,32 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 persona_history.append({"turn": 0, **persona_hint})
 
             dialog_pairs: List[Dict[str, Any]] = []
-            # for turn in range(max_turns):
-            # interactive conversations
-                        
+
             for turn in count():
                 outcome = dialog_game.get_dialog_ended(state)
                 if outcome == 1.0 or outcome == -1.0:
                     logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
                     break
-                
-                logger.info("Dialog {} turn {} | state={}", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
 
-                # initialize the mcts planner
-                planner = OpenLoopMCTS(
-                    dialog_game, 
-                    player, 
-                    mcts_cfg,
-                    
+                logger.info(
+                    "Dialog {} turn {} | state={}",
+                    dialog_idx,
+                    turn,
+                    stringify_dialogue_context(state["dialogue_context"]),
                 )
-                
-                # search for the best action
+
+                planner = OpenLoopMCTS(
+                    dialog_game,
+                    player,
+                    mcts_cfg,
+                )
+
                 for _ in range(num_MCTS_sims):
                     planner.search(state)
 
                 action_prob = planner.get_action_prob(state)
                 prob_trace = planner.get_action_prob_trace(state)
                 last_prob = prob_trace[-1]["prob"] if prob_trace else {}
-                # _log_line(
-                #     f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
-                #     f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
-                # )
                 logger.info(
                     "Dialog {} turn {} | sims={} | prob={}",
                     dialog_idx,
@@ -915,16 +928,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     planner.simulation_counter,
                     last_prob,
                 )
-                
+
                 if np.sum(action_prob) == 0:
                     logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
                     break
 
-                
                 state_rep = planner._to_string_rep(state)
                 valid_moves = planner.valid_moves.get(state_rep, [])
 
-                # sample to avoid repeatedly picking the first action when all priors are flat
                 if valid_moves is not None and len(valid_moves) > 0:
                     prob = action_prob.copy()
                     prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
@@ -935,45 +946,37 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
 
-                # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
                 state["turn_id"] = turn
 
-                next_state, _, done, _ = self.game.step(state, 
-                                                goal, 
-                                                self.generation_method, 
-                                                simulator
-                                                )
-                
+                next_state, _, done, _ = self.game.step(
+                    state,
+                    goal,
+                    self.generation_method,
+                    simulator,
+                )
+
                 sys_utt = next_state["dialogue_context"][-2]["content"]
                 user_utt = next_state["dialogue_context"][-1]["content"]
                 print("done: ", done)
 
-                # construct the preference pair
                 pair = get_preference_pair(
                     action_prob,
                     state_rep,
                     dialog_acts,
                     valid_moves,
                     planner.realizations_Vs,
-                    selected_action=best_action
+                    selected_action=best_action,
                 )
 
-                # print full history up to current turn
                 history_str = stringify_dialogue_context(next_state["dialogue_context"])
 
                 if pair is None:
                     logger.info("Not enough realizations to form preference pair; skipping turn.")
                     state = next_state
                     continue
-                
+
                 _, best_pair, worst_pair = pair
-                # sample_scores = planner.get_realization_traces(state, best_action)
-                # if sample_scores:
-                #     _log_line(
-                #         f"[Dialog {dialog_idx} | Turn {turn}] Sample scores (by realization): "
-                #         f"{json.dumps(sample_scores, ensure_ascii=False)}"
-                #     )
 
                 logger.info(
                     "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
@@ -1006,37 +1009,57 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     }
                 )
 
-                # update the current state of the conversation
                 state = next_state
-                # if env signals termination, stop the turn loop
-                # if done != 0:
-                #     logger.info("Environment terminated dialog %s at turn %s with done=%s", dialog_idx, turn, done)
-                #     break
-                
-                
-                if len(state['dialogue_context']) >= self.game_config.max_horizon:
+
+                if len(state["dialogue_context"]) >= self.game_config.max_horizon:
                     break
 
             outcome = dialog_game.get_dialog_ended(state)
             if outcome > 0.3:
-                preference_pairs.extend(dialog_pairs)
-                # log full dialog transcript
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
-                # flush dialog pairs to disk incrementally if path provided
-                if preference_path and dialog_pairs:
+                return dialog_idx, dialog_pairs
+
+            logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
+            return dialog_idx, []
+
+        tasks = list(enumerate(train_cases))
+        results: List[Tuple[int, List[Dict[str, Any]]]] = []
+
+        if worker_count == 1:
+            for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
+                results.append(simulate_dialog(dialog_idx, case))
+        else:
+            logger.info("Generating preference pairs with {} threads ...", worker_count)
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                future_to_idx = {executor.submit(simulate_dialog, idx, case): idx for idx, case in tasks}
+                for fut in tqdm(
+                    as_completed(future_to_idx),
+                    total=len(future_to_idx),
+                    desc="Generating preference pairs (threads)",
+                ):
+                    try:
+                        results.append(fut.result())
+                    except Exception as exc:  # pragma: no cover - diagnostic logging
+                        failed_idx = future_to_idx[fut]
+                        logger.exception("Dialog {} failed during threaded preference generation: {}", failed_idx, exc)
+
+        for dialog_idx, dialog_pairs in sorted(results, key=lambda x: x[0]):
+            if not dialog_pairs:
+                continue
+
+            preference_pairs.extend(dialog_pairs)
+
+            if preference_path and dialog_pairs:
+                with write_lock:
                     with preference_path.open("a", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
-            else:
-                logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
+                logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
 
         if preference_path and preference_pairs:
-            # already appended per dialog; nothing more to write here.
             logger.info("Total pairs written so far: {} (path: {})", len(preference_pairs), preference_path)
 
-        # Overwrite dataset splits so DPO trainer can consume them directly.
         if preference_pairs:
             self.dataset.train_instances = preference_pairs
             self.dataset.dev_instances = []

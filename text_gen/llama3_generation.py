@@ -71,6 +71,7 @@ class Llama3Generation(LLMGeneration):
         
         # calling the llm for response generation
         t = time.time()
+        print("Hyperparameters for Llama3 Generation: ", self.generation_config)
         response = call_llm(messages, 
                             n=1,
                             temperature=0.7,
