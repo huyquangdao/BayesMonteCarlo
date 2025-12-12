@@ -632,9 +632,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.model.plm = trained_plm
         else:
             self.model = trained_plm
-
-        save_finetuned_model(self)
+        sft_save_dir = self.model_config.saved_dir + "/sft_adapter"
+        save_finetuned_model(self, save_dir=sft_save_dir)
         loguru_logger.info("SFT training completed. Updated backbone LM with SFT weights.")
+        loguru_logger.info("Saved SFT checkpoint to {}", sft_save_dir)
 
     def train_dpo(self, pref_path, device: Optional[torch.device] = None) -> None:
         """
@@ -724,7 +725,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             eval_steps=700,                                                  # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
             tf32=use_fp16,                                                   # use tf32 precision
-            # push_to_hub=False,                                               # push model to hub
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
@@ -745,10 +745,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         dpo_trainer = trainer_cls(
             **trainer_kwargs
         )
-        # try:
-        #     dpo_trainer = trainer_cls(processing_class=tokenizer, **trainer_kwargs)
-        # except TypeError:
-        #     dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
 
         loguru_logger.info(
             f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
@@ -756,11 +752,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         dpo_trainer.train()
-        for log_row in dpo_trainer.state.log_history:
-            if "train_loss" in log_row:
-                epoch_val = log_row.get("epoch", "?")
-                loss_val = log_row.get("train_loss")
-                loguru_logger.info("DPO epoch {} train_loss={:.4f}", epoch_val, float(loss_val))
 
         trained_plm = dpo_trainer.model
         if hasattr(self.model, "plm"):
@@ -768,13 +759,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
-        base_save_dir = self.model_config.saved_dir
-        # dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
-        # if not dpo_save_dir:
-        #     dpo_save_dir = os.path.join(base_save_dir, "dpo_adapter")
-
-        save_finetuned_model(self, save_dir=base_save_dir)
-        loguru_logger.info("Saved DPO checkpoint to {}", base_save_dir)
+        dpo_save_dir = self.model_config.saved_dir + "/dpo_adapter"
+        save_finetuned_model(self, save_dir=dpo_save_dir)
+        loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
 
 
     def predict(self,

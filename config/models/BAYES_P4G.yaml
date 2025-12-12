@@ -17,11 +17,11 @@ model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu
 
 
 # Training toggles
-run_sft: true
-run_dpo: true
+run_sft: false
+run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: false
+run_online_eval: true
 max_gen_length: 256
 max_gen_tokens: 256
 
@@ -37,7 +37,6 @@ logging_steps: 10
 save_total_limit: 2
 max_grad_norm: 1.0
 max_sequence_length: 1024
-max_prompt_length: 512
 
 
 # ===== General precision / memory flags =====
