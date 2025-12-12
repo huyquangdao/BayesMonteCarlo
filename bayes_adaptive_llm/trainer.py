@@ -1030,9 +1030,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         worker_count = max(1, worker_count)
         # Multiprocessing plus CUDA tensors can fail (pidfd_getfd / pickling) and OOM;
         # default to single process when CUDA is visible.
-        if torch.cuda.is_available() and worker_count > 1:
-            logger.warning("CUDA detected; forcing preference worker_count=1 to avoid CUDA pickling/pidfd issues.")
-            worker_count = 1
+        # if torch.cuda.is_available() and worker_count > 1:
+        #     logger.warning("CUDA detected; forcing preference worker_count=1 to avoid CUDA pickling/pidfd issues.")
+        #     worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
