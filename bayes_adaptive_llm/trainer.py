@@ -685,8 +685,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         base_plm = get_peft_model(base_plm, peft_config)
         tokenizer = self.tokenizer
         tokenizer.pad_token = tokenizer.eos_token
-        tokenizer.padding_side = 'left' # to prevent errors with FA
-        tokenizer.truncation_side = 'left' # to prevent cutting off last generation
 
         # Hyperparameters
         max_length = getattr(self.model_config, "dpo_max_length", 1024)
