@@ -44,11 +44,11 @@ bf16: true
 gradient_checkpointing: false
 
 # DPO-specific
-dpo_max_length: 512          # max_length
-max_prompt_length: 256        # max_prompt_length
+dpo_max_length: 1024          # max_length
+max_prompt_length: 512        # max_prompt_length
 
-dpo_train_batch_size: 12             # per_device_train_batch_size / eval_batch_size
-dpo_eval_batch_size: 4              # per_device_eval_batch_size / eval_batch_size
+dpo_train_batch_size: 2             # per_device_train_batch_size / eval_batch_size
+dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
 dpo_epochs: 3                 # epochs
 
 dpo_learning_rate: 5e-5       # learning_rate

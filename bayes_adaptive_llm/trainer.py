@@ -671,7 +671,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         peft_config = LoraConfig(
             r=32,
-            lora_alpha=128,
+            lora_alpha=64,
             lora_dropout=0.05,
             bias="none",
             target_modules="all-linear",
