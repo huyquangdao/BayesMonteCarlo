@@ -86,7 +86,7 @@ if __name__ == '__main__':
     # construct a llm pipeline for the game
     logger.warning(f"Creating the LLM pipeline .... [{args['model_type']}]")
     
-    if args['model_type'] in [LLAMA3, QWEN] and not args['is_train']:
+    if args['model_type'] in [LLAMA3, QWEN]:
         llm_pipeline, terminators = create_llm_pipeline(LLM_MODEL_MAPPING[args['model_type']],
                                         EOS_TOKEN_MAPPING[args['model_type']]
                                         )
