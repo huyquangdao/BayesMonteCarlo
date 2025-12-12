@@ -17,11 +17,11 @@ model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu
 
 
 # Training toggles
-run_sft: true
-run_dpo: true
+run_sft: false
+run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: false
+run_online_eval: true
 
 # Evaluation flags
 eval_by_sft: false
