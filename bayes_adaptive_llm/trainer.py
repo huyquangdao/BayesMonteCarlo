@@ -736,6 +736,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             tf32=use_fp16,                                                   # use tf32 precision
             push_to_hub=False,                                               # push model to hub
             report_to="tensorboard",                                         # report metrics to tensorboard
+            max_length=max_length,
+            max_prompt_length=max_prompt_length,
         )
         
         trainer_kwargs = dict(
@@ -745,18 +747,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
             train_dataset=train_dataset,
             eval_dataset=val_dataset,
             tokenizer=tokenizer,
-            max_length=max_length,
-            max_prompt_length=max_prompt_length,
             model=base_plm,
             loss_type=loss_type,
             beta=beta,
         )
 
         trainer_cls = PatchedDPOTrainer or DPOTrainer
-        try:
-            dpo_trainer = trainer_cls(processing_class=tokenizer, **trainer_kwargs)
-        except TypeError:
-            dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
+        dpo_trainer = trainer_cls(
+            **trainer_kwargs
+        )
+        # try:
+        #     dpo_trainer = trainer_cls(processing_class=tokenizer, **trainer_kwargs)
+        # except TypeError:
+        #     dpo_trainer = trainer_cls(tokenizer=tokenizer, **trainer_kwargs)
 
         loguru_logger.info(
             f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
