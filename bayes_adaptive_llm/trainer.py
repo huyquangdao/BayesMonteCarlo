@@ -1020,6 +1020,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except Exception:
             worker_count = 1
         worker_count = max(1, worker_count)
+        # Running multiple CUDA-backed processes easily OOMs a single GPU. Disable
+        # multiprocessing unless explicitly allowed.
+        if torch.cuda.is_available() and worker_count > 1 and not getattr(self.model_config, "allow_cuda_multiprocessing", False):
+            logger.warning(
+                "CUDA detected; forcing preference worker_count=1 to avoid GPU OOM. "
+                "Set model_config.allow_cuda_multiprocessing=True to override."
+            )
+            worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
@@ -1127,6 +1135,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     ):
                         try:
                             results.append(async_res.get())
+                        except torch.cuda.OutOfMemoryError as exc:
+                            logger.error(
+                                "Dialog {} failed with CUDA OOM during multiprocessing; skipping this dialog. "
+                                "Consider lowering preference_num_workers or enabling allow_cuda_multiprocessing.",
+                                idx,
+                            )
                         except Exception as exc:  # pragma: no cover - diagnostic logging
                             logger.exception("Dialog {} failed during multiprocessing preference generation: {}", idx, exc)
             except Exception as exc:  # pragma: no cover - diagnostic logging
