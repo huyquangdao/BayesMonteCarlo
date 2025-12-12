@@ -12,8 +12,9 @@ import random
 import json
 import copy
 import inspect
+import multiprocessing as mp
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Lock
 import torch.distributed as dist
 import random
 from collections import defaultdict
@@ -129,6 +130,191 @@ class PersonaDialogGame(DialogGame):
             user_response=user_response,
         )
         return next_state
+
+
+_mcts_worker_state = None
+
+
+def _init_mcts_worker(state):
+    """
+    Initializer for multiprocessing workers. Stores shared, read-only state in a
+    module-level variable so pool workers avoid repeatedly pickling arguments.
+    """
+    global _mcts_worker_state
+    _mcts_worker_state = state
+
+
+def _simulate_dialog_process(task):
+    """
+    Run a single dialog simulation using global worker state populated by
+    `_init_mcts_worker`. Returns (dialog_idx, preference_pairs).
+    """
+    if _mcts_worker_state is None:
+        raise RuntimeError("MCTS worker state not initialized.")
+
+    dialog_idx, case = task
+    cfg = _mcts_worker_state
+    skip_to_dialog_idx = cfg["skip_to_dialog_idx"]
+
+    if dialog_idx < skip_to_dialog_idx:
+        return dialog_idx, []
+
+    simulators = cfg["simulators"]
+    if not simulators:
+        raise ValueError("No simulators available for preference generation.")
+
+    def _log_line(text: str) -> None:
+        log_lock = cfg["log_lock"]
+        if log_lock is None:
+            append_to_log(cfg["log_file"], [text])
+            return
+        with log_lock:
+            append_to_log(cfg["log_file"], [text])
+
+    simulator = random.choice(simulators)
+    dialog_game = PersonaDialogGame(
+        cfg["game"],
+        cfg["generation_method"],
+        simulator,
+        llm_pipeline=cfg["game_config"].llm_pipeline,
+        terminators=cfg["game_config"].terminators,
+    )
+
+    dialog_state = cfg["game"].reset(case, simulator)
+    persona_hint = {}
+    if hasattr(simulator, "user_profile_description"):
+        raw_desc = getattr(simulator, "user_profile_description", "")
+        persona_hint["description"] = sanitize_persona_description(raw_desc)
+
+    dialog_pairs: List[Dict[str, Any]] = []
+
+    for turn in count():
+        outcome = dialog_game.get_dialog_ended(dialog_state)
+        if outcome == 1.0 or outcome == -1.0:
+            logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
+            break
+
+        logger.info(
+            "Dialog {} turn {} | state={}",
+            dialog_idx,
+            turn,
+            stringify_dialogue_context(dialog_state["dialogue_context"]),
+        )
+
+        planner = OpenLoopMCTS(
+            dialog_game,
+            cfg["player"],
+            cfg["mcts_cfg"],
+        )
+
+        for _ in range(cfg["num_MCTS_sims"]):
+            planner.search(dialog_state)
+
+        action_prob = planner.get_action_prob(dialog_state)
+        prob_trace = planner.get_action_prob_trace(dialog_state)
+        last_prob = prob_trace[-1]["prob"] if prob_trace else {}
+        logger.info(
+            "Dialog {} turn {} | sims={} | prob={}",
+            dialog_idx,
+            turn,
+            planner.simulation_counter,
+            last_prob,
+        )
+
+        if np.sum(action_prob) == 0:
+            logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
+            break
+
+        state_rep = planner._to_string_rep(dialog_state)
+        valid_moves = planner.valid_moves.get(state_rep, [])
+
+        if valid_moves is not None and len(valid_moves) > 0:
+            prob = action_prob.copy()
+            prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
+            best_action = int(np.random.choice(len(prob), p=prob))
+        else:
+            best_action = int(np.argmax(action_prob))
+        goal = cfg["player"].id2goal[best_action]
+
+        prompt_dialogue_context = cfg["prompt_preference_by_game"] + stringify_dialogue_context(dialog_state["dialogue_context"])
+
+        dialog_state["dialog_id"] = dialog_idx
+        dialog_state["turn_id"] = turn
+
+        next_state, _, done, _ = cfg["game"].step(
+            dialog_state,
+            goal,
+            cfg["generation_method"],
+            simulator,
+        )
+
+        sys_utt = next_state["dialogue_context"][-2]["content"]
+        user_utt = next_state["dialogue_context"][-1]["content"]
+        print("done: ", done)
+
+        pair = get_preference_pair(
+            action_prob,
+            state_rep,
+            cfg["dialog_acts"],
+            valid_moves,
+            planner.realizations_Vs,
+            selected_action=best_action,
+        )
+
+        history_str = stringify_dialogue_context(next_state["dialogue_context"])
+
+        if pair is None:
+            logger.info("Not enough realizations to form preference pair; skipping turn.")
+            dialog_state = next_state
+            continue
+
+        _, best_pair, worst_pair = pair
+
+        logger.info(
+            "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
+            dialog_idx,
+            turn,
+            goal,
+            best_pair[0],
+            float(best_pair[1]),
+            worst_pair[0],
+            float(worst_pair[1]),
+        )
+
+        _log_line(
+            f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
+            f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
+            f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})"
+        )
+
+        dialog_pairs.append(
+            {
+                "prompt": prompt_dialogue_context,
+                "chosen": best_pair[0],
+                "rejected": worst_pair[0],
+                "turn": turn,
+                "action": goal,
+                "dialog_index": dialog_idx,
+                "system_utterance": sys_utt,
+                "user_utterance": user_utt,
+                "persona_hint": persona_hint or None,
+            }
+        )
+
+        dialog_state = next_state
+
+        if len(dialog_state["dialogue_context"]) >= cfg["game_config"].max_horizon:
+            break
+
+    outcome = dialog_game.get_dialog_ended(dialog_state)
+    if outcome > 0.3:
+        full_dialog = stringify_dialogue_context(dialog_state["dialogue_context"])
+        _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
+        return dialog_idx, dialog_pairs
+
+    logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
+    return dialog_idx, []
+
 
 class BayesAdaptiveLLMTrainer(Trainer):
     """
@@ -865,184 +1051,90 @@ class BayesAdaptiveLLMTrainer(Trainer):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"pref_gen_{timestamp}.log"
 
-        log_lock = Lock()
-        write_lock = Lock()
+        manager = None
+        log_lock = None
+        write_lock = threading.Lock()
+        if worker_count > 1:
+            try:
+                manager = mp.Manager()
+                log_lock = manager.Lock()
+            except Exception as exc:
+                logger.warning("Falling back to thread lock for logging: {}", exc)
+                log_lock = threading.Lock()
+        else:
+            log_lock = threading.Lock()
 
-        def _log_line(text: str) -> None:
-            with log_lock:
-                append_to_log(log_file, [text])
+        worker_state = {
+            "skip_to_dialog_idx": skip_to_dialog_idx,
+            "simulators": simulators,
+            "game": self.game,
+            "generation_method": self.generation_method,
+            "game_config": self.game_config,
+            "player": player,
+            "mcts_cfg": mcts_cfg,
+            "num_MCTS_sims": num_MCTS_sims,
+            "prompt_preference_by_game": prompt_preference_by_game,
+            "dialog_acts": dialog_acts,
+            "log_file": log_file,
+            "log_lock": log_lock,
+        }
 
-        def simulate_dialog(dialog_idx: int, case) -> Tuple[int, List[Dict[str, Any]]]:
-            if dialog_idx < skip_to_dialog_idx:
-                return dialog_idx, []
-
-            simulator = random.choice(simulators)
-            dialog_game = PersonaDialogGame(
-                self.game,
-                self.generation_method,
-                simulator,
-                llm_pipeline=self.game_config.llm_pipeline,
-                terminators=self.game_config.terminators,
-            )
-
-            state = self.game.reset(case, simulator)
-            persona_history: List[Dict[str, str]] = []
-            persona_hint = {}
-            if hasattr(simulator, "user_profile_description"):
-                raw_desc = getattr(simulator, "user_profile_description", "")
-                persona_hint["description"] = sanitize_persona_description(raw_desc)
-            if persona_hint:
-                persona_history.append({"turn": 0, **persona_hint})
-
-            dialog_pairs: List[Dict[str, Any]] = []
-
-            for turn in count():
-                outcome = dialog_game.get_dialog_ended(state)
-                if outcome == 1.0 or outcome == -1.0:
-                    logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
-                    break
-
-                logger.info(
-                    "Dialog {} turn {} | state={}",
-                    dialog_idx,
-                    turn,
-                    stringify_dialogue_context(state["dialogue_context"]),
-                )
-
-                planner = OpenLoopMCTS(
-                    dialog_game,
-                    player,
-                    mcts_cfg,
-                )
-
-                for _ in range(num_MCTS_sims):
-                    planner.search(state)
-
-                action_prob = planner.get_action_prob(state)
-                prob_trace = planner.get_action_prob_trace(state)
-                last_prob = prob_trace[-1]["prob"] if prob_trace else {}
-                logger.info(
-                    "Dialog {} turn {} | sims={} | prob={}",
-                    dialog_idx,
-                    turn,
-                    planner.simulation_counter,
-                    last_prob,
-                )
-
-                if np.sum(action_prob) == 0:
-                    logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
-                    break
-
-                state_rep = planner._to_string_rep(state)
-                valid_moves = planner.valid_moves.get(state_rep, [])
-
-                if valid_moves is not None and len(valid_moves) > 0:
-                    prob = action_prob.copy()
-                    prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
-                    best_action = int(np.random.choice(len(prob), p=prob))
-                else:
-                    best_action = int(np.argmax(action_prob))
-                goal = player.id2goal[best_action]
-
-                prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
-
-                state["dialog_id"] = dialog_idx
-                state["turn_id"] = turn
-
-                next_state, _, done, _ = self.game.step(
-                    state,
-                    goal,
-                    self.generation_method,
-                    simulator,
-                )
-
-                sys_utt = next_state["dialogue_context"][-2]["content"]
-                user_utt = next_state["dialogue_context"][-1]["content"]
-                print("done: ", done)
-
-                pair = get_preference_pair(
-                    action_prob,
-                    state_rep,
-                    dialog_acts,
-                    valid_moves,
-                    planner.realizations_Vs,
-                    selected_action=best_action,
-                )
-
-                history_str = stringify_dialogue_context(next_state["dialogue_context"])
-
-                if pair is None:
-                    logger.info("Not enough realizations to form preference pair; skipping turn.")
-                    state = next_state
-                    continue
-
-                _, best_pair, worst_pair = pair
-
-                logger.info(
-                    "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
-                    dialog_idx,
-                    turn,
-                    goal,
-                    best_pair[0],
-                    float(best_pair[1]),
-                    worst_pair[0],
-                    float(worst_pair[1]),
-                )
-
-                _log_line(
-                    f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
-                    f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
-                    f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})"
-                )
-
-                dialog_pairs.append(
-                    {
-                        "prompt": prompt_dialogue_context,
-                        "chosen": best_pair[0],
-                        "rejected": worst_pair[0],
-                        "turn": turn,
-                        "action": goal,
-                        "dialog_index": dialog_idx,
-                        "system_utterance": sys_utt,
-                        "user_utterance": user_utt,
-                        "persona_hint": persona_hint or None,
-                    }
-                )
-
-                state = next_state
-
-                if len(state["dialogue_context"]) >= self.game_config.max_horizon:
-                    break
-
-            outcome = dialog_game.get_dialog_ended(state)
-            if outcome > 0.3:
-                full_dialog = stringify_dialogue_context(state["dialogue_context"])
-                _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
-                return dialog_idx, dialog_pairs
-
-            logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
-            return dialog_idx, []
-
+        _init_mcts_worker(worker_state)
         tasks = list(enumerate(train_cases))
         results: List[Tuple[int, List[Dict[str, Any]]]] = []
 
-        if worker_count == 1:
-            for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
-                results.append(simulate_dialog(dialog_idx, case))
-        else:
-            logger.info("Generating preference pairs with {} threads ...", worker_count)
+        def _run_with_threads() -> List[Tuple[int, List[Dict[str, Any]]]]:
+            thread_results: List[Tuple[int, List[Dict[str, Any]]]] = []
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
-                future_to_idx = {executor.submit(simulate_dialog, idx, case): idx for idx, case in tasks}
+                future_to_idx = {executor.submit(_simulate_dialog_process, (idx, case)): idx for idx, case in tasks}
                 for fut in tqdm(
                     as_completed(future_to_idx),
                     total=len(future_to_idx),
                     desc="Generating preference pairs (threads)",
                 ):
                     try:
-                        results.append(fut.result())
+                        thread_results.append(fut.result())
                     except Exception as exc:  # pragma: no cover - diagnostic logging
                         failed_idx = future_to_idx[fut]
                         logger.exception("Dialog {} failed during threaded preference generation: {}", failed_idx, exc)
+            return thread_results
+
+        if worker_count == 1:
+            for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
+                results.append(_simulate_dialog_process((dialog_idx, case)))
+        else:
+            logger.info("Generating preference pairs with {} processes ...", worker_count)
+            try:
+                ctx = mp.get_context("spawn")
+            except ValueError:
+                ctx = mp
+
+            try:
+                with ctx.Pool(
+                    processes=worker_count,
+                    initializer=_init_mcts_worker,
+                    initargs=(worker_state,),
+                ) as pool:
+                    async_results = [
+                        (idx, pool.apply_async(_simulate_dialog_process, ((idx, case),)))
+                        for idx, case in tasks
+                    ]
+
+                    for idx, async_res in tqdm(
+                        async_results,
+                        total=len(async_results),
+                        desc="Generating preference pairs (processes)",
+                    ):
+                        try:
+                            results.append(async_res.get())
+                        except Exception as exc:  # pragma: no cover - diagnostic logging
+                            logger.exception("Dialog {} failed during multiprocessing preference generation: {}", idx, exc)
+            except Exception as exc:  # pragma: no cover - diagnostic logging
+                logger.exception("Multiprocessing preference generation failed; falling back to threads: {}", exc)
+                results = _run_with_threads()
+            finally:
+                if manager is not None:
+                    manager.shutdown()
 
         for dialog_idx, dialog_pairs in sorted(results, key=lambda x: x[0]):
             if not dialog_pairs:
