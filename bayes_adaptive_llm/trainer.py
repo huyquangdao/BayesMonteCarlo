@@ -734,8 +734,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             eval_steps=700,                                                  # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
             tf32=use_fp16,                                                   # use tf32 precision
-            push_to_hub=False,                                               # push model to hub
-            report_to="tensorboard",                                         # report metrics to tensorboard
+            # push_to_hub=False,                                               # push model to hub
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
