@@ -32,8 +32,7 @@ class BayesAdaptiveLLMModel(Model):
             cache_dir=self.model_config.cached_dir,
             torch_dtype=dtype,
             # device_map="auto" if torch.cuda.is_available() else None, 
-            device_map=None,
-            low_cpu_mem_usage=True,
+            device_map="cuda" if torch.cuda.is_available() else None,
         )
         self.plm.config.use_cache = False
 
