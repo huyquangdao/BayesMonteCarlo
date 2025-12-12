@@ -25,7 +25,7 @@ run_online_eval: false
 
 # Evaluation flags
 eval_by_sft: false
-eval_by_dpo: false
+eval_by_dpo: true
 
 max_gen_length: 256
 max_gen_tokens: 256
