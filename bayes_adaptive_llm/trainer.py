@@ -32,6 +32,7 @@ from datasets import Dataset, DatasetDict
 from multiprocessing import cpu_count
 from itertools import count
 from json.decoder import JSONDecodeError
+import pickle
 
 import numpy as np
 import torch
@@ -134,7 +135,13 @@ class PersonaDialogGame(DialogGame):
 
 _mcts_worker_state = None
 
-
+def _is_picklable(obj) -> bool:
+    try:
+        pickle.dumps(obj)
+        return True
+    except Exception:
+        return False
+    
 def _init_mcts_worker(state):
     """
     Initializer for multiprocessing workers. Stores shared, read-only state in a
@@ -149,10 +156,9 @@ def _init_mcts_worker(state):
     if torch.cuda.is_available():
         ng = torch.cuda.device_count()
         torch.cuda.set_device(wid % ng)
-        
+
     global _mcts_worker_state
     _mcts_worker_state = state
-
 
 def _simulate_dialog_process(task):
     """
@@ -1036,13 +1042,16 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logger.warning("Only {} GPU detected; forcing preference worker_count=1 to avoid OOM.", num_gpus)
             worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
+        rank = int(os.getenv("RANK", os.getenv("LOCAL_RANK", "0")))
+        world_size = int(os.getenv("WORLD_SIZE", "1"))
+        if world_size > 1:
+            logger.info("Preference gen sharding enabled: rank={} / world_size={}", rank, world_size)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)
-        logger.info("Action mapping: {}", action_mapping)
         dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
+
         player = LLMPlayer(self.game_config, action_mapping, self.model_config)
-        # expose generation pipeline to player heuristics if needed
         setattr(self.model_config, "llm_pipeline", self.game_config.llm_pipeline)
         setattr(self.model_config, "terminators", self.game_config.terminators)
 
@@ -1061,14 +1070,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             preference_path = Path(self.model_config.preference_pairs_path)
             preference_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # logging raw responses to bayes_adaptive_llm/logs
         log_dir = Path(__file__).resolve().parent / "logs"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"pref_gen_{timestamp}.log"
 
-        manager = None
-        log_lock = None
         write_lock = threading.Lock()
+        log_lock = threading.Lock()
         if worker_count > 1:
             try:
                 manager = mp.Manager()
@@ -1080,8 +1087,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             log_lock = threading.Lock()
 
         worker_state = {
-            "skip_to_dialog_idx": skip_to_dialog_idx,
-            "simulators": simulators,
+            "skip_to_dialog_idx": getattr(self.model_config, "skip_to_dialog_idx", 40),
+            "simulators": dev_simulators,
             "game": self.game,
             "generation_method": self.generation_method,
             "game_config": self.game_config,
@@ -1095,68 +1102,66 @@ class BayesAdaptiveLLMTrainer(Trainer):
         }
 
         _init_mcts_worker(worker_state)
-        tasks = list(enumerate(train_cases))
+        all_tasks = list(enumerate(train_cases))
+        if world_size > 1:
+            tasks = [(i, c) for (i, c) in all_tasks if (i % world_size) == rank]
+        else:
+            tasks = all_tasks
+
         results: List[Tuple[int, List[Dict[str, Any]]]] = []
 
         def _run_with_threads() -> List[Tuple[int, List[Dict[str, Any]]]]:
             thread_results: List[Tuple[int, List[Dict[str, Any]]]] = []
+            # threads OK cho GPU inference (không pickle), nhưng nhớ worker_state global là read-only
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 future_to_idx = {executor.submit(_simulate_dialog_process, (idx, case)): idx for idx, case in tasks}
-                for fut in tqdm(
-                    as_completed(future_to_idx),
-                    total=len(future_to_idx),
-                    desc="Generating preference pairs (threads)",
-                ):
+                for fut in tqdm(as_completed(future_to_idx), total=len(future_to_idx), desc="Pref pairs (threads)"):
+                    idx = future_to_idx[fut]
                     try:
                         thread_results.append(fut.result())
-                    except Exception as exc:  # pragma: no cover - diagnostic logging
-                        failed_idx = future_to_idx[fut]
-                        logger.exception("Dialog {} failed during threaded preference generation: {}", failed_idx, exc)
+                    except (torch.OutOfMemoryError, torch.cuda.OutOfMemoryError) as exc:
+                        logger.error("Dialog {} OOM (threads); skipping.", idx)
+                    except Exception as exc:
+                        logger.exception("Dialog {} failed (threads): {}", idx, exc)
             return thread_results
 
-        if worker_count == 1:
-            for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
-                results.append(_simulate_dialog_process((dialog_idx, case)))
-        else:
-            logger.info("Generating preference pairs with {} processes ...", worker_count)
-            try:
-                ctx = mp.get_context("spawn")
-            except ValueError:
-                ctx = mp
+        use_process_pool = False
+        if worker_count > 1 and not torch.cuda.is_available():
+            # CPU-only mới đáng dùng Pool
+            use_process_pool = _is_picklable(worker_state)
+            if not use_process_pool:
+                logger.warning("worker_state not picklable; using threads instead.")
+        elif worker_count > 1 and torch.cuda.is_available():
+            logger.warning(
+                "CUDA detected: using THREADS (no mp.Pool) to avoid pickle issues and GPU OOM. "
+                "For multi-GPU speedup, launch multiple processes with torchrun and sharding (RANK/WORLD_SIZE)."
+            )
 
-            try:
+        if worker_count == 1:
+            for dialog_idx, case in tqdm(tasks, desc="Pref pairs (single)"):
+                try:
+                    results.append(_simulate_dialog_process((dialog_idx, case)))
+                except (torch.OutOfMemoryError, torch.cuda.OutOfMemoryError):
+                    logger.error("Dialog {} OOM (single); skipping.", dialog_idx)
+        else:
+            if use_process_pool:
+                logger.info("Pref pairs with {} CPU processes ...", worker_count)
+                ctx = mp.get_context("spawn")
                 with ctx.Pool(
                     processes=worker_count,
                     initializer=_init_mcts_worker,
                     initargs=(worker_state,),
                 ) as pool:
-                    async_results = [
-                        (idx, pool.apply_async(_simulate_dialog_process, ((idx, case),)))
-                        for idx, case in tasks
-                    ]
-
-                    for idx, async_res in tqdm(
-                        async_results,
-                        total=len(async_results),
-                        desc="Generating preference pairs (processes)",
-                    ):
+                    async_results = [(idx, pool.apply_async(_simulate_dialog_process, ((idx, case),))) for idx, case in tasks]
+                    for idx, async_res in tqdm(async_results, total=len(async_results), desc="Pref pairs (processes)"):
                         try:
                             results.append(async_res.get())
-                        except torch.cuda.OutOfMemoryError as exc:
-                            logger.error(
-                                "Dialog {} failed with CUDA OOM during multiprocessing; skipping this dialog. "
-                                "Consider lowering preference_num_workers or enabling allow_cuda_multiprocessing.",
-                                idx,
-                            )
-                        except Exception as exc:  # pragma: no cover - diagnostic logging
-                            logger.exception("Dialog {} failed during multiprocessing preference generation: {}", idx, exc)
-            except Exception as exc:  # pragma: no cover - diagnostic logging
-                logger.exception("Multiprocessing preference generation failed; falling back to threads: {}", exc)
+                        except (torch.OutOfMemoryError, torch.cuda.OutOfMemoryError):
+                            logger.error("Dialog {} OOM (processes); skipping.", idx)
+                        except Exception as exc:
+                            logger.exception("Dialog {} failed (processes): {}", idx, exc)
+            else:
                 results = _run_with_threads()
-            finally:
-                if manager is not None:
-                    manager.shutdown()
-
         for dialog_idx, dialog_pairs in sorted(results, key=lambda x: x[0]):
             if not dialog_pairs:
                 continue
