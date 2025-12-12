@@ -238,6 +238,7 @@ def parse_args():
     parser.add_argument("--gen_models", type=str, default='bart', help="names of models")
     parser.add_argument("--metrics", type=str, help="names of metrics")
     parser.add_argument('--overwrite_sim', action='store_true', help='if we overwrite the saved user simulators')
+    parser.add_argument('--is_train', action='store_true', default=False, help='if we are in the training phase')
     
     # arguments fro recommendation training
     parser.add_argument("--domain", default = 'movie', type=str, help="the name of the domain of consideration")

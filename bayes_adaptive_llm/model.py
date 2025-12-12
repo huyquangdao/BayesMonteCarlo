@@ -20,12 +20,11 @@ class BayesAdaptiveLLMModel(Model):
 
     def __init__(self, model_config, **kwargs):
         super().__init__(model_config, **kwargs)
-        dtype = torch.bfloat16 if getattr(self.model_config, "bf16", False) else None
+        dtype = torch.bfloat16 if getattr(self.model_config, "bf16", True) else None
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
-            torch_dtype=dtype,
         )
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
@@ -37,9 +36,9 @@ class BayesAdaptiveLLMModel(Model):
         self.plm.config.use_cache = False
 
         # extend vocabulary with task-specific tokens
-        if not self.model_config.run_online_eval:
-            self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
-            self.plm.resize_token_embeddings(len(self.tokenizer), mean_resizing=False)
+        # if not self.model_config.run_online_eval:
+        #     self.tokenizer.add_special_tokens(self.model_config.special_tokens_dict)
+        #     self.plm.resize_token_embeddings(len(self.tokenizer), mean_resizing=False)
 
         if getattr(self.tokenizer, "chat_template", None) is None:
             self.tokenizer.chat_template = (

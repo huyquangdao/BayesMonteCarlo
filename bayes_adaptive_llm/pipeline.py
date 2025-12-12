@@ -23,7 +23,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
     def load_pretrained_model(self, model_dir, is_rl: bool = False) -> None:
         if model_dir is None:
-            model_dir = self.model_config.saved_dir
+            pass  # use the initialized model
 
         print(f"[LOAD] >>> Requested to load pretrained model from: {model_dir}")
         print(f"[LOAD] >>> is_rl = {is_rl}")
@@ -65,7 +65,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         if getattr(self.model_config, "run_dpo", False):
             logger.info("Training with DPO on preference pairs ...")
             # assuming dataset already carries preference data or was just generated
-            self.load_pretrained_model(model_dir=self.model_config.saved_dir, is_rl=False)
+            model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
+            self.load_pretrained_model(model_dir=model_dir, is_rl=False)
             pref_path = getattr(self.model_config, "preference_pairs_path", None)
             if not pref_path or not os.path.exists(pref_path):
                 logger.warning("No preference pairs found or path does not exist; skipping DPO.")
@@ -79,7 +80,11 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_online_eval", False):
             logger.info("Online evaluation ...")
-            self.load_pretrained_model(model_dir=self.model_config.dpo_adapter_path, is_rl=False)
+            if getattr(self.model_config, "eval_by_sft", False):
+                model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
+            elif getattr(self.model_config, "eval_by_dpo", False):
+                model_dir = os.path.join(self.model_config.saved_dir, self.model_config.dpo_adapter_folder)
+            self.load_pretrained_model(model_dir=model_dir, is_rl=False)
             online_eval_results = self.run_online_test()
 
         return offline_eval_results, online_eval_results, preference_pairs

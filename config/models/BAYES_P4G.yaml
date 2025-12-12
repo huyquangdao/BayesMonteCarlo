@@ -11,8 +11,8 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1
-dpo_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/dpo_adapter   # nếu cần để DPOTrainer biết đường dẫn
-sft_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/sft_adapter    # nếu cần để DPOTrainer biết đường dẫn
+dpo_adapter_folder: dpo_adapter   
+sft_adapter_folder: sft_adapter    
 model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu cần để pipeline/generation biết đường dẫn
 
 
@@ -22,11 +22,17 @@ run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: true
+
+# Evaluation flags
+eval_by_sft: false
+eval_by_dpo: true 
+
 max_gen_length: 256
 max_gen_tokens: 256
 
 # SFT hyperparameters (memory-friendly)
-batch_size: 1
+use_lora: true
+batch_size: 2
 gradient_accumulation: 8
 learning_rate: 3e-5
 warmup_ratio: 0.05
@@ -35,34 +41,39 @@ num_train_epochs: 3
 logging_steps: 10
 save_total_limit: 2
 max_grad_norm: 1.0
-max_sequence_length: 768
+max_sequence_length: 1024
 
-# DPO-specific
-dpo_max_length: 768
-dpo_beta: 0.1
-dpo_learning_rate: 1e-5
-dpo_gradient_accumulation: 8
-max_prompt_length: 512
-dpo_batch_size: 1
-dpo_epochs: 3
+
+# ===== General precision / memory flags =====
 fp16: false
 bf16: true
-gradient_checkpointing: true
+gradient_checkpointing: false
+
+# DPO-specific
+dpo_max_length: 1024          # max_length
+max_prompt_length: 512        # max_prompt_length
+
+dpo_train_batch_size: 2             # per_device_train_batch_size / eval_batch_size
+dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
+dpo_epochs: 3                 # epochs
+
+dpo_learning_rate: 5e-5       # learning_rate
+dpo_beta: 0.1                 # beta
+dpo_warmup_ratio: 0.1         # warmup_ratio
+
+dpo_gradient_accumulation: 8  # grad_accum
+dpo_max_grad_norm: 0.3        # max_grad_norm
+
+dpo_optimizer: adamw_torch_fused   # optimizer_type
+dpo_lr_scheduler_type: cosine      # lr_scheduler_type
+
+dpo_fp16: false                # use_fp16
+dpo_bf16: true                 # use_bf16
+dpo_loss_type: sigmoid         
+
+
 # Path to preference pairs (jsonl) used for DPO; each row should include
-# dialog_id, prompt, chosen, rejected, and an optional persona_hint with
-# personality/decision_making_style.
 preference_pairs_path: "data/preference_pairs_llama3.1.jsonl"
 # preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
-# Special tokens for persuasion (same as TRIP/PPDPP PG)
-special_tokens_dict:
-  pad_token: "<pad>"
-  cls_token: "<cls>"
-  sep_token: "<sep>"
-  additional_special_tokens:
-    - "[PERSUADER]"
-    - "[PERSUADEE]"
-    - "[PATH]"
-    - "[SEP]"
-    - "[CONTEXT]"
-    - "[GOAL]"
+
