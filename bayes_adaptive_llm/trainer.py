@@ -621,7 +621,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         loguru_logger.info("Initializing TRL SFTTrainer for persuasion SFT...")
-
+        self.tokenizer.pad_token = self.tokenizer.eos_token
         sft_trainer = SFTTrainer(
             model=base_model,
             args=sft_config,
