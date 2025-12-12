@@ -39,7 +39,7 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
@@ -675,9 +675,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
 
+        peft_config = LoraConfig(
+            r=64,
+            lora_alpha=16,
+            lora_dropout=0.1,
+            bias="none",
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                            "gate_proj", "up_proj", "down_proj"],
+            task_type="CAUSAL_LM",
+        )
         # model_path = getattr(self.model_config, "saved_dir", None) 
         # tokenizer = AutoTokenizer.from_pretrained(model_path)
         base_plm = self.model.plm
+        base_plm = get_peft_model(base_plm, peft_config)
         tokenizer = self.tokenizer
         # base_plm = AutoModelForCausalLM.from_pretrained(
         #     self.model_config.plm,
@@ -732,7 +742,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             max_length=max_length,
             max_prompt_length=max_prompt_length,
-            reference_free=True,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
         )
         
         trainer_kwargs = dict(
@@ -770,7 +780,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         base_save_dir = self.model_config.saved_dir
         dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
         if not dpo_save_dir:
-            dpo_save_dir = os.path.join(base_save_dir, "dpo")
+            dpo_save_dir = os.path.join(base_save_dir, "dpo_adapter")
 
         save_finetuned_model(self, save_dir=dpo_save_dir)
         loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)

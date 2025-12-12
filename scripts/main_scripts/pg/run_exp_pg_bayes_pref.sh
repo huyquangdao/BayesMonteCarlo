@@ -10,7 +10,7 @@ do
 # NCCL_IB_DISABLE=1
 # NCCL_P2P_DISABLE=1
 # NCCL_ASYNC_ERROR_HANDLING=1
-CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 8081 --gpu_ids 2 --num_processes 1 run.py \
+CUDA_VISIBLE_DEVICES=2,3,5 accelerate launch --main_process_port 8081 --gpu_ids 2,3,5 --num_processes 3 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
@@ -19,8 +19,8 @@ CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 8081 --gpu_ids 2 --
   --loggers terminal \
   --datasets p4g \
   --models bayes_adaptive_llm \
-  --gen_models chatgpt \
-  --model_type chatgpt \
+  --gen_models llama3 \
+  --model_type train \
   --is_so_game \
   --use_persona \
   --is_utterance_based_action \
