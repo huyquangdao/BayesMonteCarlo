@@ -12,7 +12,7 @@ do
 # NCCL_ASYNC_ERROR_HANDLING=1
 
 #if train phase is needed, add --is_train
-CUDA_VISIBLE_DEVICES=2,3,4 accelerate launch --main_process_port 8081 --gpu_ids 2,3,4 --num_processes 3 run.py \
+CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 8081 --gpu_ids 2 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
@@ -23,7 +23,7 @@ CUDA_VISIBLE_DEVICES=2,3,4 accelerate launch --main_process_port 8081 --gpu_ids 
   --models bayes_adaptive_llm \
   --gen_models llama3 \
   --model_type llama3 \
-  --is_train \
+  # --is_train \
   --is_so_game \
   --use_persona \
   --is_utterance_based_action \
