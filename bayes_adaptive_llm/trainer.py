@@ -732,7 +732,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             logging_steps=25,                                                # log every 25 steps
             save_steps=500,                                                  # when to save checkpoint
             save_total_limit=2,                                              # limit the total amount of checkpoints
-            evaluation_strategy="steps",                                     # evaluate every 1000 steps
+            eval_strategy="steps",                                           # evaluate every 1000 steps
             eval_steps=700,                                                  # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
             tf32=use_fp16,                                                   # use tf32 precision
