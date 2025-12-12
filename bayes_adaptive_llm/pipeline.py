@@ -79,7 +79,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_online_eval", False):
             logger.info("Online evaluation ...")
-            self.load_pretrained_model(model_dir={self.model_config.saved_dir + "/sft_adapter"}, is_rl=False)
+            model_dir = self.model_config.saved_dir + self.model_config.sft_adapter_folder
+            self.load_pretrained_model(model_dir=model_dir, is_rl=False)
             online_eval_results = self.run_online_test()
 
         return offline_eval_results, online_eval_results, preference_pairs

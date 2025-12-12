@@ -10,9 +10,9 @@ lm_size: 768
 cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
-saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1
-dpo_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/dpo_adapter   # nếu cần để DPOTrainer biết đường dẫn
-sft_adapter_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/sft_adapter    # nếu cần để DPOTrainer biết đường dẫn
+saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1/
+dpo_adapter_folder: dpo_adapter   
+sft_adapter_folder: sft_adapter    
 model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu cần để pipeline/generation biết đường dẫn
 
 

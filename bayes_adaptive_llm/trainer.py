@@ -632,7 +632,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.model.plm = trained_plm
         else:
             self.model = trained_plm
-        sft_save_dir = self.model_config.saved_dir + "/sft_adapter"
+        sft_save_dir = self.model_config.saved_dir + self.model_config.sft_adapter_folder
         save_finetuned_model(self, save_dir=sft_save_dir)
         loguru_logger.info("SFT training completed. Updated backbone LM with SFT weights.")
         loguru_logger.info("Saved SFT checkpoint to {}", sft_save_dir)
@@ -759,7 +759,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         else:
             self.model = trained_plm
 
-        dpo_save_dir = self.model_config.saved_dir + "/dpo_adapter"
+        dpo_save_dir = self.model_config.saved_dir + self.model_config.dpo_adapter_folder
         save_finetuned_model(self, save_dir=dpo_save_dir)
         loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
 
