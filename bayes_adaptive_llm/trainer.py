@@ -598,7 +598,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
             weight_decay=getattr(self.model_config, "weight_decay", 0.0),
             max_seq_length=getattr(self.model_config, "max_sequence_length", 1024),
-            max_prompt_length=getattr(self.model_config, "max_prompt_length", 512),
             lr_scheduler_type=getattr(self.model_config, "lr_scheduler_type", "cosine"),
             logging_steps=getattr(self.model_config, "logging_steps", 10),
             save_steps=getattr(self.model_config, "save_steps", 500),
