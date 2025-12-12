@@ -1051,18 +1051,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file = log_dir / f"pref_gen_{timestamp}.log"
 
-        manager = None
-        log_lock = None
+        log_lock = threading.Lock()
         write_lock = threading.Lock()
-        if worker_count > 1:
-            try:
-                manager = mp.Manager()
-                log_lock = manager.Lock()
-            except Exception as exc:
-                logger.warning("Falling back to thread lock for logging: {}", exc)
-                log_lock = threading.Lock()
-        else:
-            log_lock = threading.Lock()
 
         worker_state = {
             "skip_to_dialog_idx": skip_to_dialog_idx,
@@ -1103,38 +1093,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
             for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
                 results.append(_simulate_dialog_process((dialog_idx, case)))
         else:
-            logger.info("Generating preference pairs with {} processes ...", worker_count)
-            try:
-                ctx = mp.get_context("spawn")
-            except ValueError:
-                ctx = mp
-
-            try:
-                with ctx.Pool(
-                    processes=worker_count,
-                    initializer=_init_mcts_worker,
-                    initargs=(worker_state,),
-                ) as pool:
-                    async_results = [
-                        (idx, pool.apply_async(_simulate_dialog_process, ((idx, case),)))
-                        for idx, case in tasks
-                    ]
-
-                    for idx, async_res in tqdm(
-                        async_results,
-                        total=len(async_results),
-                        desc="Generating preference pairs (processes)",
-                    ):
-                        try:
-                            results.append(async_res.get())
-                        except Exception as exc:  # pragma: no cover - diagnostic logging
-                            logger.exception("Dialog {} failed during multiprocessing preference generation: {}", idx, exc)
-            except Exception as exc:  # pragma: no cover - diagnostic logging
-                logger.exception("Multiprocessing preference generation failed; falling back to threads: {}", exc)
-                results = _run_with_threads()
-            finally:
-                if manager is not None:
-                    manager.shutdown()
+            # Always use threads (not processes) to avoid pidfd_getfd / CUDA pickling failures.
+            logger.info("Generating preference pairs with {} threads ...", worker_count)
+            results = _run_with_threads()
 
         for dialog_idx, dialog_pairs in sorted(results, key=lambda x: x[0]):
             if not dialog_pairs:
