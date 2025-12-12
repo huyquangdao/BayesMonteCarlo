@@ -1186,16 +1186,13 @@ class PersuationGame(Game):
         self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
 
         # prefer generating a natural utterance whenever a generation model is available
-        use_generation = generation_model is not None or not self.game_config.is_utterance_based_action
-
-        if use_generation:
-            system_response = generation_model.generate_response(
-                res_state,
-                llm_pipeline=self.game_config.llm_pipeline,
-                terminators=self.game_config.terminators,
-            )
+        if not self.game_config.is_utterance_based_action:
+            system_response = generation_model.generate_response(res_state,
+                                                                llm_pipeline = self.game_config.llm_pipeline, 
+                                                                terminators = self.game_config.terminators
+                                                                )
+        # we're using utterance-based action
         else:
-            # utterance-based action: treat the action itself as the system utterance
             system_response = action
 
         state['response'] = system_response
