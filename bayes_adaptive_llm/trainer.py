@@ -140,15 +140,6 @@ def _init_mcts_worker(state):
     Initializer for multiprocessing workers. Stores shared, read-only state in a
     module-level variable so pool workers avoid repeatedly pickling arguments.
     """
-    wid = 0
-    try:
-        wid = mp.current_process()._identity[0] - 1  # 0-based
-    except Exception:
-        wid = 0
-
-    if torch.cuda.is_available():
-        ng = torch.cuda.device_count()
-        torch.cuda.set_device(wid % ng)
     global _mcts_worker_state
     _mcts_worker_state = state
 
@@ -419,6 +410,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Please adapt _instance_to_messages_for_persuasion."
         )
 
+    
     def _instance_to_messages_for_negotiation(self, inst):
         """
         Convert a negotiation instance to chat messages for SFT.
@@ -1028,11 +1020,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except Exception:
             worker_count = 1
         worker_count = max(1, worker_count)
-        # Multiprocessing plus CUDA tensors can fail (pidfd_getfd / pickling) and OOM;
-        # default to single process when CUDA is visible.
-        # if torch.cuda.is_available() and worker_count > 1:
-        #     logger.warning("CUDA detected; forcing preference worker_count=1 to avoid CUDA pickling/pidfd issues.")
-        #     worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
@@ -1140,21 +1127,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     ):
                         try:
                             results.append(async_res.get())
-                        except RuntimeError as exc:
-                            # catch pidfd_getfd and similar spawn-time errors
-                            logger.error(
-                                "Dialog {} failed during multiprocessing (RuntimeError: {}). "
-                                "Falling back to threads; consider running with worker_count=1.",
-                                idx,
-                                exc,
-                            )
-                            raise
-                        except torch.cuda.OutOfMemoryError as exc:
-                            logger.error(
-                                "Dialog {} failed with CUDA OOM during multiprocessing; skipping this dialog. "
-                                "Consider lowering preference_num_workers or enabling allow_cuda_multiprocessing.",
-                                idx,
-                            )
                         except Exception as exc:  # pragma: no cover - diagnostic logging
                             logger.exception("Dialog {} failed during multiprocessing preference generation: {}", idx, exc)
             except Exception as exc:  # pragma: no cover - diagnostic logging
