@@ -834,7 +834,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except Exception:
             worker_count = 1
         worker_count = max(1, worker_count)
-        skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 120)
+        skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)

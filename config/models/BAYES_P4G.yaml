@@ -30,6 +30,12 @@ eval_by_dpo: false
 max_gen_length: 256
 max_gen_tokens: 256
 
+
+#Collect Preference pairs hyperparameters
+preference_num_workers: 4
+skip_to_dialog_idx: 0
+
+
 # SFT hyperparameters (memory-friendly)
 use_lora: true
 batch_size: 2
