@@ -17,7 +17,7 @@ model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu
 
 
 # Training toggles
-run_sft: false
+run_sft: true
 run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
@@ -67,20 +67,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-# dialog_id, prompt, chosen, rejected, and an optional persona_hint with
-# personality/decision_making_style.
 preference_pairs_path: "data/preference_pairs_llama3.1.jsonl"
 # preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
-# Special tokens for persuasion (same as TRIP/PPDPP PG)
-special_tokens_dict:
-  pad_token: "<pad>"
-  cls_token: "<cls>"
-  sep_token: "<sep>"
-  additional_special_tokens:
-    - "[PERSUADER]"
-    - "[PERSUADEE]"
-    - "[PATH]"
-    - "[SEP]"
-    - "[CONTEXT]"
-    - "[GOAL]"
+
