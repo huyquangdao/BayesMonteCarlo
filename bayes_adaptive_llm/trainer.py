@@ -1030,10 +1030,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         worker_count = max(1, worker_count)
         # Running multiple CUDA-backed processes easily OOMs a single GPU. Disable
         # multiprocessing unless explicitly allowed.
-        num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        if num_gpus <= 1 and worker_count > 1:
-            logger.warning("Only {} GPU detected; forcing preference worker_count=1 to avoid OOM.", num_gpus)
-            worker_count = 1
+        # num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        # if num_gpus <= 1 and worker_count > 1:
+        #     logger.warning("Only {} GPU detected; forcing preference worker_count=1 to avoid OOM.", num_gpus)
+        #     worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility

@@ -32,7 +32,7 @@ max_gen_tokens: 256
 
 
 #Collect Preference pairs hyperparameters
-preference_num_workers: 3
+preference_num_workers: 2
 skip_to_dialog_idx: 0
 
 
