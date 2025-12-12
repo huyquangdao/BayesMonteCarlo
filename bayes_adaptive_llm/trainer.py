@@ -719,8 +719,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         grad_accum = max(
             1, int(getattr(self.model_config, "dpo_gradient_accumulation", 8))
         )
-        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", True)))
-        use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", False)))
+        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", False)))
+        use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", True)))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
 

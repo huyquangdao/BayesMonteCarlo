@@ -20,7 +20,7 @@ class BayesAdaptiveLLMModel(Model):
 
     def __init__(self, model_config, **kwargs):
         super().__init__(model_config, **kwargs)
-        dtype = torch.bfloat16 if getattr(self.model_config, "bf16", False) else None
+        dtype = torch.bfloat16 if getattr(self.model_config, "bf16", True) else None
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_config.tokenizer,

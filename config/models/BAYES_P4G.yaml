@@ -45,8 +45,8 @@ dpo_gradient_accumulation: 8
 max_prompt_length: 128
 dpo_batch_size: 1
 dpo_epochs: 3
-fp16: true
-bf16: false
+fp16: false
+bf16: true
 gradient_checkpointing: true
 # Path to preference pairs (jsonl) used for DPO; each row should include
 # dialog_id, prompt, chosen, rejected, and an optional persona_hint with
