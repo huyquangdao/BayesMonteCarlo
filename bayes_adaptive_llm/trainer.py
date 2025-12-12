@@ -140,6 +140,16 @@ def _init_mcts_worker(state):
     Initializer for multiprocessing workers. Stores shared, read-only state in a
     module-level variable so pool workers avoid repeatedly pickling arguments.
     """
+    wid = 0
+    try:
+        wid = mp.current_process()._identity[0] - 1  # 0-based
+    except Exception:
+        wid = 0
+
+    if torch.cuda.is_available():
+        ng = torch.cuda.device_count()
+        torch.cuda.set_device(wid % ng)
+        
     global _mcts_worker_state
     _mcts_worker_state = state
 
@@ -410,7 +420,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Please adapt _instance_to_messages_for_persuasion."
         )
 
-    
     def _instance_to_messages_for_negotiation(self, inst):
         """
         Convert a negotiation instance to chat messages for SFT.
@@ -1022,11 +1031,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
         worker_count = max(1, worker_count)
         # Running multiple CUDA-backed processes easily OOMs a single GPU. Disable
         # multiprocessing unless explicitly allowed.
-        if torch.cuda.is_available() and worker_count > 1 and not getattr(self.model_config, "allow_cuda_multiprocessing", False):
-            logger.warning(
-                "CUDA detected; forcing preference worker_count=1 to avoid GPU OOM. "
-                "Set model_config.allow_cuda_multiprocessing=True to override."
-            )
+        num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        if num_gpus <= 1 and worker_count > 1:
+            logger.warning("Only {} GPU detected; forcing preference worker_count=1 to avoid OOM.", num_gpus)
             worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
