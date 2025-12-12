@@ -676,8 +676,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return
 
         peft_config = LoraConfig(
-            r=64,
-            lora_alpha=16,
+            r=32,
+            lora_alpha=64,
             lora_dropout=0.1,
             bias="none",
             target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
@@ -764,6 +764,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             f"batch_size={batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
         )
 
+        print('running ....')
         dpo_trainer.train()
         for log_row in dpo_trainer.state.log_history:
             if "train_loss" in log_row:

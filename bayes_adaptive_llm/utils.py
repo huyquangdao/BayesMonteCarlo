@@ -251,7 +251,7 @@ def _load_plm_from_meta(base_model, save_dir: str, saved_format: str):
 
         if not os.path.isdir(adapter_dir):
             raise FileNotFoundError(f"LoRA adapter dir not found: {adapter_dir}")
-
+        
         plm = PeftModel.from_pretrained(
             base_model,
             adapter_dir,

@@ -18,10 +18,10 @@ model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu
 
 # Training toggles
 run_sft: false
-run_dpo: true
+run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: false
+run_online_eval: true
 max_gen_length: 256
 max_gen_tokens: 256
 
@@ -38,15 +38,15 @@ max_grad_norm: 1.0
 max_sequence_length: 768
 
 # DPO-specific
-dpo_max_length: 512
+dpo_max_length: 768
 dpo_beta: 0.1
 dpo_learning_rate: 1e-5
 dpo_gradient_accumulation: 8
-max_prompt_length: 128
+max_prompt_length: 512
 dpo_batch_size: 1
 dpo_epochs: 3
-fp16: true
-bf16: false
+fp16: false
+bf16: true
 gradient_checkpointing: true
 # Path to preference pairs (jsonl) used for DPO; each row should include
 # dialog_id, prompt, chosen, rejected, and an optional persona_hint with
