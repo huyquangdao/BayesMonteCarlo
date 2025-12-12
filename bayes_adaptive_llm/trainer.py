@@ -39,7 +39,8 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
 from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, PeftModel
+
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
@@ -578,16 +579,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         peft_config = None
         if use_lora:
             peft_config = LoraConfig(
-                r=getattr(self.model_config, "lora_r", 16),
-                lora_alpha=getattr(self.model_config, "lora_alpha", 32),
-                lora_dropout=getattr(self.model_config, "lora_dropout", 0.05),
+                r=32,
+                lora_alpha=128,
+                lora_dropout=0.05,
                 bias="none",
+                target_modules="all-linear",
                 task_type="CAUSAL_LM",
-                target_modules=getattr(
-                    self.model_config,
-                    "lora_target_modules",
-                    ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-                ),
             )
 
         sft_config = SFTConfig(
@@ -673,7 +670,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return
 
         peft_config = LoraConfig(
-            r=256,
+            r=32,
             lora_alpha=128,
             lora_dropout=0.05,
             bias="none",
@@ -682,16 +679,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         base_plm = self.model.plm
-        base_plm = get_peft_model(base_plm, peft_config)
+        if not isinstance(base_plm, PeftModel):
+            base_plm = get_peft_model(base_plm, peft_config)
+            self.model.plm = base_plm
+
         tokenizer = self.tokenizer
         tokenizer.pad_token = tokenizer.eos_token
 
         # Hyperparameters
         max_length = getattr(self.model_config, "dpo_max_length", 1024)
         max_prompt_length = getattr(self.model_config, "max_prompt_length", 512)
-        per_device_train_batch_size = getattr(self.model_config, "dpo_batch_size", 1)
+        per_device_train_batch_size = getattr(self.model_config, "dpo_train_batch_size", 12)
+        per_device_eval_batch_size = getattr(self.model_config, "dpo_eval_batch_size", 4)
         gradient_checkpointing = getattr(self.model_config, "gradient_checkpointing", False)
-        per_device_eval_batch_size = getattr(self.model_config, "dpo_batch_size", 1)
         epochs = getattr(self.model_config, "dpo_epochs", 3)
         learning_rate = float(getattr(self.model_config, "dpo_learning_rate", 1e-5))
         beta = float(getattr(self.model_config, "dpo_beta", 0.1))
