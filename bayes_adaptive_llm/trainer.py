@@ -656,9 +656,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         logs epoch losses, and saves a checkpoint.
         """
         gc.collect()
-        # torch.cuda.memory_summary(device=None, abbreviated=False)
-
-        # device = device or getattr(self, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         if DPOTrainer is None or DPOConfig is None:
             loguru_logger.warning("trl DPOTrainer/DPOConfig unavailable; skipping DPO training.")
             return
@@ -676,81 +673,85 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return
 
         peft_config = LoraConfig(
-            r=64,
-            lora_alpha=16,
-            lora_dropout=0.1,
+            r=256,
+            lora_alpha=128,
+            lora_dropout=0.05,
             bias="none",
-            target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                            "gate_proj", "up_proj", "down_proj"],
+            target_modules="all-linear",
             task_type="CAUSAL_LM",
         )
-        # model_path = getattr(self.model_config, "saved_dir", None) 
-        # tokenizer = AutoTokenizer.from_pretrained(model_path)
+
         base_plm = self.model.plm
         base_plm = get_peft_model(base_plm, peft_config)
         tokenizer = self.tokenizer
-        # base_plm = AutoModelForCausalLM.from_pretrained(
-        #     self.model_config.plm,
-        #     torch_dtype=torch.bfloat16 if getattr(self.model_config, "bf16", False) else None,
-        #     device_map=None,
-        #     low_cpu_mem_usage=True,
-        # )
-
-        # # nếu muốn start từ SFT ckpt:
-        # sft_dir = getattr(self.model_config, "saved_dir", None)
-        # if sft_dir:
-        #     ckpt_path = os.path.join(sft_dir, "model.pth")
-        #     if os.path.exists(ckpt_path):
-        #         state_dict = torch.load(ckpt_path, map_location="cpu")
-        #         base_plm.load_state_dict(state_dict, strict=False)
-        #         # base_plm.to("cpu") 
-        #         tokenizer = self.tokenizer
-        #         if tokenizer.pad_token is None:
-        #             tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = 'left' # to prevent errors with FA
+        tokenizer.truncation_side = 'left' # to prevent cutting off last generation
 
         # Hyperparameters
-        max_length = getattr(self.model_config, "dpo_max_length", 512)
-        max_prompt_length = getattr(self.model_config, "max_prompt_length", max_length)
-        batch_size = getattr(self.model_config, "dpo_batch_size", 1)
+        max_length = getattr(self.model_config, "dpo_max_length", 1024)
+        max_prompt_length = getattr(self.model_config, "max_prompt_length", 512)
+        per_device_train_batch_size = getattr(self.model_config, "dpo_batch_size", 1)
+        gradient_checkpointing = getattr(self.model_config, "gradient_checkpointing", False)
+        per_device_eval_batch_size = getattr(self.model_config, "dpo_batch_size", 1)
         epochs = getattr(self.model_config, "dpo_epochs", 3)
         learning_rate = float(getattr(self.model_config, "dpo_learning_rate", 1e-5))
         beta = float(getattr(self.model_config, "dpo_beta", 0.1))
         warmup_ratio = float(getattr(self.model_config, "dpo_warmup_ratio", 0.1))
-        grad_accum = max(
-            1, int(getattr(self.model_config, "dpo_gradient_accumulation", 8))
-        )
-        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", getattr(self.model_config, "fp16", False)))
-        use_bf16 = bool(getattr(self.model_config, "dpo_bf16", getattr(self.model_config, "bf16", True)))
+        grad_accum = int(getattr(self.model_config, "dpo_gradient_accumulation", 8))
+        optimizer_type = getattr(self.model_config, "dpo_optimizer", "adamw_torch_fused")
+        lr_scheduler_type = getattr(self.model_config, "dpo_lr_scheduler_type", "cosine")
+        max_grad_norm = float(getattr(self.model_config, "dpo_max_grad_norm", 0.3))
+        use_fp16 = bool(getattr(self.model_config, "dpo_fp16", False))
+        use_bf16 = bool(getattr(self.model_config, "dpo_bf16", True))
         loss_type = getattr(self.model_config, "dpo_loss_type", None)
         save_dir = getattr(self.model_config, "saved_dir", "./dpo_output")
 
         hf_dataset = HFDataset.from_list(preference_pairs)
+        split = hf_dataset.train_test_split(
+            test_size=0.1,   
+            shuffle=True,
+            seed=42,         
+        )
+
+        train_dataset = split["train"]
+        val_dataset   = split["test"]
 
         training_args = DPOConfig(
             output_dir=save_dir,
-            per_device_train_batch_size=batch_size,
-            gradient_accumulation_steps=grad_accum,
-            num_train_epochs=epochs,
-            learning_rate=learning_rate,
-            warmup_ratio=warmup_ratio,
-            fp16=use_fp16,
-            bf16=use_bf16,
-            save_strategy=IntervalStrategy.NO,
-            logging_strategy="epoch",
-            report_to="none",
-            remove_unused_columns=False,
-            logging_steps=getattr(self.model_config, "logging_steps", 10),
-            max_length=max_length,
-            max_prompt_length=max_prompt_length,
-            gradient_checkpointing_kwargs={"use_reentrant": False},
+            num_train_epochs=epochs,                                         # number of training epochs
+            per_device_train_batch_size=per_device_train_batch_size,         # batch size per device during training
+            per_device_eval_batch_size=per_device_eval_batch_size,           # batch size for evaluation
+            gradient_accumulation_steps=grad_accum,                          # number of steps before performing a backward/update pass
+            gradient_checkpointing=gradient_checkpointing,                   # use gradient checkpointing to save memory
+            optim=optimizer_type,                                            # use fused adamw optimizer
+            learning_rate=learning_rate,                                     # 10x higher LR than QLoRA paper
+            max_grad_norm=max_grad_norm,                                     # max gradient norm based on QLoRA paper
+            warmup_ratio=warmup_ratio,                                       # warmup ratio based on QLoRA paper
+            lr_scheduler_type=lr_scheduler_type,                             # use cosine learning rate scheduler
+            logging_steps=25,                                                # log every 25 steps
+            save_steps=500,                                                  # when to save checkpoint
+            save_total_limit=2,                                              # limit the total amount of checkpoints
+            evaluation_strategy="steps",                                     # evaluate every 1000 steps
+            eval_steps=700,                                                  # when to evaluate
+            bf16=use_bf16,                                                   # use bfloat16 precision
+            tf32=use_fp16,                                                   # use tf32 precision
+            push_to_hub=False,                                               # push model to hub
+            report_to="tensorboard",                                         # report metrics to tensorboard
         )
         
         trainer_kwargs = dict(
+            ref_model=None,
+            peft_config=peft_config,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=val_dataset,
+            tokenizer=tokenizer,
+            max_length=max_length,
+            max_prompt_length=max_prompt_length,
             model=base_plm,
             loss_type=loss_type,
-            args=training_args,
-            train_dataset=hf_dataset,
-
+            beta=beta,
         )
 
         trainer_cls = PatchedDPOTrainer or DPOTrainer
@@ -761,7 +762,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         loguru_logger.info(
             f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
-            f"batch_size={batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
+            f"batch_size={per_device_train_batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
         )
 
         dpo_trainer.train()
@@ -778,12 +779,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.model = trained_plm
 
         base_save_dir = self.model_config.saved_dir
-        dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
-        if not dpo_save_dir:
-            dpo_save_dir = os.path.join(base_save_dir, "dpo_adapter")
+        # dpo_save_dir = getattr(self.model_config, "dpo_adapter_path", None)
+        # if not dpo_save_dir:
+        #     dpo_save_dir = os.path.join(base_save_dir, "dpo_adapter")
 
-        save_finetuned_model(self, save_dir=dpo_save_dir)
-        loguru_logger.info("Saved DPO checkpoint to {}", dpo_save_dir)
+        save_finetuned_model(self, save_dir=base_save_dir)
+        loguru_logger.info("Saved DPO checkpoint to {}", base_save_dir)
 
 
     def predict(self,
