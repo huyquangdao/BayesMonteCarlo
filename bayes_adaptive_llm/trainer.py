@@ -634,8 +634,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         sft_trainer.train()
 
         # sft_trainer.save_model(self.model_config.saved_dir)
-        if self.tokenizer is not None:
-            self.tokenizer.save_pretrained(self.model_config.saved_dir)
+        # if self.tokenizer is not None:
+        #     self.tokenizer.save_pretrained(self.model_config.saved_dir)
 
         trained_plm = sft_trainer.model
         if hasattr(self.model, "plm"):
