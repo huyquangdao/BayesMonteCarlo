@@ -1028,12 +1028,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
         except Exception:
             worker_count = 1
         worker_count = max(1, worker_count)
-        # Running multiple CUDA-backed processes easily OOMs a single GPU. Disable
-        # multiprocessing unless explicitly allowed.
-        # num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        # if num_gpus <= 1 and worker_count > 1:
-        #     logger.warning("Only {} GPU detected; forcing preference worker_count=1 to avoid OOM.", num_gpus)
-        #     worker_count = 1
+        # Multiprocessing plus CUDA tensors can fail (pidfd_getfd / pickling) and OOM;
+        # default to single process when CUDA is visible.
+        if torch.cuda.is_available() and worker_count > 1:
+            logger.warning("CUDA detected; forcing preference worker_count=1 to avoid CUDA pickling/pidfd issues.")
+            worker_count = 1
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 40)
 
         # expose mapping to player via model_config for LLMPlayer compatibility
@@ -1141,6 +1140,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     ):
                         try:
                             results.append(async_res.get())
+                        except RuntimeError as exc:
+                            # catch pidfd_getfd and similar spawn-time errors
+                            logger.error(
+                                "Dialog {} failed during multiprocessing (RuntimeError: {}). "
+                                "Falling back to threads; consider running with worker_count=1.",
+                                idx,
+                                exc,
+                            )
+                            raise
                         except torch.cuda.OutOfMemoryError as exc:
                             logger.error(
                                 "Dialog {} failed with CUDA OOM during multiprocessing; skipping this dialog. "
