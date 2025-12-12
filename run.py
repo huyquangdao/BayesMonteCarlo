@@ -91,6 +91,7 @@ if __name__ == '__main__':
                                         EOS_TOKEN_MAPPING[args['model_type']]
                                         )
     else:
+        print("No loading of llm pipeline ......")
         llm_pipeline, terminators = None, None
             
     # set the current random seed
