@@ -980,7 +980,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 )
                 max_parallel_workers = max(
                     1,
-                    getattr(self.model_config, "num_mcts_workers", min(cpu_count(), 4)),
+                    getattr(self.model_config, "num_mcts_workers", 4),
                 )
                 min_sims_per_worker = max(1, getattr(self.model_config, "min_sims_per_worker", 8))
                 # keep each worker busy with enough simulations to explore the tree
