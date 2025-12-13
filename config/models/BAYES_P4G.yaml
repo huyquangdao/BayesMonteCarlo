@@ -33,7 +33,7 @@ max_gen_tokens: 256
 
 #Collect Preference pairs hyperparameters
 num_mcts_workers: 4
-min_sims_per_worker: 8
+min_sims_per_worker: 6
 skip_to_dialog_idx: 40
 
 
