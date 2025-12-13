@@ -1215,6 +1215,24 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         can_use_mp = world_size > 1
         if can_use_mp:
+            try:
+                pickle.dumps(
+                    (
+                        self.model_config,
+                        self.game_config,
+                        dataset_config,
+                        worker_tasks,
+                        generation_method_spec,
+                        action_mapping,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Multiprocess preference generation disabled; context not picklable: {}", exc
+                )
+                can_use_mp = False
+
+        if can_use_mp:
             mp.set_start_method("spawn", force=True)
             try:
                 mp.spawn(
@@ -1237,20 +1255,19 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     nprocs=world_size,
                     join=True,
                 )
+                with merged_path.open("w", encoding="utf-8") as out:
+                    for r in range(world_size):
+                        p = out_dir / f"pref_pairs_rank{r}.jsonl"
+                        if p.exists():
+                            out.write(p.read_text(encoding="utf-8"))
+                preference_pairs = _load_pairs_from_file(merged_path)
+                logger.info("Merged preference pairs to {}", merged_path)
             except Exception as exc:
                 logger.warning(
                     "Multiprocess preference generation failed, falling back to single process: {}", exc
                 )
                 can_use_mp = False
-
-            with merged_path.open("w", encoding="utf-8") as out:
-                for r in range(world_size):
-                    p = out_dir / f"pref_pairs_rank{r}.jsonl"
-                    if p.exists():
-                        out.write(p.read_text(encoding="utf-8"))
-            preference_pairs = _load_pairs_from_file(merged_path)
-            logger.info("Merged preference pairs to {}", merged_path)
-        else:
+        if not can_use_mp:
             log_file = out_dir / f"pref_gen_{timestamp}.log"
             for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
                 simulator = random.choice(simulators)
