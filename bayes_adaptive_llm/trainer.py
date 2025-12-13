@@ -399,6 +399,7 @@ def _run_dialog_with_mcts(
 def _preference_worker_main(
     rank: int,
     world_size: int,
+    cases: Sequence[Any],
     simulators: Sequence[Any],
     action_mapping: Dict[str, int],
     model_config: Any,
@@ -410,7 +411,6 @@ def _preference_worker_main(
     prompt_prefix: str,
     skip_to_dialog_idx: int,
     max_horizon: int,
-    tasks_by_rank: Sequence[Sequence[Tuple[int, Any]]],
 ):
     """
     Worker entry point for multiprocessing preference generation.
@@ -448,12 +448,14 @@ def _preference_worker_main(
 
     game = game_cls(game_config, dataset_config)
 
-    tasks = tasks_by_rank[rank] if rank < len(tasks_by_rank) else []
-    for dialog_idx, case in tasks:
+    for dialog_idx in range(rank, len(cases), world_size):
+        if dialog_idx < skip_to_dialog_idx:
+            continue
+
         simulator = random.choice(simulators)
         dialog_pairs, outcome, _ = _run_dialog_with_mcts(
             dialog_idx=dialog_idx,
-            case=case,
+            case=cases[dialog_idx],
             simulator=simulator,
             player=player,
             dialog_acts=dialog_acts,
@@ -1188,10 +1190,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 120)
         max_horizon = getattr(self.game_config, "max_horizon", 10)
         dataset_config = getattr(self.game, "dataset_config", None)
-        tasks = [(idx, case) for idx, case in enumerate(train_cases) if idx >= skip_to_dialog_idx]
-        if not tasks:
-            logger.warning("No tasks to process after applying skip_to_dialog_idx={}; nothing to generate.", skip_to_dialog_idx)
-            return []
 
         preference_pairs: List[Dict[str, Any]] = []
         preference_path: Optional[Path] = None
@@ -1210,66 +1208,53 @@ class BayesAdaptiveLLMTrainer(Trainer):
         requested_workers = getattr(self.model_config, "pref_generation_workers", 2)
         world_size = requested_workers or torch.cuda.device_count()
         world_size = 1 if world_size is None else int(world_size)
-        world_size = min(world_size, len(tasks)) if len(tasks) > 0 else 1
-        worker_tasks = [tasks[i::world_size] for i in range(world_size)]
+        world_size = min(world_size, len(train_cases)) if len(train_cases) > 0 else 1
 
         can_use_mp = world_size > 1
         if can_use_mp:
             try:
                 pickle.dumps(
-                    (
-                        self.model_config,
-                        self.game_config,
-                        dataset_config,
-                        worker_tasks,
-                        generation_method_spec,
-                        action_mapping,
-                    )
+                    (self.game_config, self.model_config, action_mapping, dataset_config, generation_method_spec)
                 )
             except Exception as exc:
                 logger.warning(
-                    "Multiprocess preference generation disabled; context not picklable: {}", exc
+                    "Preference generation context not picklable; falling back to single process: {}", exc
                 )
                 can_use_mp = False
 
         if can_use_mp:
             mp.set_start_method("spawn", force=True)
-            try:
-                mp.spawn(
-                    _preference_worker_main,
-                    args=(
-                        world_size,
-                        simulators,
-                        action_mapping,
-                        self.model_config,
-                        self.game_config,
-                        self.game.__class__,
-                        dataset_config,
-                        generation_method_spec,
-                        str(out_dir),
-                        prompt_preference_by_game,
-                        skip_to_dialog_idx,
-                        max_horizon,
-                        worker_tasks,
-                    ),
-                    nprocs=world_size,
-                    join=True,
-                )
-                with merged_path.open("w", encoding="utf-8") as out:
-                    for r in range(world_size):
-                        p = out_dir / f"pref_pairs_rank{r}.jsonl"
-                        if p.exists():
-                            out.write(p.read_text(encoding="utf-8"))
-                preference_pairs = _load_pairs_from_file(merged_path)
-                logger.info("Merged preference pairs to {}", merged_path)
-            except Exception as exc:
-                logger.warning(
-                    "Multiprocess preference generation failed, falling back to single process: {}", exc
-                )
-                can_use_mp = False
-        if not can_use_mp:
+            mp.spawn(
+                _preference_worker_main,
+                args=(
+                    world_size,
+                    train_cases,
+                    simulators,
+                    action_mapping,
+                    self.model_config,
+                    self.game_config,
+                    self.game.__class__,
+                    dataset_config,
+                    generation_method_spec,
+                    str(out_dir),
+                    prompt_preference_by_game,
+                    skip_to_dialog_idx,
+                    max_horizon,
+                ),
+                nprocs=world_size,
+                join=True,
+            )
+
+            with merged_path.open("w", encoding="utf-8") as out:
+                for r in range(world_size):
+                    p = out_dir / f"pref_pairs_rank{r}.jsonl"
+                    if p.exists():
+                        out.write(p.read_text(encoding="utf-8"))
+            preference_pairs = _load_pairs_from_file(merged_path)
+            logger.info("Merged preference pairs to {}", merged_path)
+        else:
             log_file = out_dir / f"pref_gen_{timestamp}.log"
-            for dialog_idx, case in tqdm(tasks, desc="Generating preference pairs"):
+            for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
                 simulator = random.choice(simulators)
                 dialog_pairs, outcome, _ = _run_dialog_with_mcts(
                     dialog_idx=dialog_idx,
