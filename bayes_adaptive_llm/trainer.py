@@ -558,18 +558,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return getattr(obj, key, default)
 
         # persona
-        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+        # persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
         # ===== ROLE / PERSONA / STYLE =====
         lines = []
         lines.append("ROLE:")
         lines.append("You are a Persuader trying to persuade the user to donate to a charity.")
 
-        if persona:
-            lines.append("")
-            lines.append("[USER PERSONA]")
-            lines.append("The current user's profile is: ")
-            lines.append(persona)
+        # if persona:
+        #     lines.append("")
+        #     lines.append("[USER PERSONA]")
+        #     lines.append("The current user's profile is: ")
+        #     lines.append(persona)
 
         lines.append("")
         lines.append("[RESPONSE STYLE]")
@@ -634,12 +634,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
         lines.append("You are a Negotiator trying to reach a fair agreement with the other party.")
 
         # persona
-        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+        # persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
-        if persona:
-            lines.append("")
-            lines.append("[USER PERSONA]")
-            lines.append(persona)
+        # if persona:
+        #     lines.append("")
+        #     lines.append("[USER PERSONA]")
+        #     lines.append(persona)
+        
         lines.append("")
         lines.append("[RESPONSE STYLE]")
         lines.append("- Answer as the Negotiator in the dialogue.")
