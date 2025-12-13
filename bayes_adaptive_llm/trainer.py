@@ -889,29 +889,38 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 target_planner.simulation_counter += getattr(wp, "simulation_counter", 0)
 
                 for state_key, vm in wp.valid_moves.items():
-                    target_planner.valid_moves.setdefault(state_key, vm)
+                    if state_key not in target_planner.valid_moves:
+                        target_planner.valid_moves[state_key] = vm
+                    else:
+                        # union of visited moves to keep masks consistent
+                        merged = set(map(int, target_planner.valid_moves[state_key])) | set(map(int, vm))
+                        target_planner.valid_moves[state_key] = np.array(sorted(merged), dtype=int)
 
                 for state_key, prior in wp.P.items():
                     # keep the first prior we see; priors are fixed per state
                     target_planner.P.setdefault(state_key, copy.deepcopy(prior))
 
-                for state_key, ns_val in wp.Ns.items():
-                    target_planner.Ns[state_key] = target_planner.Ns.get(state_key, 0) + ns_val
-
                 for state_key, action_counts in wp.Nsa.items():
                     tgt_counts = target_planner.Nsa.setdefault(state_key, {})
                     tgt_q = target_planner.Q.setdefault(state_key, {})
                     for action_idx, count in action_counts.items():
-                        prev_count = tgt_counts.get(action_idx, 0)
-                        prev_q = tgt_q.get(action_idx, self.model_config.Q_0 if hasattr(self.model_config, "Q_0") else 0.0)
+                        a_int = int(action_idx)
+                        prev_count = tgt_counts.get(a_int, 0)
+                        prev_q = tgt_q.get(a_int, self.model_config.Q_0 if hasattr(self.model_config, "Q_0") else 0.0)
                         src_q = wp.Q.get(state_key, {}).get(action_idx, prev_q)
 
-                        new_count = prev_count + count
-                        tgt_counts[action_idx] = new_count
+                        new_count = prev_count + int(count)
+                        tgt_counts[a_int] = new_count
 
                         if new_count > 0:
-                            tgt_q[action_idx] = (prev_q * prev_count + src_q * count) / new_count
+                            tgt_q[a_int] = (prev_q * prev_count + src_q * count) / new_count
 
+            # keep Ns consistent with merged Nsa
+            for state_key, counts in target_planner.Nsa.items():
+                if counts:
+                    target_planner.Ns[state_key] = int(sum(counts.values()))
+
+            for wp in worker_planners:
                 for state_key, utt_dict in wp.realizations_Vs.items():
                     tgt_vs = target_planner.realizations_Vs.setdefault(state_key, {})
                     tgt_ns = target_planner.realizations_Ns.setdefault(state_key, {})
@@ -926,8 +935,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
             # fabricate a single trace entry for logging convenience
             if root_key in target_planner.Nsa and target_planner.Nsa[root_key]:
-                if root_key in target_planner.Ns:
-                    target_planner.simulation_counter = target_planner.Ns[root_key]
+                target_planner.simulation_counter = target_planner.Ns.get(root_key, target_planner.simulation_counter)
                 prob_dict = target_planner._get_prob_distribution(root_key)
                 target_planner.action_prob_traces[root_key] = [
                     {
@@ -980,9 +988,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 )
                 max_parallel_workers = max(
                     1,
-                    getattr(self.model_config, "num_mcts_workers", 4),
+                    getattr(self.model_config, "num_mcts_workers", min(cpu_count(), 4)),
                 )
-                min_sims_per_worker = max(1, getattr(self.model_config, "min_sims_per_worker", 2))
+                min_sims_per_worker = max(1, getattr(self.model_config, "min_sims_per_worker", 8))
                 # keep each worker busy with enough simulations to explore the tree
                 num_mcts_workers = min(
                     max_parallel_workers,
@@ -1021,7 +1029,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # make sure we hit the requested number of root-level simulations
                 root_key = planner._to_string_rep(state)
-                sims_recorded = planner.Ns.get(root_key, 0)
+                sims_recorded = int(sum(planner.Nsa.get(root_key, {}).values()))
                 remaining_sims = num_MCTS_sims - sims_recorded
                 if remaining_sims > 0:
                     logger.info(
