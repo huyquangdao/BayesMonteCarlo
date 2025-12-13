@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 8081 --gpu_ids 4 --
   --datasets p4g \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type train \
+  --model_type llama3 \
   --is_so_game \
   --use_persona \
   --num_train_rl_epochs 10 \
