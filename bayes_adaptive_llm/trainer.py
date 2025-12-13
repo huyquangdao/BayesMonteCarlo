@@ -12,6 +12,7 @@ import random
 import json
 import copy
 import inspect
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import torch.distributed as dist
@@ -854,6 +855,84 @@ class BayesAdaptiveLLMTrainer(Trainer):
         def _log_line(text: str) -> None:
             append_to_log(log_file, [text])
 
+        def _run_mcts_worker(base_state, sims: int):
+            """
+            Run a chunk of MCTS simulations in a dedicated planner instance so we
+            can merge the results later without worrying about thread safety.
+            """
+            worker_planner = OpenLoopMCTS(
+                PersonaDialogGame(
+                    self.game,
+                    self.generation_method,
+                    simulator,
+                    llm_pipeline=self.game_config.llm_pipeline,
+                    terminators=self.game_config.terminators,
+                ),
+                player,
+                mcts_cfg,
+            )
+            for _ in range(sims):
+                # use a copy to prevent shared-state mutation across workers
+                worker_planner.search(copy.deepcopy(base_state))
+            return worker_planner
+
+        def _merge_mcts_workers(target_planner, worker_planners, root_state):
+            """
+            Aggregate visit counts / values from multiple planners into a single one.
+            """
+            root_key = target_planner._to_string_rep(root_state)
+            target_planner.simulation_counter = 0
+
+            for wp in worker_planners:
+                target_planner.simulation_counter += getattr(wp, "simulation_counter", 0)
+
+                for state_key, vm in wp.valid_moves.items():
+                    target_planner.valid_moves.setdefault(state_key, vm)
+
+                for state_key, prior in wp.P.items():
+                    # keep the first prior we see; priors are fixed per state
+                    target_planner.P.setdefault(state_key, copy.deepcopy(prior))
+
+                for state_key, ns_val in wp.Ns.items():
+                    target_planner.Ns[state_key] = target_planner.Ns.get(state_key, 0) + ns_val
+
+                for state_key, action_counts in wp.Nsa.items():
+                    tgt_counts = target_planner.Nsa.setdefault(state_key, {})
+                    tgt_q = target_planner.Q.setdefault(state_key, {})
+                    for action_idx, count in action_counts.items():
+                        prev_count = tgt_counts.get(action_idx, 0)
+                        prev_q = tgt_q.get(action_idx, self.model_config.Q_0 if hasattr(self.model_config, "Q_0") else 0.0)
+                        src_q = wp.Q.get(state_key, {}).get(action_idx, prev_q)
+
+                        new_count = prev_count + count
+                        tgt_counts[action_idx] = new_count
+
+                        if new_count > 0:
+                            tgt_q[action_idx] = (prev_q * prev_count + src_q * count) / new_count
+
+                for state_key, utt_dict in wp.realizations_Vs.items():
+                    tgt_vs = target_planner.realizations_Vs.setdefault(state_key, {})
+                    tgt_ns = target_planner.realizations_Ns.setdefault(state_key, {})
+                    src_ns = wp.realizations_Ns.get(state_key, {})
+                    for utt, v_val in utt_dict.items():
+                        add_n = src_ns.get(utt, 1)
+                        prev_n = tgt_ns.get(utt, 0)
+                        prev_v = tgt_vs.get(utt, 0.0)
+                        merged_n = prev_n + add_n
+                        tgt_ns[utt] = merged_n
+                        tgt_vs[utt] = (prev_v * prev_n + v_val * add_n) / merged_n
+
+            # fabricate a single trace entry for logging convenience
+            if root_key in target_planner.Nsa and target_planner.Nsa[root_key]:
+                prob_dict = target_planner._get_prob_distribution(root_key)
+                target_planner.action_prob_traces[root_key] = [
+                    {
+                        "simulation": target_planner.simulation_counter,
+                        "state": root_key,
+                        "prob": prob_dict,
+                    }
+                ]
+
         for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
             # skip to dialog_idx
             if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 120):
@@ -895,10 +974,42 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     mcts_cfg,
                     
                 )
-                
-                # search for the best action
-                for _ in range(num_MCTS_sims):
-                    planner.search(state)
+                max_parallel_workers = max(
+                    1,
+                    getattr(self.model_config, "num_mcts_workers", min(cpu_count(), 4)),
+                )
+                # keep each worker busy with at least 2 simulations to avoid zero-visit roots
+                num_mcts_workers = min(max_parallel_workers, max(1, num_MCTS_sims // 2))
+                use_parallel = num_mcts_workers > 1
+
+                if use_parallel:
+                    # split simulations across workers and merge the results
+                    sims_per_worker = math.ceil(num_MCTS_sims / num_mcts_workers)
+                    logger.info(
+                        "Running MCTS in parallel | sims={} | workers={} | sims/worker~{}",
+                        num_MCTS_sims,
+                        num_mcts_workers,
+                        sims_per_worker,
+                    )
+                    worker_planners = []
+                    with ThreadPoolExecutor(max_workers=num_mcts_workers) as executor:
+                        futures = []
+                        remaining = num_MCTS_sims
+                        for _ in range(num_mcts_workers):
+                            if remaining <= 0:
+                                break
+                            sims_this_worker = min(sims_per_worker, remaining)
+                            futures.append(executor.submit(_run_mcts_worker, state, sims_this_worker))
+                            remaining -= sims_this_worker
+
+                        for fut in as_completed(futures):
+                            worker_planners.append(fut.result())
+
+                    _merge_mcts_workers(planner, worker_planners, state)
+                else:
+                    # search for the best action
+                    for _ in range(num_MCTS_sims):
+                        planner.search(state)
 
                 action_prob = planner.get_action_prob(state)
                 prob_trace = planner.get_action_prob_trace(state)
