@@ -640,7 +640,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         #     lines.append("")
         #     lines.append("[USER PERSONA]")
         #     lines.append(persona)
-        
+
         lines.append("")
         lines.append("[RESPONSE STYLE]")
         lines.append("- Answer as the Negotiator in the dialogue.")
@@ -975,8 +975,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         peft_config = None
         if use_lora:
             peft_config = LoraConfig(
-                r=16,
-                lora_alpha=32,
+                r=32,
+                lora_alpha=64,
                 lora_dropout=0.05,
                 bias="none",
                 target_modules="all-linear",
