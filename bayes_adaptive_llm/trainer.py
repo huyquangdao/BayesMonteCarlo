@@ -1205,7 +1205,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         generation_method_spec = _serialize_generation_method(self.generation_method)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        requested_workers = getattr(self.model_config, "pref_generation_workers", 3)
+        requested_workers = getattr(self.model_config, "pref_generation_workers", 2)
         world_size = requested_workers or torch.cuda.device_count()
         world_size = 1 if world_size is None else int(world_size)
         world_size = min(world_size, len(train_cases)) if len(train_cases) > 0 else 1
