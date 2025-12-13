@@ -441,6 +441,10 @@ def _preference_worker_main(
     out_dir.mkdir(parents=True, exist_ok=True)
     worker_path = out_dir / f"pref_pairs_rank{rank}.jsonl"
     log_file = out_dir / f"pref_gen_rank{rank}.log"
+    if worker_path.exists():
+        worker_path.unlink()
+    if log_file.exists():
+        log_file.unlink()
 
     generation_method = _build_generation_method_from_spec(generation_method_spec)
     if generation_method is None:
@@ -448,10 +452,45 @@ def _preference_worker_main(
 
     game = game_cls(game_config, dataset_config)
 
-    for dialog_idx in range(rank, len(cases), world_size):
-        if dialog_idx < skip_to_dialog_idx:
-            continue
+    total_cases = len(cases)
+    if skip_to_dialog_idx >= total_cases:
+        logger.info(
+            "Worker {} sees skip_to_dialog_idx {} beyond total cases {}; nothing to process.",
+            rank,
+            skip_to_dialog_idx,
+            total_cases,
+        )
+        return
 
+    run_start = max(skip_to_dialog_idx, 0)
+    remaining = total_cases - run_start
+    base = remaining // world_size
+    remainder = remaining % world_size
+    offset = rank * base + min(rank, remainder)
+    shard_size = base + (1 if rank < remainder else 0)
+
+    start_idx = run_start + offset
+    end_idx = min(start_idx + shard_size, total_cases)
+
+    if start_idx >= end_idx:
+        logger.info(
+            "Worker {} has no assigned dialogs after skip (start={}, end={}, total={}).",
+            rank,
+            start_idx,
+            end_idx,
+            total_cases,
+        )
+        return
+
+    logger.info(
+        "Worker {} processing dialog indices in [{}, {}) out of {} total.",
+        rank,
+        start_idx,
+        end_idx,
+        total_cases,
+    )
+
+    for dialog_idx in range(start_idx, end_idx):
         simulator = random.choice(simulators)
         dialog_pairs, outcome, _ = _run_dialog_with_mcts(
             dialog_idx=dialog_idx,
