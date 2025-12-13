@@ -238,69 +238,6 @@ def _load_pairs_from_file(path: Path) -> List[Dict[str, Any]]:
     return pairs
 
 
-def _sanitize_for_mp(obj: Any, drop_callables: bool = True, label: str = "") -> Any:
-    """
-    Create a picklable clone of a config-like object by dropping attributes
-    that cannot be pickled (e.g., lambdas or bound callables created by
-    distributed wrappers). This keeps the class type intact so downstream
-    code can rely on attribute access semantics.
-    """
-    if obj is None:
-        return None
-
-    try:
-        clone = copy.deepcopy(obj)
-    except Exception as exc:
-        logger.debug("Falling back to shallow copy for {}: {}", label or type(obj).__name__, exc)
-        clone = copy.copy(obj)
-
-    for name, val in list(getattr(clone, "__dict__", {}).items()):
-        remove = False
-        if drop_callables and callable(val):
-            remove = True
-        else:
-            try:
-                pickle.dumps(val)
-            except Exception:
-                remove = True
-
-        if remove:
-            logger.debug(
-                "Dropping non-picklable field {}.{} from mp context.",
-                label or type(obj).__name__,
-                name,
-            )
-            setattr(clone, name, None)
-    return clone
-
-
-def _sanitize_generation_method_spec(spec: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """
-    Drop non-picklable components from the generation method spec so it can
-    be shared across spawned processes.
-    """
-    if not spec:
-        return None
-
-    cleaned = dict(spec)
-    cleaned["config"] = _sanitize_for_mp(spec.get("config"), label="generation_config")
-
-    pipeline = spec.get("pipeline")
-    if pipeline is not None:
-        try:
-            pickle.dumps(pipeline)
-        except Exception:
-            cleaned["pipeline"] = None
-
-    try:
-        pickle.dumps(cleaned.get("cls"))
-    except Exception as exc:
-        logger.warning("Generation method class not picklable for mp: {}", exc)
-        cleaned["cls"] = None
-
-    return cleaned
-
-
 def _run_dialog_with_mcts(
     dialog_idx: int,
     case: Any,
@@ -1305,7 +1242,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
         merged_path = preference_path if preference_path else out_dir / "preference_pairs_merged.jsonl"
 
         generation_method_spec = _serialize_generation_method(self.generation_method)
-        generation_method_spec = _sanitize_generation_method_spec(generation_method_spec)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         requested_workers = getattr(self.model_config, "pref_generation_workers", 2)
@@ -1314,23 +1250,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
         world_size = min(world_size, len(train_cases)) if len(train_cases) > 0 else 1
 
         can_use_mp = world_size > 1
-        picklable_game_config = _sanitize_for_mp(self.game_config, label="game_config")
-        picklable_model_config = _sanitize_for_mp(self.model_config, label="model_config")
-        picklable_dataset_config = _sanitize_for_mp(dataset_config, label="dataset_config")
-
-        if generation_method_spec is None or generation_method_spec.get("cls") is None:
-            logger.warning("Generation method spec missing or not picklable; using single-process preference gen.")
-            can_use_mp = False
-
         if can_use_mp:
             try:
                 pickle.dumps(
-                    (picklable_game_config, picklable_model_config, action_mapping, picklable_dataset_config, generation_method_spec)
+                    (self.game_config, self.model_config, action_mapping, dataset_config, generation_method_spec)
                 )
             except Exception as exc:
                 logger.warning(
-                    "Preference generation context not picklable after sanitizing; falling back to single process: {}",
-                    exc,
+                    "Preference generation context not picklable; falling back to single process: {}", exc
                 )
                 can_use_mp = False
 
@@ -1343,10 +1270,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     train_cases,
                     simulators,
                     action_mapping,
-                    picklable_model_config,
-                    picklable_game_config,
+                    self.model_config,
+                    self.game_config,
                     self.game.__class__,
-                    picklable_dataset_config,
+                    dataset_config,
                     generation_method_spec,
                     str(out_dir),
                     prompt_preference_by_game,
