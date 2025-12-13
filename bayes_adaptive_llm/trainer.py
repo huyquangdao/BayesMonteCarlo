@@ -10,6 +10,7 @@ import gc
 import os
 import random
 import json
+import pickle
 import copy
 import inspect
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -34,6 +35,7 @@ from json.decoder import JSONDecodeError
 
 import numpy as np
 import torch
+import torch.multiprocessing as mp
 from torch.optim import AdamW
 from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
@@ -129,6 +131,352 @@ class PersonaDialogGame(DialogGame):
             user_response=user_response,
         )
         return next_state
+
+
+def _log_line_to_file(log_file: Optional[Path], text: str) -> None:
+    """
+    Append a single log line to a file, creating parent directories on demand.
+    """
+    if not log_file:
+        return
+    log_file = Path(log_file)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    append_to_log(log_file, [text])
+
+
+def _select_preference_prompt(game_name: str) -> str:
+    """
+    Map game name to the preference prompt template.
+    """
+    if game_name == PERSUATION:
+        return PREFERENCE_PAIR_PROMPT_P4G
+    if game_name == NEGOTIATION:
+        return PREFERENCE_PAIR_PROMPT_NEGOTIATION
+    return ""
+
+
+def _serialize_generation_method(generation_method: Any) -> Optional[Dict[str, Any]]:
+    """
+    Extract a picklable snapshot of the generation method so workers can
+    re-instantiate it without sharing process state.
+    """
+    if generation_method is None:
+        return None
+
+    spec: Dict[str, Any] = {
+        "cls": generation_method.__class__,
+        "config": None,
+        "pipeline": None,
+        "is_test": getattr(generation_method, "is_test", True),
+    }
+
+    if hasattr(generation_method, "generation_config"):
+        try:
+            spec["config"] = copy.deepcopy(generation_method.generation_config)
+        except Exception:
+            spec["config"] = getattr(generation_method, "generation_config", None)
+
+    if hasattr(generation_method, "pipeline"):
+        pipeline = getattr(generation_method, "pipeline")
+        try:
+            pickle.dumps(pipeline)
+            spec["pipeline"] = pipeline
+        except Exception:
+            spec["pipeline"] = None
+    return spec
+
+
+def _build_generation_method_from_spec(spec: Optional[Dict[str, Any]]) -> Any:
+    """
+    Rebuild a generation method instance from a serialized snapshot.
+    """
+    if not spec:
+        return None
+
+    gen_cls = spec.get("cls")
+    if gen_cls is None:
+        return None
+
+    gen_config = copy.deepcopy(spec.get("config"))
+    pipeline = spec.get("pipeline")
+    is_test = spec.get("is_test", True)
+
+    # try common constructor signatures
+    for ctor in (
+        lambda: gen_cls(gen_config, pipeline, is_test),
+        lambda: gen_cls(gen_config, pipeline),
+        lambda: gen_cls(gen_config),
+        lambda: gen_cls(),
+    ):
+        try:
+            return ctor()
+        except TypeError:
+            continue
+        except Exception as exc:
+            logger.warning("Failed to rebuild generation method in worker: {}", exc)
+            continue
+    return None
+
+
+def _load_pairs_from_file(path: Path) -> List[Dict[str, Any]]:
+    """
+    Read preference pairs from a jsonl file.
+    """
+    pairs: List[Dict[str, Any]] = []
+    if not path.exists():
+        return pairs
+
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pairs.append(json.loads(line))
+            except JSONDecodeError as exc:
+                logger.warning("Skipping malformed preference pair line in {}: {}", path, exc)
+    return pairs
+
+
+def _run_dialog_with_mcts(
+    dialog_idx: int,
+    case: Any,
+    simulator: Any,
+    player: LLMPlayer,
+    dialog_acts: Sequence[str],
+    num_MCTS_sims: int,
+    mcts_cfg: SimpleNamespace,
+    game: Any,
+    generation_method: Any,
+    prompt_prefix: str,
+    max_horizon: int,
+    skip_to_dialog_idx: int,
+    log_file: Optional[Path],
+) -> Tuple[List[Dict[str, Any]], float, Any]:
+    """
+    Run a single dialog episode with MCTS to collect preference pairs.
+    Returns (pairs, outcome, final_state).
+    """
+    if dialog_idx < skip_to_dialog_idx:
+        return [], 0.0, None
+
+    dialog_game = PersonaDialogGame(
+        game,
+        generation_method,
+        simulator,
+        llm_pipeline=getattr(game.game_config, "llm_pipeline", None),
+        terminators=getattr(game.game_config, "terminators", None),
+    )
+
+    state = game.reset(case, simulator)
+    persona_hint = {}
+    if hasattr(simulator, "user_profile_description"):
+        raw_desc = getattr(simulator, "user_profile_description", "")
+        persona_hint["description"] = sanitize_persona_description(raw_desc)
+
+    dialog_pairs: List[Dict[str, Any]] = []
+    for turn in count():
+        outcome = dialog_game.get_dialog_ended(state)
+        if outcome == 1.0 or outcome == -1.0:
+            break
+
+        logger.info(
+            "Dialog {} turn {} | state={}",
+            dialog_idx,
+            turn,
+            stringify_dialogue_context(state.get("dialogue_context", [])),
+        )
+
+        planner = OpenLoopMCTS(dialog_game, player, mcts_cfg)
+        for _ in range(num_MCTS_sims):
+            planner.search(state)
+
+        action_prob = planner.get_action_prob(state)
+        prob_trace = planner.get_action_prob_trace(state)
+        last_prob = prob_trace[-1]["prob"] if prob_trace else {}
+        logger.info(
+            "Dialog {} turn {} | sims={} | prob={}",
+            dialog_idx,
+            turn,
+            planner.simulation_counter,
+            last_prob,
+        )
+
+        if np.sum(action_prob) == 0:
+            logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
+            break
+
+        state_rep = planner._to_string_rep(state)
+        valid_moves = planner.valid_moves.get(state_rep, [])
+
+        if valid_moves is not None and len(valid_moves) > 0:
+            prob = action_prob.copy()
+            prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
+            best_action = int(np.random.choice(len(prob), p=prob))
+        else:
+            best_action = int(np.argmax(action_prob))
+        goal = player.id2goal[best_action]
+
+        prompt_dialogue_context = prompt_prefix + stringify_dialogue_context(state["dialogue_context"])
+        state["dialog_id"] = dialog_idx
+        state["turn_id"] = turn
+
+        next_state, _, _, _ = game.step(state, goal, generation_method, simulator)
+        sys_utt = next_state["dialogue_context"][-2]["content"]
+        user_utt = next_state["dialogue_context"][-1]["content"]
+
+        pair = get_preference_pair(
+            action_prob,
+            state_rep,
+            dialog_acts,
+            valid_moves,
+            planner.realizations_Vs,
+            selected_action=best_action,
+        )
+
+        history_str = stringify_dialogue_context(next_state["dialogue_context"])
+        if pair is None:
+            logger.info("Not enough realizations to form preference pair; skipping turn.")
+            state = next_state
+            if len(state["dialogue_context"]) >= max_horizon:
+                break
+            continue
+
+        _, best_pair, worst_pair = pair
+
+        logger.info(
+            "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
+            dialog_idx,
+            turn,
+            goal,
+            best_pair[0],
+            float(best_pair[1]),
+            worst_pair[0],
+            float(worst_pair[1]),
+        )
+
+        _log_line_to_file(
+            log_file,
+            f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
+            f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
+            f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})",
+        )
+
+        dialog_pairs.append(
+            {
+                "prompt": prompt_dialogue_context,
+                "chosen": best_pair[0],
+                "rejected": worst_pair[0],
+                "turn": turn,
+                "action": goal,
+                "dialog_index": dialog_idx,
+                "system_utterance": sys_utt,
+                "user_utterance": user_utt,
+                "persona_hint": persona_hint or None,
+            }
+        )
+
+        state = next_state
+        if len(state["dialogue_context"]) >= max_horizon:
+            break
+
+    outcome = dialog_game.get_dialog_ended(state)
+    if outcome > 0.3:
+        full_dialog = stringify_dialogue_context(state["dialogue_context"])
+        _log_line_to_file(
+            log_file,
+            f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===",
+        )
+    else:
+        logger.debug(
+            "Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.",
+            dialog_idx,
+            outcome,
+        )
+    return dialog_pairs, outcome, state
+
+
+def _preference_worker_main(
+    rank: int,
+    world_size: int,
+    cases: Sequence[Any],
+    simulators: Sequence[Any],
+    action_mapping: Dict[str, int],
+    model_config: Any,
+    game_config: Any,
+    game_cls: Any,
+    dataset_config: Any,
+    generation_method_spec: Optional[Dict[str, Any]],
+    out_dir: str,
+    prompt_prefix: str,
+    skip_to_dialog_idx: int,
+    max_horizon: int,
+):
+    """
+    Worker entry point for multiprocessing preference generation.
+    """
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.set_device(rank)
+        except Exception as exc:
+            logger.warning("Worker {} failed to pin CUDA device: {}", rank, exc)
+
+    local_model_config = copy.deepcopy(model_config)
+    setattr(local_model_config, "action_mapping", action_mapping)
+    setattr(local_model_config, "llm_pipeline", getattr(game_config, "llm_pipeline", None))
+    setattr(local_model_config, "terminators", getattr(game_config, "terminators", None))
+
+    dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
+    player = LLMPlayer(game_config, action_mapping, local_model_config)
+
+    num_MCTS_sims = getattr(local_model_config, "num_mcts_sims", 30)
+    max_realizations = getattr(local_model_config, "max_realizations", 3)
+    mcts_cfg = SimpleNamespace(
+        cpuct=1.0,
+        Q_0=getattr(local_model_config, "Q_0", 0.25),
+        max_realizations=max_realizations,
+    )
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    worker_path = out_dir / f"pref_pairs_rank{rank}.jsonl"
+    log_file = out_dir / f"pref_gen_rank{rank}.log"
+
+    generation_method = _build_generation_method_from_spec(generation_method_spec)
+    if generation_method is None:
+        raise RuntimeError("Generation method could not be rebuilt in worker.")
+
+    game = game_cls(game_config, dataset_config)
+
+    for dialog_idx in range(rank, len(cases), world_size):
+        if dialog_idx < skip_to_dialog_idx:
+            continue
+
+        simulator = random.choice(simulators)
+        dialog_pairs, outcome, _ = _run_dialog_with_mcts(
+            dialog_idx=dialog_idx,
+            case=cases[dialog_idx],
+            simulator=simulator,
+            player=player,
+            dialog_acts=dialog_acts,
+            num_MCTS_sims=num_MCTS_sims,
+            mcts_cfg=mcts_cfg,
+            game=game,
+            generation_method=generation_method,
+            prompt_prefix=prompt_prefix,
+            max_horizon=max_horizon,
+            skip_to_dialog_idx=skip_to_dialog_idx,
+            log_file=log_file,
+        )
+
+        if outcome > 0.3 and dialog_pairs:
+            with worker_path.open("a", encoding="utf-8") as f:
+                for item in dialog_pairs:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 class BayesAdaptiveLLMTrainer(Trainer):
     """
@@ -808,12 +1156,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         The pairs are also written to disk if `model_config.preference_pairs_path` is provided,
         and the in-memory dataset is overwritten so DPO training can consume them directly.
         """
-        if self.game_config.name == PERSUATION:
-            prompt_preference_by_game = PREFERENCE_PAIR_PROMPT_P4G
-        elif self.game_config.name == NEGOTIATION:
-            prompt_preference_by_game = PREFERENCE_PAIR_PROMPT_NEGOTIATION
-        else:
-            prompt_preference_by_game = ""
+        prompt_preference_by_game = _select_preference_prompt(self.game_config.name)
 
         if not dev_simulators:
             raise ValueError("User simulators are required for MCTS preference generation.")
@@ -822,14 +1165,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if simulators is None or len(simulators) == 0:
             raise ValueError("No simulators available for preference generation.")
 
+        if len(train_cases) == 0:
+            logger.warning("No train cases provided; skipping preference generation.")
+            return []
+
         # expose mapping to player via model_config for LLMPlayer compatibility
         setattr(self.model_config, "action_mapping", action_mapping)
+        setattr(self.model_config, "llm_pipeline", getattr(self.game_config, "llm_pipeline", None))
+        setattr(self.model_config, "terminators", getattr(self.game_config, "terminators", None))
         logger.info("Action mapping: {}", action_mapping)
+
         dialog_acts = [goal for goal, _ in sorted(action_mapping.items(), key=lambda kv: kv[1])]
         player = LLMPlayer(self.game_config, action_mapping, self.model_config)
-        # expose generation pipeline to player heuristics if needed
-        setattr(self.model_config, "llm_pipeline", self.game_config.llm_pipeline)
-        setattr(self.model_config, "terminators", self.game_config.terminators)
 
         # MCTS configuration
         num_MCTS_sims = getattr(self.model_config, "num_mcts_sims", 30)
@@ -840,184 +1187,100 @@ class BayesAdaptiveLLMTrainer(Trainer):
             max_realizations=max_realizations,
         )
 
+        skip_to_dialog_idx = getattr(self.model_config, "skip_to_dialog_idx", 120)
+        max_horizon = getattr(self.game_config, "max_horizon", 10)
+        dataset_config = getattr(self.game, "dataset_config", None)
+
         preference_pairs: List[Dict[str, Any]] = []
         preference_path: Optional[Path] = None
         if getattr(self.model_config, "preference_pairs_path", None):
             preference_path = Path(self.model_config.preference_pairs_path)
             preference_path.parent.mkdir(parents=True, exist_ok=True)
+            preference_path.write_text("", encoding="utf-8")
 
-        # logging raw responses to bayes_adaptive_llm/logs
-        log_dir = Path(__file__).resolve().parent / "logs"
+        out_dir = preference_path.parent if preference_path else Path("preference_out")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        merged_path = preference_path if preference_path else out_dir / "preference_pairs_merged.jsonl"
+
+        generation_method_spec = _serialize_generation_method(self.generation_method)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = log_dir / f"pref_gen_{timestamp}.log"
 
-        def _log_line(text: str) -> None:
-            append_to_log(log_file, [text])
+        requested_workers = getattr(self.model_config, "pref_generation_workers", None)
+        world_size = requested_workers or torch.cuda.device_count()
+        world_size = 1 if world_size is None else int(world_size)
+        world_size = min(world_size, len(train_cases)) if len(train_cases) > 0 else 1
 
-        for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
-            # skip to dialog_idx
-            if dialog_idx < getattr(self.model_config, "skip_to_dialog_idx", 120):
-                continue
-            # fix persuadee (simulator/persona) per dialog
-            # sample a simulator from the simulator pool
-            simulator = random.choice(simulators)
-            dialog_game = PersonaDialogGame(self.game, 
-                                            self.generation_method, 
-                                            simulator,
-                                            #### 
-                                            llm_pipeline = self.game_config.llm_pipeline, 
-                                            terminators = self.game_config.terminators
-                                            )
-                        
-            # reset the initial state            
-            state = self.game.reset(case, simulator)
-            persona_history: List[Dict[str, str]] = []
-            persona_hint = {}
-            if hasattr(simulator, "user_profile_description"):
-                raw_desc = getattr(simulator, "user_profile_description", "")
-                persona_hint["description"] = sanitize_persona_description(raw_desc)
-            if persona_hint:
-                persona_history.append({"turn": 0, **persona_hint})
-
-            dialog_pairs: List[Dict[str, Any]] = []                        
-            for turn in count():
-                outcome = dialog_game.get_dialog_ended(state)
-                if outcome == 1.0 or outcome == -1.0:
-                    logger.info("Dialog {} ended early with outcome={}; stop turn loop.", dialog_idx, outcome)
-                    break
-                
-                logger.info("Dialog {} turn {} | state={}", dialog_idx, turn, stringify_dialogue_context(state["dialogue_context"]))
-
-                # initialize the mcts planner
-                planner = OpenLoopMCTS(
-                    dialog_game, 
-                    player, 
-                    mcts_cfg,
-                    
+        can_use_mp = world_size > 1
+        if can_use_mp:
+            try:
+                pickle.dumps(
+                    (self.game_config, self.model_config, action_mapping, dataset_config, generation_method_spec)
                 )
-                
-                # search for the best action
-                for _ in range(num_MCTS_sims):
-                    planner.search(state)
-
-                action_prob = planner.get_action_prob(state)
-                prob_trace = planner.get_action_prob_trace(state)
-                last_prob = prob_trace[-1]["prob"] if prob_trace else {}
-                logger.info(
-                    "Dialog {} turn {} | sims={} | prob={}",
-                    dialog_idx,
-                    turn,
-                    planner.simulation_counter,
-                    last_prob,
+            except Exception as exc:
+                logger.warning(
+                    "Preference generation context not picklable; falling back to single process: {}", exc
                 )
-                
-                if np.sum(action_prob) == 0:
-                    logger.info("Zero action probability encountered; stopping dialog {} turn {}", dialog_idx, turn)
-                    break
+                can_use_mp = False
 
-                
-                state_rep = planner._to_string_rep(state)
-                valid_moves = planner.valid_moves.get(state_rep, [])
+        if can_use_mp:
+            mp.set_start_method("spawn", force=True)
+            mp.spawn(
+                _preference_worker_main,
+                args=(
+                    world_size,
+                    train_cases,
+                    simulators,
+                    action_mapping,
+                    self.model_config,
+                    self.game_config,
+                    self.game.__class__,
+                    dataset_config,
+                    generation_method_spec,
+                    str(out_dir),
+                    prompt_preference_by_game,
+                    skip_to_dialog_idx,
+                    max_horizon,
+                ),
+                nprocs=world_size,
+                join=True,
+            )
 
-                # sample to avoid repeatedly picking the first action when all priors are flat
-                if valid_moves is not None and len(valid_moves) > 0:
-                    prob = action_prob.copy()
-                    prob = prob / prob.sum() if prob.sum() > 0 else np.ones_like(prob) / len(prob)
-                    best_action = int(np.random.choice(len(prob), p=prob))
-                else:
-                    best_action = int(np.argmax(action_prob))
-                goal = player.id2goal[best_action]
-
-                prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
-
-                # Step environment to obtain next state and utterances
-                state["dialog_id"] = dialog_idx
-                state["turn_id"] = turn
-
-                next_state, _, done, _ = self.game.step(state, 
-                                                goal, 
-                                                self.generation_method, 
-                                                simulator
-                                                )
-                
-                sys_utt = next_state["dialogue_context"][-2]["content"]
-                user_utt = next_state["dialogue_context"][-1]["content"]
-                print("done: ", done)
-
-                # construct the preference pair
-                pair = get_preference_pair(
-                    action_prob,
-                    state_rep,
-                    dialog_acts,
-                    valid_moves,
-                    planner.realizations_Vs,
-                    selected_action=best_action
+            with merged_path.open("w", encoding="utf-8") as out:
+                for r in range(world_size):
+                    p = out_dir / f"pref_pairs_rank{r}.jsonl"
+                    if p.exists():
+                        out.write(p.read_text(encoding="utf-8"))
+            preference_pairs = _load_pairs_from_file(merged_path)
+            logger.info("Merged preference pairs to {}", merged_path)
+        else:
+            log_file = out_dir / f"pref_gen_{timestamp}.log"
+            for dialog_idx, case in enumerate(tqdm(train_cases, desc="Generating preference pairs")):
+                simulator = random.choice(simulators)
+                dialog_pairs, outcome, _ = _run_dialog_with_mcts(
+                    dialog_idx=dialog_idx,
+                    case=case,
+                    simulator=simulator,
+                    player=player,
+                    dialog_acts=dialog_acts,
+                    num_MCTS_sims=num_MCTS_sims,
+                    mcts_cfg=mcts_cfg,
+                    game=self.game,
+                    generation_method=self.generation_method,
+                    prompt_prefix=prompt_preference_by_game,
+                    max_horizon=max_horizon,
+                    skip_to_dialog_idx=skip_to_dialog_idx,
+                    log_file=log_file,
                 )
 
-                # print full history up to current turn
-                history_str = stringify_dialogue_context(next_state["dialogue_context"])
-
-                if pair is None:
-                    logger.info("Not enough realizations to form preference pair; skipping turn.")
-                    state = next_state
-                    continue
-                
-                _, best_pair, worst_pair = pair
-
-                logger.info(
-                    "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
-                    dialog_idx,
-                    turn,
-                    goal,
-                    best_pair[0],
-                    float(best_pair[1]),
-                    worst_pair[0],
-                    float(worst_pair[1]),
-                )
-
-                _log_line(
-                    f"[Dialog {dialog_idx} | Turn {turn}] History+Pref:\n{history_str}\n"
-                    f"Chosen: {best_pair[0]} (V={best_pair[1]:.4f})\n"
-                    f"Rejected: {worst_pair[0]} (V={worst_pair[1]:.4f})"
-                )
-
-                dialog_pairs.append(
-                    {
-                        "prompt": prompt_dialogue_context,
-                        "chosen": best_pair[0],
-                        "rejected": worst_pair[0],
-                        "turn": turn,
-                        "action": goal,
-                        "dialog_index": dialog_idx,
-                        "system_utterance": sys_utt,
-                        "user_utterance": user_utt,
-                        "persona_hint": persona_hint or None,
-                    }
-                )
-
-                # update the current state of the conversation
-                state = next_state
-                
-                if len(state['dialogue_context']) >= self.game_config.max_horizon:
-                    break
-
-            outcome = dialog_game.get_dialog_ended(state)
-            if outcome > 0.3:
-                preference_pairs.extend(dialog_pairs)
-                # log full dialog transcript
-                full_dialog = stringify_dialogue_context(state["dialogue_context"])
-                _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
-                # flush dialog pairs to disk incrementally if path provided
-                if preference_path and dialog_pairs:
-                    with preference_path.open("a", encoding="utf-8") as f:
-                        for item in dialog_pairs:
-                            f.write(json.dumps(item, ensure_ascii=False) + "\n")
-                    logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
-            else:
-                logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
+                if outcome > 0.3 and dialog_pairs:
+                    preference_pairs.extend(dialog_pairs)
+                    if preference_path and dialog_pairs:
+                        with preference_path.open("a", encoding="utf-8") as f:
+                            for item in dialog_pairs:
+                                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+                        logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
 
         if preference_path and preference_pairs:
-            # already appended per dialog; nothing more to write here.
             logger.info("Total pairs written so far: {} (path: {})", len(preference_pairs), preference_path)
 
         # Overwrite dataset splits so DPO trainer can consume them directly.
