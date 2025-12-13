@@ -143,29 +143,6 @@ def _log_line_to_file(log_file: Optional[Path], text: str) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     append_to_log(log_file, [text])
 
-def _compute_shard(total: int, world: int, rank: int, start: int = 0):
-    """
-    Split [start, total) into `world` contiguous shards.
-    Example: total=180, world=2, start=0
-      rank0 => [0, 90)
-      rank1 => [90, 180)
-    """
-    start = max(0, int(start))
-    total = int(total)
-    world = max(1, int(world))
-    rank = int(rank)
-
-    remaining = max(0, total - start)
-    base = remaining // world
-    rem = remaining % world
-
-    offset = rank * base + min(rank, rem)
-    size = base + (1 if rank < rem else 0)
-
-    s = start + offset
-    e = min(s + size, total)
-    return s, e
-
 
 def _select_preference_prompt(game_name: str) -> str:
     """
@@ -343,9 +320,8 @@ def _run_dialog_with_mcts(
         prompt_dialogue_context = prompt_prefix + stringify_dialogue_context(state["dialogue_context"])
         state["dialog_id"] = dialog_idx
         state["turn_id"] = turn
-        with torch.inference_mode():
-            next_state, _, _, _ = game.step(state, goal, generation_method, simulator)
-            
+
+        next_state, _, _, _ = game.step(state, goal, generation_method, simulator)
         sys_utt = next_state["dialogue_context"][-2]["content"]
         user_utt = next_state["dialogue_context"][-1]["content"]
 
@@ -440,10 +416,10 @@ def _preference_worker_main(
     Worker entry point for multiprocessing preference generation.
     """
     if torch.cuda.is_available():
-        n_gpus = torch.cuda.device_count()
-        assert world_size <= n_gpus, f"world_size={world_size} > n_gpus={n_gpus} => sẽ chung GPU và OOM"
-        torch.cuda.set_device(rank)
-
+        try:
+            torch.cuda.set_device(rank)
+        except Exception as exc:
+            logger.warning("Worker {} failed to pin CUDA device: {}", rank, exc)
 
     local_model_config = copy.deepcopy(model_config)
     setattr(local_model_config, "action_mapping", action_mapping)
@@ -486,17 +462,33 @@ def _preference_worker_main(
         )
         return
 
-    total_cases = len(cases)
     run_start = max(skip_to_dialog_idx, 0)
+    remaining = total_cases - run_start
+    base = remaining // world_size
+    remainder = remaining % world_size
+    offset = rank * base + min(rank, remainder)
+    shard_size = base + (1 if rank < remainder else 0)
 
-    start_idx, end_idx = _compute_shard(
-        total=total_cases,
-        world=world_size,
-        rank=rank,
-        start=run_start,
+    start_idx = run_start + offset
+    end_idx = min(start_idx + shard_size, total_cases)
+
+    if start_idx >= end_idx:
+        logger.info(
+            "Worker {} has no assigned dialogs after skip (start={}, end={}, total={}).",
+            rank,
+            start_idx,
+            end_idx,
+            total_cases,
+        )
+        return
+
+    logger.info(
+        "Worker {} processing dialog indices in [{}, {}) out of {} total.",
+        rank,
+        start_idx,
+        end_idx,
+        total_cases,
     )
-
-    logger.info("Worker {} assigned dialogs [{}, {}) / total={}", rank, start_idx, end_idx, total_cases)
 
     for dialog_idx in range(start_idx, end_idx):
         simulator = random.choice(simulators)
@@ -619,6 +611,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Please adapt _instance_to_messages_for_persuasion."
         )
 
+    
     def _instance_to_messages_for_negotiation(self, inst):
         """
         Convert a negotiation instance to chat messages for SFT.
@@ -1251,14 +1244,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
         generation_method_spec = _serialize_generation_method(self.generation_method)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        requested_workers = int(getattr(self.model_config, "pref_generation_workers", 2) or 1)
-
-        n_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
-        if n_gpus > 0:
-            world_size = min(requested_workers, n_gpus, len(train_cases))
-        else:
-            world_size = 1  # nếu không có GPU, cứ single process (hoặc CPU mp riêng)
-
+        requested_workers = getattr(self.model_config, "pref_generation_workers", 2)
+        world_size = requested_workers or torch.cuda.device_count()
+        world_size = 1 if world_size is None else int(world_size)
+        world_size = min(world_size, len(train_cases)) if len(train_cases) > 0 else 1
 
         can_use_mp = world_size > 1
         if can_use_mp:
