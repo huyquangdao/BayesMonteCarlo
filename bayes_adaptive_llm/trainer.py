@@ -143,6 +143,26 @@ def _log_line_to_file(log_file: Optional[Path], text: str) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     append_to_log(log_file, [text])
 
+
+def _load_pairs_from_file(path: Path) -> List[Dict[str, Any]]:
+    """
+    Read preference pairs from a jsonl file.
+    """
+    pairs: List[Dict[str, Any]] = []
+    if not path.exists():
+        return pairs
+
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                pairs.append(json.loads(line))
+            except JSONDecodeError as exc:
+                logger.warning("Skipping malformed preference pair line in {}: {}", path, exc)
+    return pairs
+
 def _compute_shard(total: int, world: int, rank: int, start: int = 0):
     """
     Split [start, total) into `world` contiguous shards.
@@ -165,7 +185,6 @@ def _compute_shard(total: int, world: int, rank: int, start: int = 0):
     s = start + offset
     e = min(s + size, total)
     return s, e
-
 
 def _select_preference_prompt(game_name: str) -> str:
     """
@@ -239,26 +258,6 @@ def _build_generation_method_from_spec(spec: Optional[Dict[str, Any]]) -> Any:
             logger.warning("Failed to rebuild generation method in worker: {}", exc)
             continue
     return None
-
-
-def _load_pairs_from_file(path: Path) -> List[Dict[str, Any]]:
-    """
-    Read preference pairs from a jsonl file.
-    """
-    pairs: List[Dict[str, Any]] = []
-    if not path.exists():
-        return pairs
-
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                pairs.append(json.loads(line))
-            except JSONDecodeError as exc:
-                logger.warning("Skipping malformed preference pair line in {}: {}", path, exc)
-    return pairs
 
 
 def _run_dialog_with_mcts(
@@ -345,7 +344,7 @@ def _run_dialog_with_mcts(
         state["turn_id"] = turn
         with torch.inference_mode():
             next_state, _, _, _ = game.step(state, goal, generation_method, simulator)
-            
+
         sys_utt = next_state["dialogue_context"][-2]["content"]
         user_utt = next_state["dialogue_context"][-1]["content"]
 
@@ -1202,6 +1201,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
         The pairs are also written to disk if `model_config.preference_pairs_path` is provided,
         and the in-memory dataset is overwritten so DPO training can consume them directly.
         """
+        rank = int(os.environ.get("RANK", "0"))
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        if rank != 0:
+            logger.info("Skip preference generation on non-zero rank (RANK={}, LOCAL_RANK={}).", rank, local_rank)
+            return []
+
         prompt_preference_by_game = _select_preference_prompt(self.game_config.name)
 
         if not dev_simulators:
@@ -1260,16 +1265,28 @@ class BayesAdaptiveLLMTrainer(Trainer):
             world_size = 1  # nếu không có GPU, cứ single process (hoặc CPU mp riêng)
 
 
+        def _strip_unpicklables(obj: Any) -> Any:
+            """Best-effort remove common unpicklable callables (lambda/closures/pipelines)."""
+            clean = copy.deepcopy(obj)
+            # these are the usual suspects
+            for attr in ("llm_pipeline", "terminators"):
+                if hasattr(clean, attr):
+                    try:
+                        pickle.dumps(getattr(clean, attr))
+                    except Exception:
+                        setattr(clean, attr, None)
+            return clean
+
+        mp_model_config = _strip_unpicklables(self.model_config)
+        mp_game_config  = _strip_unpicklables(self.game_config)
+
         can_use_mp = world_size > 1
         if can_use_mp:
             try:
-                pickle.dumps(
-                    (self.game_config, self.model_config, action_mapping, dataset_config, generation_method_spec)
-                )
+                # only test picklability on stripped configs
+                pickle.dumps((mp_game_config, mp_model_config, action_mapping, dataset_config, generation_method_spec))
             except Exception as exc:
-                logger.warning(
-                    "Preference generation context not picklable; falling back to single process: {}", exc
-                )
+                logger.warning("Preference generation context not picklable; falling back to single process: {}", exc)
                 can_use_mp = False
 
         if can_use_mp:
@@ -1281,8 +1298,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     train_cases,
                     simulators,
                     action_mapping,
-                    self.model_config,
-                    self.game_config,
+                    mp_model_config,          # <-- CHANGED
+                    mp_game_config,           # <-- CHANGED
                     self.game.__class__,
                     dataset_config,
                     generation_method_spec,
@@ -1294,6 +1311,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 nprocs=world_size,
                 join=True,
             )
+
 
             with merged_path.open("w", encoding="utf-8") as out:
                 for r in range(world_size):
