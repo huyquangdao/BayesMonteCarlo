@@ -871,6 +871,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 player,
                 mcts_cfg,
             )
+            # prime the root so that every worker counts all requested simulations
+            worker_planner._init_node(copy.deepcopy(base_state))
             for _ in range(sims):
                 # use a copy to prevent shared-state mutation across workers
                 worker_planner.search(copy.deepcopy(base_state))
@@ -924,6 +926,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
             # fabricate a single trace entry for logging convenience
             if root_key in target_planner.Nsa and target_planner.Nsa[root_key]:
+                if root_key in target_planner.Ns:
+                    target_planner.simulation_counter = target_planner.Ns[root_key]
                 prob_dict = target_planner._get_prob_distribution(root_key)
                 target_planner.action_prob_traces[root_key] = [
                     {
@@ -978,8 +982,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     1,
                     getattr(self.model_config, "num_mcts_workers", min(cpu_count(), 4)),
                 )
-                # keep each worker busy with at least 2 simulations to avoid zero-visit roots
-                num_mcts_workers = min(max_parallel_workers, max(1, num_MCTS_sims // 2))
+                min_sims_per_worker = max(1, getattr(self.model_config, "min_sims_per_worker", 8))
+                # keep each worker busy with enough simulations to explore the tree
+                num_mcts_workers = min(
+                    max_parallel_workers,
+                    max(1, num_MCTS_sims // min_sims_per_worker),
+                )
                 use_parallel = num_mcts_workers > 1
 
                 if use_parallel:
@@ -1009,6 +1017,22 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 else:
                     # search for the best action
                     for _ in range(num_MCTS_sims):
+                        planner.search(state)
+
+                # make sure we hit the requested number of root-level simulations
+                root_key = planner._to_string_rep(state)
+                sims_recorded = planner.Ns.get(root_key, 0)
+                remaining_sims = num_MCTS_sims - sims_recorded
+                if remaining_sims > 0:
+                    logger.info(
+                        "Top-up sequential MCTS sims to reach target | recorded={} | target={} | extra={}",
+                        sims_recorded,
+                        num_MCTS_sims,
+                        remaining_sims,
+                    )
+                    if root_key not in planner.P:
+                        planner._init_node(copy.deepcopy(state))
+                    for _ in range(remaining_sims):
                         planner.search(state)
 
                 action_prob = planner.get_action_prob(state)
