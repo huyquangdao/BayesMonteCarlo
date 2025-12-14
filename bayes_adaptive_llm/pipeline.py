@@ -185,7 +185,12 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         print("\n[DEV SIMULATORS INFO]")
         for i, simulator in enumerate(dev_simulators):
             print(f"Simulator {i}: {simulator}")
-            
+        
+        # only pick 1 simulator in dev_simulators
+        if getattr(self.model_config, "run_simulator_analysis", False):
+            logger.info("Analyzing user simulators during preference generation ...")
+            dev_simulators = [dev_simulators[1]]
+
         preference_pairs = self.trainer.generate_preference_pairs_with_mcts(
                                                                             train_cases,
                                                                             dev_simulators,

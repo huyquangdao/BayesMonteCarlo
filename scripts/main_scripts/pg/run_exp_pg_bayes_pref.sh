@@ -25,6 +25,7 @@ CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 8081 --gpu_ids 4 --
   --model_type llama3 \
   --is_so_game \
   --use_persona \
+  --analysis_bayes_monte_carlo\
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 
