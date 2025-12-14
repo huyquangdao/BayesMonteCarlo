@@ -185,7 +185,10 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         print("\n[DEV SIMULATORS INFO]")
         for i, simulator in enumerate(dev_simulators):
             print(f"Simulator {i}: {simulator}")
-            print(f"Persona: {getattr(simulator, "user_profile_description", "")}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+
+
         
 
         preference_pairs = self.trainer.generate_preference_pairs_with_mcts(
