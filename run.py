@@ -157,6 +157,26 @@ if __name__ == '__main__':
             dev_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_dev_simulator_path)
             test_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_test_simulator_path)
 
+
+        # Analysis of the user simulators in Bayes-Monte Carlo setting
+        if args['analysis_bayes_monte_carlo']:
+            if not os.path.exists(dataset_config.save_dev_simulator_analysis_path) or args['overwrite_sim_analysis']:
+                # generate user profiles
+                train_user_profiles, dev_user_profiles, test_user_profiles = dataset.get_user_profiles_analysis()
+                logger.info("Creating Dev Set User Simulators Analysis ......")
+                dev_user_simulators = create_user_simulators(game_simulator_class, dev_user_profiles,
+                                                                saved_filed_path=dataset_config.save_dev_simulator_analysis_path)
+                logger.info("Creating Test User Simulators Analysis .....")
+                test_user_simulators = create_user_simulators(game_simulator_class, test_user_profiles,
+                                                                saved_filed_path=dataset_config.save_test_simulator_analysis_path)
+            else:
+                # load the simulator from files
+                dev_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_dev_simulator_analysis_path)
+                test_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_test_simulator_analysis_path)
+        else:
+            pass
+
+
         # setting the model type and the flag of using persona
         # according to the model type in the game config class.
         new_dev_user_simulators = []

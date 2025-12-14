@@ -7,6 +7,8 @@ log: true
 save_goal_path: data/pg_data/p4g/goal.pkl
 save_dev_simulator_path: data/pg_data/p4g/dev_sim.pkl
 save_test_simulator_path: data/pg_data/p4g/test_sim.pkl
+save_dev_simulator_analysis_path: data/pg_data/p4g/dev_sim_analysis.pkl
+save_test_simulator_analysis_path: data/pg_data/p4g/test_sim_analysis.pkl
 save_action: false
 load_action: true
 save_train_convs: true

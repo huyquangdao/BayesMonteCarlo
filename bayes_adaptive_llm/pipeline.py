@@ -181,7 +181,11 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         action_mapping = self.dataset.construct_action_mapping(combine=self.model_config.combined_action)
 
-
+        # print all info of dev_simulators for debug
+        print("\n[DEV SIMULATORS INFO]")
+        for i, simulator in enumerate(dev_simulators):
+            print(f"Simulator {i}: {simulator}")
+            
         preference_pairs = self.trainer.generate_preference_pairs_with_mcts(
                                                                             train_cases,
                                                                             dev_simulators,

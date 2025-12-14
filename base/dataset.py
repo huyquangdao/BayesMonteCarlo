@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import os
 
 from collections import defaultdict
+from itertools import cycle, islice
 import itertools
 import pickle
 
@@ -769,6 +770,25 @@ class PersuationDataset(Dataset):
         # return train user profiles
         # dev = test user profiles
         return train_user_profiles, dev_user_profiles, dev_user_profiles
+    
+
+    def get_user_profiles_analysis(self):
+        """
+        Create user profiles for negotiation:
+        - No training profiles
+        - Dev = Test (same set)
+        - Exactly 5 profiles: each uses 1 Big5 personality
+        """
+        train_user_profiles = []
+
+        big5_5 = list(islice(BIG5_PERSONALITY, 5))
+        decisions = list(islice(cycle(DECISION_MAKING_STYLE), len(big5_5)))
+
+        dev_user_profiles = list(zip(big5_5, decisions))
+
+        # dev = test
+        return train_user_profiles, dev_user_profiles, dev_user_profiles
+
     
     def return_infor(self):
         infor_dict = {
