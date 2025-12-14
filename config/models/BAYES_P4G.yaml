@@ -22,7 +22,7 @@ run_dpo: false
 run_preference_search: true   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: false
-run_simulator_analysis: false
+run_simulator_analysis: true
 
 # Evaluation flags
 eval_by_sft: false
