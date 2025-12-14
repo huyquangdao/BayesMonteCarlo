@@ -174,10 +174,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
                                     )
 
         # split the simulators to train and dev simulators
-        train_simulators, dev_simulators = train_test_split(self.dev_simulators,
-                                                            test_size=dev_ratio,
-                                                            random_state=self.game_config.seed
-                                                            )
+        if getattr(self.model_config, "run_simulator_analysis", False):
+            dev_simulators = self.dev_simulators
+        else:
+            train_simulators, dev_simulators = train_test_split(self.dev_simulators,
+                                                                test_size=dev_ratio,
+                                                                random_state=self.game_config.seed
+                                                                )
 
         action_mapping = self.dataset.construct_action_mapping(combine=self.model_config.combined_action)
 
