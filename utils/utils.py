@@ -238,6 +238,10 @@ def parse_args():
     parser.add_argument("--gen_models", type=str, default='bart', help="names of models")
     parser.add_argument("--metrics", type=str, help="names of metrics")
     parser.add_argument('--overwrite_sim', action='store_true', help='if we overwrite the saved user simulators')
+    # arguments for user simulator analysis
+    parser.add_argument('--overwrite_sim_analysis', action='store_true', help='if we overwrite the saved user simulator analyses')
+    parser.add_argument('--analysis_bayes_monte_carlo', action='store_true', help='if we are analyzing the Bayes-Monte Carlo setting')
+    #--------------------------------------------
     parser.add_argument('--is_train', action='store_true', default=False, help='if we are in the training phase')
     
     # arguments fro recommendation training
