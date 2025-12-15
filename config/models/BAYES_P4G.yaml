@@ -79,7 +79,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/preference_pairs_llama3.1_conscientiousness_3.jsonl"
+preference_pairs_path: "data/preference_pairs_llama3.1_neuroticism_3.jsonl"
 # preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 
