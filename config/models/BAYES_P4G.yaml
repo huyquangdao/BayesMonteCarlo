@@ -33,7 +33,7 @@ max_gen_tokens: 256
 
 
 #Collect Preference pairs hyperparameters
-skip_to_dialog_idx: 60
+skip_to_dialog_idx: 80
 
 
 # SFT hyperparameters (memory-friendly)
@@ -79,7 +79,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/preference_pairs_llama3.1_conscientiousness_2.jsonl"
+preference_pairs_path: "data/preference_pairs_llama3.1_conscientiousness_3.jsonl"
 # preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 
