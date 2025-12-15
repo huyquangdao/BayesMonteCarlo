@@ -12,7 +12,7 @@ do
 # NCCL_ASYNC_ERROR_HANDLING=1
 
 #if train phase is needed, add --is_train
-CUDA_VISIBLE_DEVICES=7 accelerate launch --main_process_port 8081 --gpu_ids 7 --num_processes 1 run.py \
+CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 8081 --gpu_ids 3 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
