@@ -115,7 +115,7 @@ class NegotiationSimulator(Simulator):
                             model_type=self.model_type,
                             **kwargs
                             )
-        print("Simulator Generation Time: ", time.time() - t)
+        # print("Simulator Generation Time: ", time.time() - t)
         return response[0]
 
     def generate_persona_description(self, user_profile):
