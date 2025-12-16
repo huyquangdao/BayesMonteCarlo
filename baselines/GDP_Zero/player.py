@@ -472,18 +472,18 @@ class LLMPlayer(DialogPlanner):
                 
                 # computing the bin label
                 # quantizing the price range into n bins
-                bins = generate_bins(buyer_price, seller_price, n=self.model_config.n_topics)
-                bin_label = 0
-                for i, bin in enumerate(bins):
-                    if proposed_price >= bin[0] and proposed_price <= bin[1]:
-                        bin_label = i
-                                
-                if '\"' in action:
-                    action = action.replace('\"', '').strip()
-                if "." in action:
-                    action = action.replace('.', '').strip()
-
                 try:
+                    bins = generate_bins(buyer_price, seller_price, n=self.model_config.n_topics)
+                    bin_label = 0
+                    for i, bin in enumerate(bins):
+                        if proposed_price >= bin[0] and proposed_price <= bin[1]:
+                            bin_label = i
+                                    
+                    if '\"' in action:
+                        action = action.replace('\"', '').strip()
+                    if "." in action:
+                        action = action.replace('.', '').strip()
+
                     action = self.model_config.action_mapping[action]
                 except:
                     # handling exception cases
@@ -500,7 +500,8 @@ class LLMPlayer(DialogPlanner):
                         elif self.game_config.name == EMOTIONAL_SUPPORT:
                             temp_action = "Question"
                     action = temp_action
-
+                    
+                print(action)
                 processed_responses.append((action, bin_label))
         
         elif self.game_config.name == RECOMMENDATION:
