@@ -470,11 +470,11 @@ if __name__ == '__main__':
                 # load user simulators for rl training and online evaluation
                 pipeline.set_user_simulators(
                     # run the pipeline with 1 simulators
-                    dev_simulators=[dev_user_simulators[3]],
-                    test_simulators=[test_user_simulators[3]],
+                    # dev_simulators=[dev_user_simulators[3]],
+                    # test_simulators=[test_user_simulators[3]],
                     # run the pipeline with multiple simulators
-                    # dev_simulators=new_dev_user_simulators,
-                    # test_simulators=new_test_user_simulators
+                    dev_simulators=new_dev_user_simulators,
+                    test_simulators=new_test_user_simulators
                 )
 
                 # computing the execution time
