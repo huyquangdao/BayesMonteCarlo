@@ -786,7 +786,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         input_prompt = train_dataset[0]['text']
         # print("Input prompt for generation:", input_prompt)
-        response = self.model.generate_text(input_prompt, max_new_tokens=128)
+        response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
         return response
