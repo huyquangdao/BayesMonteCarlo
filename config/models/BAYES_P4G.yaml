@@ -68,7 +68,7 @@ dpo_beta: 0.1                 # beta
 dpo_warmup_ratio: 0.1         # warmup_ratio
 
 dpo_gradient_accumulation: 8  # grad_accum
-dpo_max_grad_norm: 0.3        # max_grad_norm
+dpo_max_grad_norm: 1.0        # max_grad_norm
 
 dpo_optimizer: adamw_torch_fused   # optimizer_type
 dpo_lr_scheduler_type: cosine      # lr_scheduler_type
