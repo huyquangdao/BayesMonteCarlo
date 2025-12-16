@@ -12,7 +12,7 @@ do
 # NCCL_ASYNC_ERROR_HANDLING=1
 
 #if analysis_bayes_monte_carlo phase is needed, add --analysis_bayes_monte_carlo
-CUDA_VISIBLE_DEVICES=7 accelerate launch --main_process_port 8081 --gpu_ids 7 --num_processes 1 run.py \
+CUDA_VISIBLE_DEVICES=5,6,7 accelerate launch --main_process_port 8081 --gpu_ids 5,6,7 --num_processes 3 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
