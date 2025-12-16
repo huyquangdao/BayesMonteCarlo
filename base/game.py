@@ -907,7 +907,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                                                              terminators = self.game_config.terminators
                                                              )
 
-        logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
+        # logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
 
         deals = []
         rewards = []
@@ -934,7 +934,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 reward = max(set(rewards), key = rewards.count)
     
         if reward >= self.game_config.epsilon:
-            logger.info('--> Goal completed !')
+            # logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
@@ -945,7 +945,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 # logger.info('The conversation is on-going !')
                 pass
             
-        logger.debug("SingleNeg reward: {:.4f}", reward)
+        # logger.debug("SingleNeg reward: {:.4f}", reward)
         return reward, done, done
 
 

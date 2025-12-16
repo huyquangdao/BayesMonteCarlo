@@ -188,7 +188,7 @@ class LLMPlayer(DialogPlanner):
         #     action = action[0]
 
         # goal = action
-        # done = 0
+        done = 0
         
         # compute the llm-basd assessment
         t = time.time()
@@ -201,7 +201,7 @@ class LLMPlayer(DialogPlanner):
                                                              terminators = self.game_config.terminators
                                                              )
 
-        logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
+        # logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
 
         deals = []
         rewards = []
@@ -228,8 +228,8 @@ class LLMPlayer(DialogPlanner):
                 reward = max(set(rewards), key = rewards.count)
     
         if reward >= self.game_config.epsilon:
-            logger.info('--> Goal completed !')
-            # done = 1
+            # logger.info('--> Goal completed !')
+            done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
                 logger.info('Maximum number of turns reached !')
@@ -239,7 +239,7 @@ class LLMPlayer(DialogPlanner):
                 # logger.info('The conversation is on-going !')
                 pass
             
-        logger.debug("SingleNeg reward: {:.4f}", reward)
+        # logger.debug("SingleNeg reward: {:.4f}", reward)
         return reward
 
     def heuristics(self, state):
