@@ -24,7 +24,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
     def load_pretrained_model(self, model_dir, is_rl: bool = False) -> None:
         if model_dir is None:
             print("Load base model")
-            pass  # use the initialized model
+            return  # use the initialized model
 
         print(f"[LOAD] >>> Requested to load pretrained model from: {model_dir}")
         print(f"[LOAD] >>> is_rl = {is_rl}")
