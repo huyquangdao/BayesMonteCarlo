@@ -82,6 +82,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_online_eval", False):
             logger.info("Online evaluation ...")
+            model_dir=None
             if getattr(self.model_config, "eval_by_sft", False):
                 model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
             elif getattr(self.model_config, "eval_by_dpo", False):
