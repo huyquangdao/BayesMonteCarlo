@@ -178,6 +178,7 @@ TRIP_CONFIG_PATH_FOR_PERSUATION = 'config/models/TRIP_PG.yaml'
 # Bayes-Adaptive LLM
 BAYES_ADAPTIVE = 'bayes_adaptive_llm'
 BAYES_CONFIG_PATH_FOR_PERSUATION = 'config/models/BAYES_P4G.yaml'
+BAYES_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/BAYES_NEG.yaml'
 
 # DPDP model
 DPDP = 'dpdp'

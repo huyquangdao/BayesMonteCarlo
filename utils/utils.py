@@ -693,6 +693,13 @@ def get_model_by_names(scenario, model_names):
             #     PromptRefinerPipelineForNegotiation,
             #     PromptRefinerTrainer
             # ]     
+            BAYES_ADAPTIVE: [
+                BAYES_CONFIG_PATH_FOR_NEGOTIATION,
+                BayesAdaptiveConfigForNegotiation,
+                BayesAdaptiveLLMModel,
+                BayesAdaptiveLLMPipeline,
+                BayesAdaptiveLLMTrainer
+            ],
         }
 
         # collect model packages
