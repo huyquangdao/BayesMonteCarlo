@@ -19,7 +19,7 @@ CUDA_VISIBLE_DEVICES=7 accelerate launch --main_process_port 8081 --gpu_ids 7 --
   --scenario negotiation \
   --log_dir logs \
   --loggers terminal \
-  --datasets p4g \
+  --datasets craigslist_bargain \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
   --model_type llama3 \
