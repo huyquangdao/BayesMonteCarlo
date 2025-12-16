@@ -27,6 +27,6 @@ CUDA_VISIBLE_DEVICES=5,6,7 accelerate launch --main_process_port 8081 --gpu_ids 
   --is_utterance_based_action \
   --use_persona \
   --num_train_rl_epochs 10 \
-  --metrics acc,prf1,sr,total_reward,avg_turn
+  --metrics acc,prf1,sr,avg_turn
 
 done
