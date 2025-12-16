@@ -345,12 +345,31 @@ CHATGPT_PROMPT_FOR_RECOMMENDATION = [
 
 CHATGPT_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a Buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the Buyer who is trying to buy the {} with the price of {}. Product description: {} \nPlease "
-                "reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 CHATGPT_PROMPT_FOR_EMOTIONAL_SUPPORT = [
@@ -405,12 +424,31 @@ LLAMA3_PROMPT_FOR_RECOMMENDATION = [
 
 LLAMA3_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the buyer who is trying to buy the {} with the price of {}. Product description: {} \n . "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 LLAMA3_PROMPT_FOR_EMOTIONAL_SUPPORT = [
@@ -467,12 +505,31 @@ QWEN_PROMPT_FOR_RECOMMENDATION = [
 
 QWEN_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the buyer who is trying to buy the {} with the price of {}. Product description: {} \n . "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
+            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 QWEN_PROMPT_FOR_EMOTIONAL_SUPPORT = [

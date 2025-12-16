@@ -317,10 +317,21 @@ def construct_prompt_for_chat_gpt_response_generation_negotiation(state, prompt)
         else:
             goal_description = pred_goal
 
-    new_prompt[1]['content'] = new_prompt[1]['content'].format(state['task_background']['item_name'],
-                                                               state['task_background']['buyer_price'],
-                                                               state['task_background']['buyer_item_description'],
-                                                               goal_description)
+    dialogue_context_str = _build_dialogue_context_string(
+        state,
+        speaker_alias={"user": "Seller", "assistant": "Buyer"}
+    )
+
+    task_background = state.get("task_background", {})
+    new_prompt[1]['content'] = new_prompt[1]['content'].format(
+        item_name=task_background.get('item_name', ''),
+        seller_price=task_background.get('seller_price', ''),
+        buyer_price=task_background.get('buyer_price', ''),
+        seller_item_description=task_background.get('seller_item_description', ''),
+        buyer_item_description=task_background.get('buyer_item_description', ''),
+        goal_description=goal_description,
+        dialogue_context=dialogue_context_str
+    )
     return new_prompt, goal_description
 
 
