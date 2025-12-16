@@ -18,15 +18,15 @@ sft_adapter_folder: sft_adapter
 
 # Training toggles
 run_sft: false
-run_dpo: false
+run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: true
+run_online_eval: false
 run_simulator_analysis: false
 
 # Evaluation flags
 eval_by_sft: false
-eval_by_dpo: true
+eval_by_dpo: false
 
 max_gen_length: 256
 max_gen_tokens: 256
@@ -79,7 +79,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/preference_pairs_llama3.1.jsonl"
+preference_pairs_path: "data/preference_pairs_llama3.1_neuroticism.jsonl"
 # preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
 
 
