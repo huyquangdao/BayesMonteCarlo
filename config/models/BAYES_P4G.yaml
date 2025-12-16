@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1
-dpo_adapter_folder: dpo_adapter
+dpo_adapter_folder: dpo_adapter_5k
 sft_adapter_folder: sft_adapter    
 # model_name_or_path: checkpoints/persuation/p4g/BayesAdaptiveLLMModel_1   # nếu cần để pipeline/generation biết đường dẫn
 
@@ -25,8 +25,8 @@ run_online_eval: true
 run_simulator_analysis: false
 
 # Evaluation flags
-eval_by_sft: true
-eval_by_dpo: false
+eval_by_sft: false
+eval_by_dpo: true
 
 max_gen_length: 256
 max_gen_tokens: 256
