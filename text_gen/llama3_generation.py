@@ -74,7 +74,7 @@ class Llama3Generation(LLMGeneration):
         # print("Hyperparameters for Llama3.1 - model_type {} , max_gen_length {}", self.generation_config.model_type, self.generation_config.max_gen_length)
         response = call_llm(messages, 
                             n=1,
-                            temperature=0.2,
+                            temperature=0.7,
                             max_token=self.generation_config.max_gen_length,
                             model_type= self.generation_config.model_type,
                             **kwargs
