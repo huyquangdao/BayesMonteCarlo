@@ -97,6 +97,25 @@ class BayesAdaptiveConfigForNegotiation(BayesAdaptiveConfig):
     max_realizations = 3
     max_turns = 12
     combined_action = False
+    prompt = """
+    Context:
+    - You and a Buyer are bargaining over a single item; the Buyer wants a lower price, and you aim for a fair deal.
+    - Offers can shift during the conversation, so stay flexible while keeping your minimum acceptable price in mind.
+
+    Role:
+    - You are the Seller. The Buyer is trying to negotiate the item price with you.
+
+    Guidelines:
+    1. Evaluate each offer objectively and ask for clarification when details are unclear.
+    2. Consider whether a counteroffer, clarification, or agreement best serves your goals before replying.
+    3. Respond politely, using complete sentences that add substance to the negotiation (never empty or meaningless).
+    4. Always respond in the format `[dialog_act] utterance`, where `dialog_act` is one of: greet, inquire, inform, propose, counter, counter-noprice, confirm, affirm, deny, agree, disagree.
+    5. Choose the dialog act that reflects your genuine stance; take action `[agree]` only when the terms feel acceptable to you.
+    """
+    cot_prompt = """
+    The following is the conversation history: {}
+    Question: What are the mental states and likely next actions of the seller? Answer:
+    """
 
 
 class BayesAdaptiveConfigForEmotionalSupport(BayesAdaptiveConfig):
