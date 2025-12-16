@@ -724,10 +724,10 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=warmup_ratio,                                       # warmup ratio based on QLoRA paper
             lr_scheduler_type=lr_scheduler_type,                             # use cosine learning rate scheduler
             logging_steps=25,                                                # log every 25 steps
-            save_steps=length_pairs/5,                              # when to save checkpoint
+            save_steps=length_pairs//5,                              # when to save checkpoint
             save_total_limit=2,                                              # limit the total amount of checkpoints
             eval_strategy="steps",                                           # evaluate every 1000 steps
-            eval_steps=length_pairs/grad_accum,                     # when to evaluate
+            eval_steps=length_pairs//grad_accum,                     # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
             fp16=use_fp16,                                                   # use tf32 precision
             max_length=max_length,
