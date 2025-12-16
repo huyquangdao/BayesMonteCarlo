@@ -662,6 +662,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if not preference_pairs:
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
+        
+        length_pairs = len(preference_pairs)
 
         peft_config = LoraConfig(
             r=32,
@@ -722,12 +724,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=warmup_ratio,                                       # warmup ratio based on QLoRA paper
             lr_scheduler_type=lr_scheduler_type,                             # use cosine learning rate scheduler
             logging_steps=25,                                                # log every 25 steps
-            save_steps=500,                                                  # when to save checkpoint
+            save_steps=length_pairs/5,                              # when to save checkpoint
             save_total_limit=2,                                              # limit the total amount of checkpoints
             eval_strategy="steps",                                           # evaluate every 1000 steps
-            eval_steps=700,                                                  # when to evaluate
+            eval_steps=length_pairs/grad_accum,                     # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
-            tf32=use_fp16,                                                   # use tf32 precision
+            fp16=use_fp16,                                                   # use tf32 precision
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
@@ -750,7 +752,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         loguru_logger.info(
-            f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
+            f"Starting DPO training: {length_pairs} pairs, epochs={epochs}, "
             f"batch_size={per_device_train_batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
         )
 
