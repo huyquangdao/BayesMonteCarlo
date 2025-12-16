@@ -174,7 +174,7 @@ class LLMPlayer(DialogPlanner):
         """
         return np.array([1 for _ in self.goal2id.keys()])
 
-    def compute_reward(self, state, action, system_response, profile_description):
+    def compute_reward(self, state):
         """
         method that compute the reward for each step in a negotiation scenario
         :param state: the current state of the conversation
@@ -184,8 +184,8 @@ class LLMPlayer(DialogPlanner):
         :param eps:
         :return:
         """
-        if isinstance(action, tuple):
-            action = action[0]
+        # if isinstance(action, tuple):
+        #     action = action[0]
 
         # goal = action
         # done = 0
