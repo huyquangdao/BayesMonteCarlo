@@ -22,60 +22,60 @@ class BayesAdaptiveConfig(ModelConfig):
     dropout = 0.1
 
     # training flow toggles
-    run_sft = True
-    run_preference_search = False  # generate preference pairs via MCTS loop
-    run_dpo = False
-    run_offline_eval = False
-    run_online_eval = False
+    # run_sft = True
+    # run_preference_search = False  # generate preference pairs via MCTS loop
+    # run_dpo = False
+    # run_offline_eval = False
+    # run_online_eval = False
 
-    # preference data
-    preference_pairs_path = None
+    # # preference data
+    # preference_pairs_path = None
 
-    # optimisation
-    batch_size = 4
-    gradient_accumulation = 1
-    learning_rate = 5e-5
-    warmup_ratio = 0.05
-    weight_decay = 0.01
-    num_train_epochs = 3
-    logging_steps = 10
-    save_total_limit = 2
-    max_grad_norm = 1.0
-    optim = "adamw_torch"
-    fp16 = False
-    bf16 = True
-    save_hf_checkpoint = True
-    hf_checkpoint_subdir = "hf_checkpoint"
+    # # optimisation
+    # batch_size = 4
+    # gradient_accumulation = 1
+    # learning_rate = 5e-5
+    # warmup_ratio = 0.05
+    # weight_decay = 0.01
+    # num_train_epochs = 3
+    # logging_steps = 10
+    # save_total_limit = 2
+    # max_grad_norm = 1.0
+    # optim = "adamw_torch"
+    # fp16 = False
+    # bf16 = True
+    # save_hf_checkpoint = True
+    # hf_checkpoint_subdir = "hf_checkpoint"
 
-    # inference / prompting
-    temperature = 0.7
-    max_gen_tokens = 256
-    max_sequence_length = 1024
+    # # inference / prompting
+    # temperature = 0.7
+    # max_gen_tokens = 256
+    # max_sequence_length = 1024
 
-    # DPO-related knobs
-    dpo_beta = 0.1
-    dpo_model_path = "roberta-large"
-    dpo_use_sft_checkpoint = True
-    dpo_adapter_path = None
-    dpo_epochs = 3
-    dpo_batch_size = 2
-    dpo_learning_rate = 1e-5
-    dpo_max_length = 512
-    dpo_use_wandb = False
-    dpo_weight_decay = 0.01
-    dpo_warmup_ratio = 0.1
-    dpo_fp16 = False
-    dpo_bf16 = False
-    dpo_optim = "adamw_torch"   
-    dpo_gradient_accumulation = 4
-    max_length = None
-    max_prompt_length = None
-    gradient_checkpointing = False
-    reference_model = None
-    output_dir = None
+    # # DPO-related knobs
+    # dpo_beta = 0.1
+    # dpo_model_path = "roberta-large"
+    # dpo_use_sft_checkpoint = True
+    # dpo_adapter_path = None
+    # dpo_epochs = 3
+    # dpo_batch_size = 2
+    # dpo_learning_rate = 1e-5
+    # dpo_max_length = 512
+    # dpo_use_wandb = False
+    # dpo_weight_decay = 0.01
+    # dpo_warmup_ratio = 0.1
+    # dpo_fp16 = False
+    # dpo_bf16 = False
+    # dpo_optim = "adamw_torch"   
+    # dpo_gradient_accumulation = 4
+    # max_length = None
+    # max_prompt_length = None
+    # gradient_checkpointing = False
+    # reference_model = None
+    # output_dir = None
 
 
-    top_k_preferences = 1  
+    # top_k_preferences = 1  
 
     def __init__(self, params):
         super().__init__()
@@ -96,6 +96,7 @@ class BayesAdaptiveConfigForNegotiation(BayesAdaptiveConfig):
     num_mcts_sims = 20
     max_realizations = 3
     max_turns = 12
+    n_topics = 5
     combined_action = False
     prompt = """
     Context:
