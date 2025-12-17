@@ -99,23 +99,13 @@ class BayesAdaptiveConfigForNegotiation(BayesAdaptiveConfig):
     n_topics = 5
     combined_action = False
     prompt = """
-    Context:
-    - You and a Buyer are bargaining over a single item; the Buyer wants a lower price, and you aim for a fair deal.
-    - Offers can shift during the conversation, so stay flexible while keeping your minimum acceptable price in mind.
-
-    Role:
-    - You are the Seller. The Buyer is trying to negotiate the item price with you.
-
-    Guidelines:
-    1. Evaluate each offer objectively and ask for clarification when details are unclear.
-    2. Consider whether a counteroffer, clarification, or agreement best serves your goals before replying.
-    3. Respond politely, using complete sentences that add substance to the negotiation (never empty or meaningless).
-    4. Always respond in the format `[dialog_act] utterance`, where `dialog_act` is one of: greet, inquire, inform, propose, counter, counter-noprice, confirm, affirm, deny, agree, disagree.
-    5. Choose the dialog act that reflects your genuine stance; take action `[agree]` only when the terms feel acceptable to you.
+    You are an expert in price bargain.
+    Now give you a conversation history between a buyer and a seller, you need to infer the mental states
+    and future actions of the seller.
     """
     cot_prompt = """
     The following is the conversation history: {}
-    Question: What are the mental states and likely next actions of the seller? Answer:
+    Question: What are the mental states and future actions of the seller.? Answer:
     """
 
 
@@ -135,19 +125,9 @@ class BayesAdaptiveConfigForPersuation(BayesAdaptiveConfig):
     combined_action = False
 
     prompt = """
-    Context:
-    - Save the Children is a global charity that provides safety, nutrition, education, and emergency relief for vulnerable children.
-    - Donations of any size (as little as $1 or $2) can meaningfully improve children’s lives in developing regions and crisis zones.
-
-    Role:
-    - You are the Persuadee. The Persuader is trying to convince you to donate to Save the Children.
-
-    Guidelines:
-    1. Evaluate each request objectively and ask for clarification when details are unclear.
-    2. Think about how the Persuader’s message resonates with your values and priorities before deciding what feels right for you.
-    3. Respond politely, using complete sentences that add substance to the conversation (never empty or meaningless).
-    4. Always respond in the format `[dialog_act] utterance`, where `dialog_act` is one of the allowed persuadee acts.
-    5. Choose the dialog act that best reflects your genuine reaction; take action `[donate]` only when sufficiently convinced.
+    You are an expert in charity donation persuation.
+    Now give you a conversation history between a persuader and a persuadee, you need to infer the mental states
+    and future actions of the persuadee.
     """
     cot_prompt = """
     The following is the conversation history: {}
