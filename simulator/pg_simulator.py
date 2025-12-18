@@ -38,6 +38,7 @@ class PersuationSimulator(Simulator):
             3. Your willingness for donation depends on your persona and how influenced you are by the Persuader.
             4. You need to determine whether to donate money or not. If you think your are convinced by the
             Persuader, you should donate money for the charity.
+
             Your Response Strategy:
             1. "Donate": show your willingness to donate.
             2. "Source Derogation": attacks or doubts the organisation’s credibility.
@@ -51,8 +52,12 @@ class PersuationSimulator(Simulator):
             currently unsure about donating.
             8. "Self-assertion": Explicitly refuses to donate without even providing a personal reason.
             9. "Others": Do not explicitly foil the persuasion attempts.
-            You are the Persuadee who is being persuaded by a Persuader. Please reply with only one short and
-            succinct sentence.            
+            
+            Very important:
+            - First, decide which strategy best describes your intention according to the rules above.
+            - Then, write ONE short sentence that clearly shows that strategy.
+
+            You are the Persuadee who is being persuaded by a Persuader.           
             The conversation history is as bellow:
             """
         # we ignore the persona for the user simulator
@@ -81,7 +86,7 @@ class PersuationSimulator(Simulator):
         messages.extend(self.reformat_dialogue_context(dialogue_context))
         messages.append(
             {'role': 'user', 'content': f"""
-             You have to reply with only one short and succinct sentence.
+             Now reply with exactly one short sentence and succinct sentence.
             """
              }
         )
