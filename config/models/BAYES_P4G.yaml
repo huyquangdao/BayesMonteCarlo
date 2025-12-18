@@ -25,7 +25,7 @@ run_simulator_analysis: false
 
 # Evaluation flags
 eval_by_sft: false
-eval_by_dpo: false
+eval_by_dpo: true
 
 # eval_by_sft: true
 # eval_by_dpo: false
