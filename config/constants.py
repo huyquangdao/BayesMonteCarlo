@@ -365,8 +365,6 @@ CHATGPT_PROMPT_FOR_NEGOTIATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -403,8 +401,6 @@ CHATGPT_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -444,8 +440,6 @@ LLAMA3_PROMPT_FOR_NEGOTIATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -482,8 +476,6 @@ LLAMA3_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            # "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            # "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -525,8 +517,6 @@ QWEN_PROMPT_FOR_NEGOTIATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Seller's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -564,8 +554,6 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
