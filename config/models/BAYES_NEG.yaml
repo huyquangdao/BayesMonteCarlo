@@ -27,6 +27,11 @@ run_simulator_analysis: false
 eval_by_sft: false
 eval_by_dpo: true
 
+# eval_by_sft: true
+# eval_by_dpo: false
+
+#=======================
+
 max_gen_length: 256
 max_gen_tokens: 256
 
@@ -79,6 +84,12 @@ dpo_loss_type: sigmoid
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
 preference_pairs_path: "data/neg_data/preference_pairs_llama3.1.jsonl"
-# preference_pairs_path: "data/preference_pairs_gpt3.5-turbo_all.jsonl"
+
+#Collect fixed persona
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_openness.jsonl"
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_conscientiousness.jsonl"
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_extraversion.jsonl"
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_agreeableness.jsonl"
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_neuroticism.jsonl"
 
 
