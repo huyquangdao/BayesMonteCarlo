@@ -187,11 +187,11 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         action_mapping = self.dataset.construct_action_mapping(combine=self.model_config.combined_action)
 
         # print all info of dev_simulators for debug
-        # print("\n[DEV SIMULATORS INFO]")
-        # for i, simulator in enumerate(dev_simulators):
-        #     print(f"Simulator {i}: {simulator}")
-        #     persona_desc = getattr(simulator, "user_profile_description", "")
-        #     print(f"Persona: {persona_desc}")
+        print("\n[DEV SIMULATORS INFO]")
+        for i, simulator in enumerate(dev_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
 
 
         
