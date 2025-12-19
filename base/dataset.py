@@ -482,6 +482,22 @@ class NegotiationDataset(Dataset):
         # dev = test user profiles
         return train_user_profiles, dev_user_profiles, dev_user_profiles
 
+    def get_user_profiles_analysis(self):
+        """
+        Create user profiles for negotiation:
+        - No training profiles
+        - Dev = Test (same set)
+        - Exactly 5 profiles: each uses 1 Big5 personality
+        """
+        train_user_profiles = []
+
+        big5_5 = list(islice(BIG5_PERSONALITY, 5))
+        decisions = list(islice(cycle(DECISION_MAKING_STYLE), len(big5_5)))
+
+        dev_user_profiles = list(zip(big5_5, decisions))
+
+        # dev = test
+        return train_user_profiles, dev_user_profiles, dev_user_profiles
     # def get_user_profiles(self):
     #     """
     #     method that get the train, dev and test user profiles for the data
