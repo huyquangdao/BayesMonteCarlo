@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Experiment script for Bayes-Adaptive LLM on P4G (persuasion) mirroring the TRIP runner.
-# Requires config/models/BAYES_P4G.yaml to have run_preference_search: true (and SFT/DPO toggled as desired).
+# Experiment script for Bayes-Adaptive LLM on NEG (negotiation) 
+# Requires config/models/BAYES_NEG.yaml to have run_preference_search: true (and SFT/DPO toggled as desired).
 
 EXPNAME="NEG_BAYES_PREF"
 
@@ -13,7 +13,7 @@ do
 
 #if analysis_bayes_monte_carlo phase is needed, add --analysis_bayes_monte_carlo
 # ONLY add --is_utterance_based_action at evaluation stage
-  accelerate launch --main_process_port 8081 --gpu_ids 5 --num_processes 1 run.py \
+  accelerate launch --main_process_port 8081 --gpu_ids 4 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
