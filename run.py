@@ -141,16 +141,24 @@ if __name__ == '__main__':
         # create the dataset
         dataset = dataset_class(dataset_config)
 
+        simulator_init_kwargs = {
+            "model_type": game_config.model_type,
+            "llm_pipeline": llm_pipeline,
+            "terminators": terminators,
+        }
+
         # creating the user simulators if it does not exists.
         if not os.path.exists(dataset_config.save_dev_simulator_path) or args['overwrite_sim']:
             # generate user profiles
             train_user_profiles, dev_user_profiles, test_user_profiles = dataset.get_user_profiles()
             logger.info("Creating Dev Set User Simulators ......")
             dev_user_simulators = create_user_simulators(game_simulator_class, dev_user_profiles,
-                                                         saved_filed_path=dataset_config.save_dev_simulator_path)
+                                                         saved_filed_path=dataset_config.save_dev_simulator_path,
+                                                         **simulator_init_kwargs)
             logger.info("Creating Test User Simulators .....")
             test_user_simulators = create_user_simulators(game_simulator_class, test_user_profiles,
-                                                          saved_filed_path=dataset_config.save_test_simulator_path)
+                                                          saved_filed_path=dataset_config.save_test_simulator_path,
+                                                          **simulator_init_kwargs)
         # load the user simulators from file
         else:
             # load the simulator from files
@@ -165,10 +173,12 @@ if __name__ == '__main__':
                 train_user_profiles, dev_user_profiles, test_user_profiles = dataset.get_user_profiles_analysis()
                 logger.info("Creating Dev Set User Simulators Analysis ......")
                 dev_user_simulators = create_user_simulators(game_simulator_class, dev_user_profiles,
-                                                                saved_filed_path=dataset_config.save_dev_simulator_analysis_path)
+                                                                saved_filed_path=dataset_config.save_dev_simulator_analysis_path,
+                                                                **simulator_init_kwargs)
                 logger.info("Creating Test User Simulators Analysis .....")
                 test_user_simulators = create_user_simulators(game_simulator_class, test_user_profiles,
-                                                                saved_filed_path=dataset_config.save_test_simulator_analysis_path)
+                                                                saved_filed_path=dataset_config.save_test_simulator_analysis_path,
+                                                                **simulator_init_kwargs)
             else:
                 # load the simulator from files
                 dev_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_dev_simulator_analysis_path)

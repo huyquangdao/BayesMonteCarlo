@@ -7,12 +7,14 @@ from config.constants import CHATGPT
 
 class PersuationSimulator(Simulator):
 
-    def __init__(self, user_profile, use_persona=False):
+    def __init__(self, user_profile, use_persona=False, model_type=None, **kwargs):
         """
         constructor for class persuation simulator
         :param user_profile: a tuple of big5 persona and decision making style
         """
         self.use_persona = use_persona
+        if model_type is not None:
+            self.model_type = model_type
         # generating the profile description
         self.user_profile_description = self.generate_persona_description(user_profile)
 

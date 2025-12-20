@@ -1375,12 +1375,13 @@ def get_text_generation_model_by_name(scenario, names):
         raise Exception('Invalid Scenario ......')
 
 
-def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None):
+def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None, **sim_kwargs):
     """
     function that create a set of user simulators by using given user profiles and scenario name
     :param simulator_class: the class of the user simulator
     :param user_profiles: list contain user profiles
     :param saved_filed_path: Saved file path
+    :param sim_kwargs: optional kwargs passed to the simulator constructor (e.g., model_type, llm_pipeline)
     :return: a list of instances of simulators
     """
     # create a set of simulators
@@ -1388,7 +1389,7 @@ def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None
 
     # create a set of simulator based on sampled dev user profiles
     for profile in tqdm(user_profiles):
-        simulator = simulator_class(profile)
+        simulator = simulator_class(profile, **sim_kwargs)
         user_simulators.append(simulator)
 
     # save the user simulators to file

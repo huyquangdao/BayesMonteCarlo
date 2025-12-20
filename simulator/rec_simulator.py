@@ -5,16 +5,21 @@ from config.constants import DURECDIAL, INSPIRED
 
 class RecommendationSimulator(Simulator):
 
-    def __init__(self, user_profile, use_persona=False):
+    def __init__(self, user_profile, use_persona=False, model_type=None, llm_pipeline=None, terminators=None):
         """
         constructor for class Recommendation Simulator
         :param user_profile: the profile of the user, in the format of a dictionary
         """
-        # generating the profile description
         self.user_profile = user_profile
         self.use_persona = use_persona
-        # self.user_profile_description = ''
-        self.user_profile_description = self.generate_persona_description(user_profile)
+        if model_type is not None:
+            self.model_type = model_type
+        # generate and cache the persona description during construction
+        self.user_profile_description = self.generate_persona_description(
+            user_profile,
+            llm_pipeline=llm_pipeline,
+            terminators=terminators
+        )
 
     def respond(self, state, dataset='durecdial', **kwargs):
         """
@@ -91,7 +96,7 @@ class RecommendationSimulator(Simulator):
                 user_profile_description += f"{k}: {v} \n"
         return user_profile_description
 
-    def generate_persona_description(self, user_profile):
+    def generate_persona_description(self, user_profile, llm_pipeline=None, terminators=None):
         """
         method that generate a profile description given the user profile dictionary
         :return: an user profile description
@@ -106,7 +111,18 @@ class RecommendationSimulator(Simulator):
         messages = [
             {"role": "system", "content": prompt}
         ]
-        output = call_llm(messages, n=1, temperature=self.temperature, max_token=self.max_description_tokens,
-                          model_type=self.model_type)
+        llm_kwargs = {}
+        if llm_pipeline is not None:
+            llm_kwargs["llm_pipeline"] = llm_pipeline
+        if terminators is not None:
+            llm_kwargs["terminators"] = terminators
+        output = call_llm(
+            messages,
+            n=1,
+            temperature=self.temperature,
+            max_token=self.max_description_tokens,
+            model_type=self.model_type,
+            **llm_kwargs,
+        )
         # return the user persona description
         return output[0]

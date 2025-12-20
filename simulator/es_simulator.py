@@ -6,13 +6,19 @@ from utils.prompt import call_llm
 
 class EmotionalSupportSimulator(Simulator):
 
-    def __init__(self, user_profile, use_persona=False):
+    def __init__(self, user_profile, use_persona=False, model_type=None, llm_pipeline=None, terminators=None):
         """
         constructor for class emotional support simulator
         :param user_profile:
         """
         self.use_persona = use_persona
-        self.user_profile_description = self.generate_persona_description(user_profile)
+        if model_type is not None:
+            self.model_type = model_type
+        self.user_profile_description = self.generate_persona_description(
+            user_profile,
+            llm_pipeline=llm_pipeline,
+            terminators=terminators
+        )
 
     def respond(self, state, **kwargs):
         """
@@ -74,7 +80,7 @@ class EmotionalSupportSimulator(Simulator):
         # print(response)
         return response[0]
 
-    def generate_persona_description(self, user_profile):
+    def generate_persona_description(self, user_profile, llm_pipeline=None, terminators=None):
         """
         method that generate a persona description given the situation of the patient (problem_type, emotion_type, situation)
         :return: an user profile description
@@ -91,11 +97,19 @@ class EmotionalSupportSimulator(Simulator):
         messages = [
             {"role": "system", "content": prompt}
         ]
-        output = call_llm(messages, n=1,
-                          temperature=self.temperature,
-                          max_token=self.max_description_tokens,
-                          model_type=self.model_type
-                          )
+        llm_kwargs = {}
+        if llm_pipeline is not None:
+            llm_kwargs["llm_pipeline"] = llm_pipeline
+        if terminators is not None:
+            llm_kwargs["terminators"] = terminators
+        output = call_llm(
+            messages,
+            n=1,
+            temperature=self.temperature,
+            max_token=self.max_description_tokens,
+            model_type=self.model_type,
+            **llm_kwargs,
+        )
         
         # return the user persona description
         return output[0]
