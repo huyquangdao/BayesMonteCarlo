@@ -83,7 +83,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_agreeableness.jsonl"
+preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_openness.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_openness.jsonl"
