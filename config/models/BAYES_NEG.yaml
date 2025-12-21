@@ -37,7 +37,7 @@ max_gen_tokens: 256
 
 
 #Collect Preference pairs hyperparameters
-skip_to_dialog_idx: 200
+skip_to_dialog_idx: 0
 
 
 # SFT hyperparameters (memory-friendly)
@@ -83,7 +83,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_neuroticism.jsonl"
+preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_neuroticism_0.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_openness.jsonl"
