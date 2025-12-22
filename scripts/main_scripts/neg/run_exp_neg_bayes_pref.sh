@@ -13,7 +13,7 @@ do
 
 #if analysis_bayes_monte_carlo phase is needed, add --analysis_bayes_monte_carlo
 # ONLY add --is_utterance_based_action at evaluation stage
-  accelerate launch --main_process_port 8081 --gpu_ids 6 --num_processes 1 run.py \
+  accelerate launch --main_process_port 8081 --gpu_ids 6,7 --num_processes 2 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
