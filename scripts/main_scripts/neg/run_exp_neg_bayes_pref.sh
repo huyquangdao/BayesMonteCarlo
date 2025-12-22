@@ -13,7 +13,7 @@ do
 
 #if analysis_bayes_monte_carlo phase is needed, add --analysis_bayes_monte_carlo
 # ONLY add --is_utterance_based_action at evaluation stage
-  accelerate launch --main_process_port 8081 --gpu_ids 7 --num_processes 1 run.py \
+  accelerate launch --main_process_port 8081 --gpu_ids 5 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
@@ -23,7 +23,7 @@ do
   --datasets craigslist_bargain \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type chatgpt \
+  --model_type llama3 \
   --is_so_game \
   --is_utterance_based_action \
   --use_persona \
