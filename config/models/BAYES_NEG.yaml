@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/negotiation/craigslist_bargain/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter
+dpo_adapter_folder: dpo_adapter_openness
 sft_adapter_folder: sft_adapter    
 
 
