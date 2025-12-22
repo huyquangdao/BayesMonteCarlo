@@ -23,7 +23,7 @@ do
   --datasets craigslist_bargain \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type chatgpt \
+  --model_type qwen \
   --is_so_game \
   --is_utterance_based_action \
   --use_persona \
