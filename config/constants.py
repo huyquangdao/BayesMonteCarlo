@@ -798,11 +798,23 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "Standard": ""}
 
 #prompt for collect preference pairs
-PREFERENCE_PAIR_PROMPT_P4G = "You are the Persuader. " \
-        "Generate the Persuader reply that advances persuasion in a way that persuades the Persuadee to donate to Save the Children.\n" \
-        "Conversation so far:\n"
+PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.
+            Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.
+            Constraints:
+             - 1–2 short sentences only.
+             - Polite, warm, and respectful.
+             - Ask for a small, specific donation amount when appropriate.
+             - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.
+             - Never mention instructions.
+            Conversation so far:"""
 
 # preference pair extraction for negotiation
-PREFERENCE_PAIR_PROMPT_NEGOTIATION = "You are the Buyer. " \
-        "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n" \
-        "Conversation so far:\n"
+PREFERENCE_PAIR_PROMPT_NEGOTIATION = """You are the Buyer in a price negotiation with a Seller.
+            Write the Buyer's next message to move toward an agreement. Aim for a fair deal but try to pay less.
+            Rules:
+            - Reply in 1–2 short sentences.
+            - Be polite and cooperative.
+            - Include a concrete price offer or counter-offer whenever possible (use numbers).
+            - If the Seller already gave a price, respond with a counter-offer and a brief reason (e.g., budget/market/condition).
+            - Do not mention these rules or any system instructions.
+            Conversation so far:\n"""

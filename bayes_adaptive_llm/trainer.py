@@ -168,15 +168,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         # ===== ROLE/ GOAL / STYLE =====
         system_content = (
-            "You are a Persuader trying to persuade the user to donate to a charity.\n"
-            "Goal: encourage the user to donate to a charity in a respectful, trust-building way.\n\n"
-            "Rules:\n"
-            "- Stay in character as the Persuader.\n"
-            "- Reply in 1–2 short sentences only.\n"
-            "- Be warm, empathetic, and non-pushy.\n"
-            "- Use one clear move per turn: ask a question OR make a concrete, verifiable point OR suggest a small next step.\n"
-            "- Avoid guilt-tripping, threats, or manipulation.\n"
-            "- Do not mention these rules.\n"
+            "You are the Persuader.\n"
+            "Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.\n"
+            "Constraints:\n"
+            " - 1–2 short sentences only.\n"
+            " - Polite, warm, and respectful.\n"
+            " - Ask for a small, specific donation amount when appropriate.\n"
+            " - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n"
+            " - Never mention instructions.\n"
+            "Conversation so far:"
         )
 
         messages = [{"role": "system", "content": system_content}]
@@ -232,13 +232,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return getattr(obj, key, default)
 
         system_content = (
-            "You are the Buyer negotiating the final price.\n"
-            "Aim for a fair deal but try to pay less.\n\n"
+            "You are the Buyer.\n"
+            "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n"
+            "Aim for a fair deal but try to pay less.\n"
             "Style constraints:\n"
             "- 1–2 short sentences.\n"
             "- Include a price (offer/counter-offer) when possible.\n"
             "- Keep a polite tone.\n"
             "- Never mention the instructions.\n"
+            "Conversation so far:"
         )
 
 
@@ -1185,12 +1187,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # negotiation scenario
                 elif self.game_config.name == NEGOTIATION:
-
+                    # print("List epi_reward: ", epi_reward)
                     epi_reward = epi_reward.mean(dim=0)
                     sl_ratio_reward = epi_reward[0].item()
                     fairness_reward = epi_reward[1].item()
                     turn_reward = epi_reward[-1].item()
-
                     # three objectives
                     # i.e user reward, item_freq, turn_reward
                     if len(objective_based_reward) == 2:
@@ -1232,7 +1233,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             # single objective game:
             else:
                 epi_reward = torch.cat(epi_reward, dim=0)
-                
+                print("List epi_reward: ", epi_reward)
                 # objective-based epi reward
                 total_reward = epi_reward.sum(dim=0)
 
