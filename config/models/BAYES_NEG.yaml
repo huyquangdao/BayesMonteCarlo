@@ -43,14 +43,14 @@ skip_to_dialog_idx: 0
 # SFT hyperparameters (memory-friendly)
 use_lora: true
 batch_size: 2
-gradient_accumulation: 8
+gradient_accumulation: 16
 learning_rate: 2e-5
-warmup_ratio: 0.1
-weight_decay: 0.01
-num_train_epochs: 3
+warmup_ratio: 0.05
+weight_decay: 0.1
+num_train_epochs: 2
 logging_steps: 10
 save_total_limit: 2
-max_grad_norm: 1.0
+max_grad_norm: 0.3
 max_sequence_length: 1024
 
 
@@ -65,9 +65,9 @@ max_prompt_length: 512        # max_prompt_length
 
 dpo_train_batch_size: 2             # per_device_train_batch_size / eval_batch_size
 dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
-dpo_epochs: 3                 # epochs
+dpo_epochs: 1                 # epochs
 
-dpo_learning_rate: 1e-5       # learning_rate
+dpo_learning_rate: 5e-7       # learning_rate
 dpo_beta: 0.1                 # beta
 dpo_warmup_ratio: 0.1         # warmup_ratio
 
