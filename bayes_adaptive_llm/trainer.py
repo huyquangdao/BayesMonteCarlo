@@ -606,21 +606,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
             report_to=["none"],
         )
 
-        def _token_accuracy(eval_pred):
-            """
-            Token-level accuracy ignoring masked labels (-100).
-            """
-            logits = eval_pred.predictions
-            labels = eval_pred.label_ids
-            if isinstance(logits, tuple):
-                logits = logits[0]
-            preds = np.argmax(logits, axis=-1)
-            mask = labels != -100
-            total = mask.sum()
-            correct = ((preds == labels) & mask).sum()
-            acc = float(correct) / float(total) if total != 0 else 0.0
-            return {"acc": acc}
-
         loguru_logger.info("Initializing TRL SFTTrainer for persuasion SFT...")
         self.tokenizer.pad_token = self.tokenizer.eos_token
         sft_trainer = SFTTrainer(
@@ -630,21 +615,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
             eval_dataset=eval_dataset,
             tokenizer=self.tokenizer,
             peft_config=peft_config,
-            compute_metrics=_token_accuracy,
         )
 
         sft_trainer.train()
-
-        # Log train/eval accuracy explicitly for traceability
-        train_metrics = sft_trainer.evaluate(eval_dataset=train_dataset, metric_key_prefix="train")
-        eval_metrics = sft_trainer.evaluate(eval_dataset=eval_dataset, metric_key_prefix="eval")
-        train_acc = train_metrics.get("train_acc", None)
-        eval_acc = eval_metrics.get("eval_acc", None)
-        loguru_logger.info(
-            "SFT accuracy - train: {:.4f} | eval: {:.4f}",
-            train_acc if train_acc is not None else float("nan"),
-            eval_acc if eval_acc is not None else float("nan"),
-        )
 
         trained_plm = sft_trainer.model
         if hasattr(self.model, "plm"):
