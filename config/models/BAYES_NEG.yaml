@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/negotiation/craigslist_bargain/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter_conscientiousness
+dpo_adapter_folder: dpo_adapter_extraversion
 sft_adapter_folder: sft_adapter    
 
 
@@ -83,7 +83,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_conscientiousness.jsonl"
+preference_pairs_path: "data/neg_data/preference_pairs_llama3.1_extraversion.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_openness.jsonl"
