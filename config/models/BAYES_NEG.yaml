@@ -69,10 +69,10 @@ dpo_epochs: 2                 # epochs
 
 dpo_learning_rate: 2e-5       # learning_rate
 dpo_beta: 0.1                 # beta
-dpo_warmup_ratio: 0.03         # warmup_ratio
+dpo_warmup_ratio: 0.06         # warmup_ratio
 
 dpo_gradient_accumulation: 8  # grad_accum
-dpo_max_grad_norm: 2.0        # max_grad_norm
+dpo_max_grad_norm: 1.0        # max_grad_norm
 
 dpo_optimizer: adamw_torch_fused   # optimizer_type
 dpo_lr_scheduler_type: cosine      # lr_scheduler_type
