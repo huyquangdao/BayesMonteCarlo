@@ -28,6 +28,6 @@ do
   --is_utterance_based_action \
   --use_persona \
   --num_train_rl_epochs 10 \
-  --metrics acc,prf1,sr,sl_ratio,avg_turn
+  --metrics acc,prf1,sr,sl_ratio,avg_turn,max_epi_reward
 
 done
