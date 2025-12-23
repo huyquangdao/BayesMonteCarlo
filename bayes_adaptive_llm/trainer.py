@@ -231,16 +231,21 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
+        task_background = _get(inst, "task_background", {}) or {}
+        item_name = task_background.get("item_name", "the item")
+        buyer_price = task_background.get("buyer_price", "N/A")
+        seller_price = task_background.get("seller_price", "N/A")
+        item_description = (
+            task_background.get("seller_item_description")
+            or task_background.get("buyer_item_description")
+            or ""
+        )
+
         system_content = (
-            "You are the Buyer.\n"
-            "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n"
-            "Aim for a fair deal but try to pay less.\n"
-            "Style constraints:\n"
-            "- 1–2 short sentences.\n"
-            "- Include a price (offer/counter-offer) when possible.\n"
-            "- Keep a polite tone.\n"
-            "- Never mention the instructions.\n"
-            "Conversation so far:"
+            "Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.\n"
+            f"You are the buyer who is trying to buy the {item_name} with the price of {buyer_price}. Product description: {item_description}\n"
+            f"The seller listed price is {seller_price}.\n"
+            "Please reply with only one short and succinct sentence."
         )
 
 
@@ -775,7 +780,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             [instance], [instance] 
         )
         input_prompt = train_dataset[0]['text']
-        # print("Input prompt for generation:", input_prompt)
+        print("Input prompt for generation:", input_prompt)
         response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
@@ -920,7 +925,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
-                prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
+                if self.game_config.name == NEGOTIATION:
+                    tb = state.get("task_background", {})
+                    prompt_prefix = prompt_preference_by_game.format(
+                        item_name=tb.get("item_name", "the item"),
+                        buyer_price=tb.get("buyer_price", "N/A"),
+                        seller_price=tb.get("seller_price", "N/A"),
+                        item_description=tb.get("seller_item_description") or tb.get("buyer_item_description") or "",
+                    )
+                else:
+                    prompt_prefix = prompt_preference_by_game
+
+                prompt_dialogue_context = prompt_prefix + stringify_dialogue_context(state["dialogue_context"])
 
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx

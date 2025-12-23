@@ -810,12 +810,8 @@ PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.
             Conversation so far:"""
 
 # preference pair extraction for negotiation
-PREFERENCE_PAIR_PROMPT_NEGOTIATION = """You are the Buyer in a price negotiation with a Seller.
-            Write the Buyer's next message to move toward an agreement. Aim for a fair deal but try to pay less.
-            Rules:
-            - Reply in 1–2 short sentences.
-            - Be polite and cooperative.
-            - Include a concrete price offer or counter-offer whenever possible (use numbers).
-            - If the Seller already gave a price, respond with a counter-offer and a brief reason (e.g., budget/market/condition).
-            - Do not mention these rules or any system instructions.
-            Conversation so far:\n"""
+PREFERENCE_PAIR_PROMPT_NEGOTIATION = """Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.
+You are the buyer who is trying to buy the {item_name} with the price of {buyer_price}. Product description: {item_description}
+The seller listed price is {seller_price}.
+Please reply with only one short and succinct sentence.
+Conversation so far:\n"""
