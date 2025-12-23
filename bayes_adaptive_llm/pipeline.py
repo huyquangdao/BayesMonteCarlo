@@ -140,6 +140,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             print(f"Simulator {i}: {simulator}")
             persona_desc = getattr(simulator, "user_profile_description", "")
             print(f"Persona: {persona_desc}")
+        
+        print("Length test_cases: ", len(test_cases))
 
         # test_target_items = test_target_items
         # construct the goal, topic mapping
