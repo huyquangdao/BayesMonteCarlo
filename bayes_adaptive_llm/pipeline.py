@@ -134,6 +134,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
 
+        # use a single persona duplicated across all test cases for simulator analysis
+
         # debug
         print("\n[TEST SIMULATORS INFO]")
         for i, simulator in enumerate(test_simulators):
@@ -155,6 +157,10 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         # please manage the randon seed carefully.
         if len(test_simulators) > len(test_cases):
             test_simulators = random.sample(test_simulators, len(test_cases))
+            
+        if getattr(self.model_config, "run_simulator_analysis", False) and len(test_simulators) > 0:
+            single_simulator = random.choice(test_simulators)
+            test_simulators = [single_simulator for _ in range(len(test_cases))]
 
         # make sure there is no gradient-relevant computation
         with torch.no_grad():
