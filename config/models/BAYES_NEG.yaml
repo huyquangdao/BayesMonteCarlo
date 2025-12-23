@@ -21,7 +21,7 @@ sft_adapter_folder: sft_adapter
 # dpo_adapter_folder: dpo_adapter_neuroticism
 
 # Training toggles
-run_sft: true
+run_sft: false
 run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
