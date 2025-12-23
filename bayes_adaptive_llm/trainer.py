@@ -1236,7 +1236,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 print("List epi_reward: ", epi_reward)
                 # objective-based epi reward
                 total_reward = epi_reward.sum(dim=0)
-                max_epi_reward = epi_reward.max().item()
+                max_epi_reward = 0.0
+                if is_successful:
+                    max_epi_reward = epi_reward.max().item()
 
                 # update the online evaluator
                 # recommendation scenario
