@@ -27,7 +27,6 @@ do
   --model_type llama3 \
   --is_so_game \
   --is_utterance_based_action \
-  --analysis_bayes_monte_carlo \
   --use_persona \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
