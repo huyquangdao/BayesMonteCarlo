@@ -134,6 +134,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
 
+        # debug
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+
         # test_target_items = test_target_items
         # construct the goal, topic mapping
         action_mapping = self.dataset.construct_action_mapping(
