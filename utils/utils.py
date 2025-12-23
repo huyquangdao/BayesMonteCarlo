@@ -176,7 +176,7 @@ from baselines.GDP_Zero.pipeline import GDPZeroPipelineForNegotiation, GDPZeroPi
 
 # metrics for evaluation
 from eval.metric import Accuracy, PrecisionRecallF1, Item_Freq, SR, OfflineMetric, OnlineMetric, DistN, AverageTurn, \
-    RougeN, BleuN, Fairness, SL_Ratio, Toxicity, User_Reward, Total_Reward
+    RougeN, BleuN, Fairness, SL_Ratio, Toxicity, User_Reward, Total_Reward, Max_Epi_Reward
 
 # user simulators
 from simulator.rec_simulator import RecommendationSimulator
@@ -947,6 +947,7 @@ def get_metrics_by_names(scenario, metric_names):
             SUCCESS_RATE: SR(),
             SL_RATIO: SL_Ratio(),
             FAIRNESS: Fairness(),
+            MAX_EPI_REWARD: Max_Epi_Reward(),
             AVG_TURN: AverageTurn()
         }
 

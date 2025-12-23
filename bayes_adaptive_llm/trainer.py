@@ -66,7 +66,7 @@ from bayes_adaptive_llm.data_processor import (
 )
 from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
 from config.constants import PREFERENCE_PAIR_PROMPT_NEGOTIATION, PREFERENCE_PAIR_PROMPT_P4G, RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
-    TOXICITY, ITEM_FREQ, USER_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
+    TOXICITY, ITEM_FREQ, USER_REWARD, MAX_EPI_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
     P4G_GOAL2DESCRIPTION
 
 from baselines.GDP_Zero.game import DialogGame
@@ -1236,6 +1236,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 print("List epi_reward: ", epi_reward)
                 # objective-based epi reward
                 total_reward = epi_reward.sum(dim=0)
+                max_epi_reward = epi_reward.max().item()
 
                 # update the online evaluator
                 # recommendation scenario
@@ -1257,7 +1258,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                             # use to compute the success rate and avg conv turn.
                             SUCCESS_RATE: is_successful,
                             AVG_TURN: conv_turn,
-                            SL_RATIO: total_reward.item()
+                            SL_RATIO: total_reward.item(),
+                            MAX_EPI_REWARD: max_epi_reward
                         }
                     )
                 # emotional support conversation
@@ -1320,4 +1322,3 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # return the results of the online evaluation
         print(results)
         return results 
-

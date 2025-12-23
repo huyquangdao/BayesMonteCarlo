@@ -296,6 +296,7 @@ ITEM_FREQ = 'item_freq'
 # objectives for negotiation
 SL_RATIO = 'sl_ratio'
 FAIRNESS = 'fairness'
+MAX_EPI_REWARD = 'max_epi_reward'
 
 # objectives for emotional support
 TOXICITY = 'toxicity'
