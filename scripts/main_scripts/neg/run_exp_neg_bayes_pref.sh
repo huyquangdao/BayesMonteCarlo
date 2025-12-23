@@ -23,7 +23,7 @@ do
   --datasets craigslist_bargain \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type train \
+  --model_type llama3 \
   --is_so_game \
   --is_utterance_based_action \
   --use_persona \
