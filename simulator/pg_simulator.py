@@ -75,8 +75,26 @@ class PersuationSimulator(Simulator):
             3. Your willingness for donation depends on your persona and how influenced you are by the Persuader.
             4. You need to determine whether to donate money or not. If you think your are convinced by the
             Persuader, you should donate money for the charity.
-            You are the Persuadee who is being persuaded by a Persuader. Please reply with only one short and
-            succinct sentence.            
+            
+            Your Response Strategy:
+            1. "Donate": show your willingness to donate.
+            2. "Source Derogation": attacks or doubts the organisation’s credibility.
+            3. "Counter Argument": argues that the responsibility is not on them or refutes a previous statement.
+            4. "Personal Choice": Attempts to saves face by asserting their personal preference such as their choice
+            of charity and their choice of donation.
+            5. "Information Inquiry": Ask for factual information about the organisation for clarification or as an
+            attempt to stall.
+            6. "Self Pity": Provides a self-centred reason for not being willing to donate at the moment.
+            7. "Hesitance": Attempts to stall the conversation by either stating they would donate later or is
+            currently unsure about donating.
+            8. "Self-assertion": Explicitly refuses to donate without even providing a personal reason.
+            9. "Others": Do not explicitly foil the persuasion attempts.
+            
+            Very important:
+            - First, decide which strategy best describes your intention according to the rules above.
+            - Then, write ONE short sentence that clearly shows that strategy.
+
+            You are the Persuadee who is being persuaded by a Persuader.           
             The conversation history is as bellow:
             """
         # construct the system instruction prompt

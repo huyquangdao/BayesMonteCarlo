@@ -194,7 +194,6 @@ if __name__ == '__main__':
             # set the model type
             simulator.set_model_type(game_config.model_type)
             # set the flag of using persona
-            print("use_persona: ", args['use_persona'])
             simulator.is_using_persona(args['use_persona'])
             new_dev_user_simulators.append(simulator)
 
@@ -203,7 +202,6 @@ if __name__ == '__main__':
             # set the model type
             simulator.set_model_type(game_config.model_type)
             # set the flag of using persona
-            print("use_persona: ", args['use_persona'])
             simulator.is_using_persona(args['use_persona'])
             new_test_user_simulators.append(simulator)
 
