@@ -194,6 +194,7 @@ if __name__ == '__main__':
             # set the model type
             simulator.set_model_type(game_config.model_type)
             # set the flag of using persona
+            print("use_persona: ", args['use_persona'])
             simulator.is_using_persona(args['use_persona'])
             new_dev_user_simulators.append(simulator)
 
@@ -202,6 +203,7 @@ if __name__ == '__main__':
             # set the model type
             simulator.set_model_type(game_config.model_type)
             # set the flag of using persona
+            print("use_persona: ", args['use_persona'])
             simulator.is_using_persona(args['use_persona'])
             new_test_user_simulators.append(simulator)
 
@@ -483,10 +485,8 @@ if __name__ == '__main__':
                     # dev_simulators=[dev_user_simulators[3]],
                     # test_simulators=[test_user_simulators[3]],
                     # run the pipeline with multiple simulators
-                    # dev_simulators=new_dev_user_simulators,
-                    # test_simulators=new_test_user_simulators
-                    dev_simulators=[],
-                    test_simulators=[]
+                    dev_simulators=new_dev_user_simulators,
+                    test_simulators=new_test_user_simulators
                 )
 
                 # computing the execution time
