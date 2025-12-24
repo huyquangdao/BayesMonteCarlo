@@ -136,13 +136,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         # use a single persona duplicated across all test cases for simulator analysis
         # debug
-        print("\n[TEST SIMULATORS INFO]")
-        for i, simulator in enumerate(test_simulators):
-            print(f"Simulator {i}: {simulator}")
-            persona_desc = getattr(simulator, "user_profile_description", "")
-            print(f"Persona: {persona_desc}")
+        # print("\n[TEST SIMULATORS INFO]")
+        # for i, simulator in enumerate(test_simulators):
+        #     print(f"Simulator {i}: {simulator}")
+        #     persona_desc = getattr(simulator, "user_profile_description", "")
+        #     print(f"Persona: {persona_desc}")
         
-        print("Length test_cases: ", len(test_cases))
+        # print("Length test_cases: ", len(test_cases))
 
 
         # test_target_items = test_target_items
@@ -163,13 +163,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             test_simulators = [single_simulator for _ in range(len(test_cases))]
 
         # debug
-        # print("\n[TEST SIMULATORS INFO]")
-        # for i, simulator in enumerate(test_simulators):
-        #     print(f"Simulator {i}: {simulator}")
-        #     persona_desc = getattr(simulator, "user_profile_description", "")
-        #     print(f"Persona: {persona_desc}")
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
         
-        # print("Length test_cases: ", len(test_cases))
+        print("Length test_cases: ", len(test_cases))
 
         # make sure there is no gradient-relevant computation
         with torch.no_grad():
