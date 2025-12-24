@@ -135,7 +135,14 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             # test_simulators = random.sample(test_simulators, len(test_target_items))
 
         # use a single persona duplicated across all test cases for simulator analysis
-
+        # debug
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+        
+        print("Length test_cases: ", len(test_cases))
 
 
         # test_target_items = test_target_items
