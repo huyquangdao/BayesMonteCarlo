@@ -156,13 +156,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             test_simulators = [single_simulator for _ in range(len(test_cases))]
 
         # debug
-        print("\n[TEST SIMULATORS INFO]")
-        for i, simulator in enumerate(test_simulators):
-            print(f"Simulator {i}: {simulator}")
-            persona_desc = getattr(simulator, "user_profile_description", "")
-            print(f"Persona: {persona_desc}")
+        # print("\n[TEST SIMULATORS INFO]")
+        # for i, simulator in enumerate(test_simulators):
+        #     print(f"Simulator {i}: {simulator}")
+        #     persona_desc = getattr(simulator, "user_profile_description", "")
+        #     print(f"Persona: {persona_desc}")
         
-        print("Length test_cases: ", len(test_cases))
+        # print("Length test_cases: ", len(test_cases))
 
         # make sure there is no gradient-relevant computation
         with torch.no_grad():
