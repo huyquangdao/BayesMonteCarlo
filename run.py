@@ -483,8 +483,10 @@ if __name__ == '__main__':
                     # dev_simulators=[dev_user_simulators[3]],
                     # test_simulators=[test_user_simulators[3]],
                     # run the pipeline with multiple simulators
-                    dev_simulators=new_dev_user_simulators,
-                    test_simulators=new_test_user_simulators
+                    # dev_simulators=new_dev_user_simulators,
+                    # test_simulators=new_test_user_simulators
+                    dev_simulators=[],
+                    test_simulators=[]
                 )
 
                 # computing the execution time
