@@ -10,8 +10,8 @@ lm_size: 768
 cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
-saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter_high-acceptance
+saved_dir: checkpoints/negotiation/craigslist_bargain/BayesAdaptiveLLMModel
+dpo_adapter_folder: dpo_adapter
 sft_adapter_folder: sft_adapter    
 
 # dpo_adapter_folder: dpo_adapter_openness
@@ -19,25 +19,24 @@ sft_adapter_folder: sft_adapter
 # dpo_adapter_folder: dpo_adapter_extraversion
 # dpo_adapter_folder: dpo_adapter_agreeableness
 # dpo_adapter_folder: dpo_adapter_neuroticism
-# dpo_adapter_folder: dpo_adapter_high-acceptance
-# dpo_adapter_folder: dpo_adapter_low-acceptance
 
 # Training toggles
 run_sft: false
-run_dpo: false
+run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: true
+run_online_eval: false
 run_simulator_analysis: false
 
 # Evaluation flags
-eval_by_sft: false
-eval_by_dpo: true
+# eval_by_sft: false
+# eval_by_dpo: true
 
 # eval_by_sft: true
 # eval_by_dpo: false
 
 #=======================
+
 max_gen_length: 256
 max_gen_tokens: 256
 
@@ -49,13 +48,13 @@ skip_to_dialog_idx: 0
 # SFT hyperparameters (memory-friendly)
 use_lora: true
 batch_size: 2
-gradient_accumulation: 8
-learning_rate: 1e-5
-warmup_ratio: 0.1
-weight_decay: 0.01
+gradient_accumulation: 16
+learning_rate: 2e-5
+warmup_ratio: 0.05
+weight_decay: 0.1
 num_train_epochs: 1
 logging_steps: 10
-save_total_limit: 1
+save_total_limit: 2
 max_grad_norm: 0.3
 max_sequence_length: 1024
 
@@ -67,15 +66,15 @@ gradient_checkpointing: false
 
 # DPO-specific
 dpo_max_length: 1024          # max_length
-max_prompt_length: 768        # max_prompt_length
+max_prompt_length: 512        # max_prompt_length
 
-dpo_train_batch_size: 1             # per_device_train_batch_size / eval_batch_size
+dpo_train_batch_size: 2             # per_device_train_batch_size / eval_batch_size
 dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
-dpo_epochs: 5                 # epochs
+dpo_epochs: 3                 # epochs
 
 dpo_learning_rate: 2e-5       # learning_rate
-dpo_beta: 0.1                 # beta
-dpo_warmup_ratio: 0.06         # warmup_ratio
+dpo_beta: 0.05                 # beta
+dpo_warmup_ratio: 0.03         # warmup_ratio
 
 dpo_gradient_accumulation: 8  # grad_accum
 dpo_max_grad_norm: 2.0        # max_grad_norm
@@ -85,11 +84,11 @@ dpo_lr_scheduler_type: cosine      # lr_scheduler_type
 
 dpo_fp16: false                # use_fp16
 dpo_bf16: true                 # use_bf16
-dpo_loss_type: sigmoid          
+dpo_loss_type: sigmoid         
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_low-acceptance.jsonl"
+preference_pairs_path: "data/neg_data/preference_pairs_llama3.1.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_openness.jsonl"
@@ -97,7 +96,5 @@ preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_low-acceptance.js
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_extraversion.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_agreeableness.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_neuroticism.jsonl"
-# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_high-acceptance.jsonl"
-# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_low-acceptance.jsonl"
 
 

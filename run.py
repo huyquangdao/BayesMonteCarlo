@@ -86,7 +86,7 @@ if __name__ == '__main__':
     # construct a llm pipeline for the game
     logger.warning(f"Creating the LLM pipeline .... [{args['model_type']}]")
     
-    if args['model_type'] in [LLAMA3, QWEN] and not args['is_train']:
+    if args['model_type'] in [LLAMA3, QWEN]:
         llm_pipeline, terminators = create_llm_pipeline(LLM_MODEL_MAPPING[args['model_type']],
                                         EOS_TOKEN_MAPPING[args['model_type']]
                                         )
@@ -141,21 +141,51 @@ if __name__ == '__main__':
         # create the dataset
         dataset = dataset_class(dataset_config)
 
+        simulator_init_kwargs = {
+            "model_type": game_config.model_type,
+            "llm_pipeline": llm_pipeline,
+            "terminators": terminators,
+        }
+
         # creating the user simulators if it does not exists.
         if not os.path.exists(dataset_config.save_dev_simulator_path) or args['overwrite_sim']:
             # generate user profiles
             train_user_profiles, dev_user_profiles, test_user_profiles = dataset.get_user_profiles()
             logger.info("Creating Dev Set User Simulators ......")
             dev_user_simulators = create_user_simulators(game_simulator_class, dev_user_profiles,
-                                                         saved_filed_path=dataset_config.save_dev_simulator_path)
+                                                         saved_filed_path=dataset_config.save_dev_simulator_path,
+                                                         **simulator_init_kwargs)
             logger.info("Creating Test User Simulators .....")
             test_user_simulators = create_user_simulators(game_simulator_class, test_user_profiles,
-                                                          saved_filed_path=dataset_config.save_test_simulator_path)
+                                                          saved_filed_path=dataset_config.save_test_simulator_path,
+                                                          **simulator_init_kwargs)
         # load the user simulators from file
         else:
             # load the simulator from files
             dev_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_dev_simulator_path)
             test_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_test_simulator_path)
+
+
+        # Analysis of the user simulators in Bayes-Monte Carlo setting
+        if args['analysis_bayes_monte_carlo']:
+            if not os.path.exists(dataset_config.save_dev_simulator_analysis_path) or args['overwrite_sim_analysis']:
+                # generate user profiles
+                train_user_profiles, dev_user_profiles, test_user_profiles = dataset.get_user_profiles_analysis()
+                logger.info("Creating Dev Set User Simulators Analysis ......")
+                dev_user_simulators = create_user_simulators(game_simulator_class, dev_user_profiles,
+                                                                saved_filed_path=dataset_config.save_dev_simulator_analysis_path,
+                                                                **simulator_init_kwargs)
+                logger.info("Creating Test User Simulators Analysis .....")
+                test_user_simulators = create_user_simulators(game_simulator_class, test_user_profiles,
+                                                                saved_filed_path=dataset_config.save_test_simulator_analysis_path,
+                                                                **simulator_init_kwargs)
+            else:
+                # load the simulator from files
+                dev_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_dev_simulator_analysis_path)
+                test_user_simulators = load_user_simulators(simulator_file_path=dataset_config.save_test_simulator_analysis_path)
+        else:
+            pass
+
 
         # setting the model type and the flag of using persona
         # according to the model type in the game config class.
@@ -450,8 +480,8 @@ if __name__ == '__main__':
                 # load user simulators for rl training and online evaluation
                 pipeline.set_user_simulators(
                     # run the pipeline with 1 simulators
-                    # dev_simulators=[dev_user_simulators[0]],
-                    # test_simulators=[test_user_simulators[0]],
+                    # dev_simulators=[dev_user_simulators[3]],
+                    # test_simulators=[test_user_simulators[3]],
                     # run the pipeline with multiple simulators
                     dev_simulators=new_dev_user_simulators,
                     test_simulators=new_test_user_simulators

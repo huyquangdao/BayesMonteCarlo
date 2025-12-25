@@ -8,7 +8,7 @@ from nltk.translate.bleu_score import sentence_bleu
 from base.metric import Metric
 
 from rouge import Rouge
-from config.constants import SUCCESS_RATE, AVG_TURN, SL_RATIO, FAIRNESS, TOXICITY, ITEM_FREQ, USER_REWARD, TOTAL_REWARD
+from config.constants import SUCCESS_RATE, AVG_TURN, SL_RATIO, FAIRNESS, TOXICITY, ITEM_FREQ, USER_REWARD, TOTAL_REWARD, MAX_EPI_REWARD
 
 
 def _cal_rouge(hypothesis, reference):
@@ -319,6 +319,22 @@ class Total_Reward(OnlineMetric):
         for result in results:
             total_reward += result[TOTAL_REWARD]
         return total_reward / len(results)
+
+class Max_Epi_Reward(OnlineMetric):
+
+    def compute(self, results):
+        """
+        method that computes the mean of max episode reward across conversations
+        """
+        max_reward = 0.0
+        valid_count = 0
+        for result in results:
+            if MAX_EPI_REWARD in result:
+                max_reward += result[MAX_EPI_REWARD]
+                valid_count += 1
+        if valid_count == 0:
+            return 0.0
+        return max_reward / valid_count
 
 
 class WordF1(OfflineMetric):

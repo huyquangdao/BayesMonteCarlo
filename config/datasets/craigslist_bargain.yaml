@@ -11,6 +11,8 @@ log: true
 save_goal_path: data/neg_data/craigslist/goal.pkl
 save_dev_simulator_path: data/neg_data/craigslist/dev_sim.pkl
 save_test_simulator_path: data/neg_data/craigslist/test_sim.pkl
+save_dev_simulator_analysis_path: data/neg_data/craigslist/dev_sim_analysis.pkl
+save_test_simulator_analysis_path: data/neg_data/craigslist/test_sim_analysis.pkl
 save_action: false
 load_action: true
 save_train_convs: true

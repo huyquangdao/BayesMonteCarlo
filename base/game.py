@@ -907,7 +907,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                                                              terminators = self.game_config.terminators
                                                              )
 
-        logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
+        # logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
 
         deals = []
         rewards = []
@@ -934,7 +934,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 reward = max(set(rewards), key = rewards.count)
     
         if reward >= self.game_config.epsilon:
-            logger.info('--> Goal completed !')
+            # logger.info('--> Goal completed !')
             done = 1
         else:
             if len(state['dialogue_context']) == self.game_config.max_horizon:
@@ -945,7 +945,7 @@ class SingleObjectiveNegotiationGame(NegotiationGame):
                 # logger.info('The conversation is on-going !')
                 pass
             
-        logger.debug("SingleNeg reward: {:.4f}", reward)
+        # logger.debug("SingleNeg reward: {:.4f}", reward)
         return reward, done, done
 
 
@@ -1185,8 +1185,7 @@ class PersuationGame(Game):
         prefix = f"[{' | '.join(context_labels)}] " if context_labels else ""
         self._log_line(f"{prefix}SYSTEM_PROMPT:\n{self._format_prompt(res_state['dialogue_context'])}")
 
-        # we're using categorical action
-        # then we need to generate an natural language utterance using the input action
+        # prefer generating a natural utterance whenever a generation model is available
         if not self.game_config.is_utterance_based_action:
             system_response = generation_model.generate_response(res_state,
                                                                 llm_pipeline = self.game_config.llm_pipeline, 

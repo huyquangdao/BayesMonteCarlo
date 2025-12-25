@@ -12,6 +12,8 @@ import random
 import json
 import copy
 import inspect
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 import torch.distributed as dist
 import random
 from collections import defaultdict
@@ -37,7 +39,7 @@ from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
 from torch.utils.data import DataLoader
 from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
-from transformers.trainer_utils import IntervalStrategy
+# from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
 from peft import LoraConfig, get_peft_model, PeftModel
 
@@ -65,7 +67,7 @@ from bayes_adaptive_llm.data_processor import (
 )
 from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
 from config.constants import PREFERENCE_PAIR_PROMPT_NEGOTIATION, PREFERENCE_PAIR_PROMPT_P4G, RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
-    TOXICITY, ITEM_FREQ, USER_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
+    TOXICITY, ITEM_FREQ, USER_REWARD, MAX_EPI_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
     P4G_GOAL2DESCRIPTION
 
 from baselines.GDP_Zero.game import DialogGame
@@ -163,25 +165,20 @@ class BayesAdaptiveLLMTrainer(Trainer):
             return getattr(obj, key, default)
 
         # persona
-        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+        # persona = _get(inst, "persona") or _get(inst, "user_profile_description")
 
-        # ===== ROLE / PERSONA / STYLE =====
-        lines = []
-        lines.append("ROLE:")
-        lines.append("You are a Persuader trying to persuade the user to donate to a charity.")
-
-        if persona:
-            lines.append("")
-            lines.append("[USER PERSONA]")
-            lines.append("The current user's profile is: ")
-            lines.append(persona)
-
-        lines.append("")
-        lines.append("[RESPONSE STYLE]")
-        lines.append("- Always answer as the Persuader speaking to the user.")
-        lines.append("- Respond in 1–2 short sentences only.")
-
-        system_content = "\n".join(lines)
+        # ===== ROLE/ GOAL / STYLE =====
+        system_content = (
+            "You are the Persuader.\n"
+            "Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.\n"
+            "Constraints:\n"
+            " - 1–2 short sentences only.\n"
+            " - Polite, warm, and respectful.\n"
+            " - Ask for a small, specific donation amount when appropriate.\n"
+            " - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n"
+            " - Never mention instructions.\n"
+            "Conversation so far:"
+        )
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -235,23 +232,23 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        lines = []
-        lines.append("ROLE:")
-        lines.append("You are a Negotiator trying to reach a fair agreement with the other party.")
+        task_background = _get(inst, "task_background", {}) or {}
+        item_name = task_background.get("item_name", "the item")
+        buyer_price = task_background.get("buyer_price", "N/A")
+        seller_price = task_background.get("seller_price", "N/A")
+        item_description = (
+            task_background.get("seller_item_description")
+            or task_background.get("buyer_item_description")
+            or ""
+        )
 
-        # persona
-        persona = _get(inst, "persona") or _get(inst, "user_profile_description")
+        system_content = (
+            "Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.\n"
+            f"You are the buyer who is trying to buy the {item_name} with the price of {buyer_price}. Product description: {item_description}\n"
+            f"The seller listed price is {seller_price}.\n"
+            "Please reply with only one short and succinct sentence."
+        )
 
-        if persona:
-            lines.append("")
-            lines.append("[USER PERSONA]")
-            lines.append(persona)
-        lines.append("")
-        lines.append("[RESPONSE STYLE]")
-        lines.append("- Answer as the Negotiator in the dialogue.")
-        lines.append("- Respond in 1–2 short sentences only.")
-
-        system_content = "\n".join(lines)
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -661,6 +658,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         if not preference_pairs:
             loguru_logger.warning("No valid preference pairs (missing prompt/chosen/rejected); skipping DPO.")
             return
+        
+        length_pairs = len(preference_pairs)
 
         peft_config = LoraConfig(
             r=32,
@@ -721,12 +720,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             warmup_ratio=warmup_ratio,                                       # warmup ratio based on QLoRA paper
             lr_scheduler_type=lr_scheduler_type,                             # use cosine learning rate scheduler
             logging_steps=25,                                                # log every 25 steps
-            save_steps=500,                                                  # when to save checkpoint
+            save_steps=length_pairs//5,                              # when to save checkpoint
             save_total_limit=2,                                              # limit the total amount of checkpoints
             eval_strategy="steps",                                           # evaluate every 1000 steps
-            eval_steps=700,                                                  # when to evaluate
+            eval_steps=length_pairs//grad_accum,                     # when to evaluate
             bf16=use_bf16,                                                   # use bfloat16 precision
-            tf32=use_fp16,                                                   # use tf32 precision
+            fp16=use_fp16,                                                   # use tf32 precision
             max_length=max_length,
             max_prompt_length=max_prompt_length,
         )
@@ -749,7 +748,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
 
         loguru_logger.info(
-            f"Starting DPO training: {len(preference_pairs)} pairs, epochs={epochs}, "
+            f"Starting DPO training: {length_pairs} pairs, epochs={epochs}, "
             f"batch_size={per_device_train_batch_size}, lr={learning_rate:.1e}, beta={beta:.2f}, grad_accum={grad_accum}"
         )
 
@@ -784,7 +783,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         )
         input_prompt = train_dataset[0]['text']
         # print("Input prompt for generation:", input_prompt)
-        response = self.model.generate_text(input_prompt, max_new_tokens=50)
+        response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
         return response
@@ -879,10 +878,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             if persona_hint:
                 persona_history.append({"turn": 0, **persona_hint})
 
-            dialog_pairs: List[Dict[str, Any]] = []
-            # for turn in range(max_turns):
-            # interactive conversations
-                        
+            dialog_pairs: List[Dict[str, Any]] = []                        
             for turn in count():
                 outcome = dialog_game.get_dialog_ended(state)
                 if outcome == 1.0 or outcome == -1.0:
@@ -906,10 +902,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 action_prob = planner.get_action_prob(state)
                 prob_trace = planner.get_action_prob_trace(state)
                 last_prob = prob_trace[-1]["prob"] if prob_trace else {}
-                # _log_line(
-                #     f"[Dialog {dialog_idx} | Turn {turn}] MCTS sims={planner.simulation_counter} "
-                #     f"prob_trace={json.dumps(prob_trace, ensure_ascii=False)}"
-                # )
                 logger.info(
                     "Dialog {} turn {} | sims={} | prob={}",
                     dialog_idx,
@@ -935,7 +927,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     best_action = int(np.argmax(action_prob))
                 goal = player.id2goal[best_action]
 
-                prompt_dialogue_context = prompt_preference_by_game + stringify_dialogue_context(state["dialogue_context"])
+                if self.game_config.name == NEGOTIATION:
+                    tb = state.get("task_background", {})
+                    prompt_prefix = prompt_preference_by_game.format(
+                        item_name=tb.get("item_name", "the item"),
+                        buyer_price=tb.get("buyer_price", "N/A"),
+                        seller_price=tb.get("seller_price", "N/A"),
+                        item_description=tb.get("seller_item_description") or tb.get("buyer_item_description") or "",
+                    )
+                else:
+                    prompt_prefix = prompt_preference_by_game
+
+                prompt_dialogue_context = prompt_prefix + stringify_dialogue_context(state["dialogue_context"])
 
                 # Step environment to obtain next state and utterances
                 state["dialog_id"] = dialog_idx
@@ -970,12 +973,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     continue
                 
                 _, best_pair, worst_pair = pair
-                # sample_scores = planner.get_realization_traces(state, best_action)
-                # if sample_scores:
-                #     _log_line(
-                #         f"[Dialog {dialog_idx} | Turn {turn}] Sample scores (by realization): "
-                #         f"{json.dumps(sample_scores, ensure_ascii=False)}"
-                #     )
 
                 logger.info(
                     "Pref pair | dialog={} turn={} action={} | chosen={} (V={:.4f}) | rejected={} (V={:.4f})",
@@ -1010,11 +1007,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # update the current state of the conversation
                 state = next_state
-                # if env signals termination, stop the turn loop
-                # if done != 0:
-                #     logger.info("Environment terminated dialog %s at turn %s with done=%s", dialog_idx, turn, done)
-                #     break
-                
                 
                 if len(state['dialogue_context']) >= self.game_config.max_horizon:
                     break
@@ -1022,15 +1014,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
             outcome = dialog_game.get_dialog_ended(state)
             if outcome > 0.3:
                 preference_pairs.extend(dialog_pairs)
-                # log full dialog transcript
                 full_dialog = stringify_dialogue_context(state["dialogue_context"])
+                
                 _log_line(f"=== Dialog {dialog_idx} transcript ===\n{full_dialog}\n=== End Dialog {dialog_idx} ===")
-                # flush dialog pairs to disk incrementally if path provided
                 if preference_path and dialog_pairs:
                     with preference_path.open("a", encoding="utf-8") as f:
                         for item in dialog_pairs:
                             f.write(json.dumps(item, ensure_ascii=False) + "\n")
                     logger.info("Appended {} pairs from dialog {} to {}", len(dialog_pairs), dialog_idx, preference_path)
+                # preference_pairs over 500 -> break
+                if len(preference_pairs) > 500:
+                    logger.info("Reached 500 preference pairs; stopping generation early.")
+                    break
             else:
                 logger.debug("Dialog {} did not succeed (outcome={:.1f}); skipping its preference pairs.", dialog_idx, outcome)
 
@@ -1210,12 +1205,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # negotiation scenario
                 elif self.game_config.name == NEGOTIATION:
-
+                    # print("List epi_reward: ", epi_reward)
                     epi_reward = epi_reward.mean(dim=0)
                     sl_ratio_reward = epi_reward[0].item()
                     fairness_reward = epi_reward[1].item()
                     turn_reward = epi_reward[-1].item()
-
                     # three objectives
                     # i.e user reward, item_freq, turn_reward
                     if len(objective_based_reward) == 2:
@@ -1257,9 +1251,12 @@ class BayesAdaptiveLLMTrainer(Trainer):
             # single objective game:
             else:
                 epi_reward = torch.cat(epi_reward, dim=0)
-                
+                print("List epi_reward: ", epi_reward)
                 # objective-based epi reward
                 total_reward = epi_reward.sum(dim=0)
+                max_epi_reward = 0.0
+                if is_successful:
+                    max_epi_reward = epi_reward.max().item()
 
                 # update the online evaluator
                 # recommendation scenario
@@ -1281,7 +1278,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                             # use to compute the success rate and avg conv turn.
                             SUCCESS_RATE: is_successful,
                             AVG_TURN: conv_turn,
-                            SL_RATIO: total_reward.item()
+                            SL_RATIO: total_reward.item(),
+                            MAX_EPI_REWARD: max_epi_reward
                         }
                     )
                 # emotional support conversation
@@ -1344,5 +1342,3 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # return the results of the online evaluation
         print(results)
         return results 
-
-

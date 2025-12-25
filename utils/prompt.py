@@ -272,7 +272,7 @@ def get_llm_based_assessment_for_recommendation(target_topic,
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            responses.append(response.choices[0]['message']['content'])
+            responses.append(_get_message_content(response.choices[0]) or "")
     # calling the llama 3
     else:
         no_think = "/no_think" if model_type == QWEN else ""
@@ -369,7 +369,7 @@ def get_llm_based_assessment_for_negotiation(simulated_conversation,
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            responses.append(response.choices[0]['message']['content'])
+            responses.append(_get_message_content(response.choices[0]) or "")
     else:
         no_think = "/no_think" if model_type == QWEN else ""
         for p in messages:
@@ -440,7 +440,7 @@ def get_llm_based_assessment_for_emotional_support(state,
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            responses.append(response.choices[0]['message']['content'])
+            responses.append(_get_message_content(response.choices[0]) or "")
     # calling the llama 3
     else:
         no_think = "/no_think" if model_type == QWEN else ""
@@ -513,7 +513,7 @@ def get_llm_based_assessment_for_persuation(state,
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            responses.append(response.choices[0]['message']['content'])
+            responses.append(_get_message_content(response.choices[0]) or "")
     # calling the llama 3
     else:
         no_think = "/no_think" if model_type == QWEN else ""

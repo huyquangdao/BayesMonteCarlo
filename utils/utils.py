@@ -176,7 +176,7 @@ from baselines.GDP_Zero.pipeline import GDPZeroPipelineForNegotiation, GDPZeroPi
 
 # metrics for evaluation
 from eval.metric import Accuracy, PrecisionRecallF1, Item_Freq, SR, OfflineMetric, OnlineMetric, DistN, AverageTurn, \
-    RougeN, BleuN, Fairness, SL_Ratio, Toxicity, User_Reward, Total_Reward
+    RougeN, BleuN, Fairness, SL_Ratio, Toxicity, User_Reward, Total_Reward, Max_Epi_Reward
 
 # user simulators
 from simulator.rec_simulator import RecommendationSimulator
@@ -238,6 +238,10 @@ def parse_args():
     parser.add_argument("--gen_models", type=str, default='bart', help="names of models")
     parser.add_argument("--metrics", type=str, help="names of metrics")
     parser.add_argument('--overwrite_sim', action='store_true', help='if we overwrite the saved user simulators')
+    # arguments for user simulator analysis
+    parser.add_argument('--overwrite_sim_analysis', action='store_true', help='if we overwrite the saved user simulator analyses')
+    parser.add_argument('--analysis_bayes_monte_carlo', action='store_true', help='if we are analyzing the Bayes-Monte Carlo setting')
+    #--------------------------------------------
     parser.add_argument('--is_train', action='store_true', default=False, help='if we are in the training phase')
     
     # arguments fro recommendation training
@@ -689,6 +693,13 @@ def get_model_by_names(scenario, model_names):
             #     PromptRefinerPipelineForNegotiation,
             #     PromptRefinerTrainer
             # ]     
+            BAYES_ADAPTIVE: [
+                BAYES_CONFIG_PATH_FOR_NEGOTIATION,
+                BayesAdaptiveConfigForNegotiation,
+                BayesAdaptiveLLMModel,
+                BayesAdaptiveLLMPipeline,
+                BayesAdaptiveLLMTrainer
+            ],
         }
 
         # collect model packages
@@ -936,6 +947,7 @@ def get_metrics_by_names(scenario, metric_names):
             SUCCESS_RATE: SR(),
             SL_RATIO: SL_Ratio(),
             FAIRNESS: Fairness(),
+            MAX_EPI_REWARD: Max_Epi_Reward(),
             AVG_TURN: AverageTurn()
         }
 
@@ -1364,12 +1376,13 @@ def get_text_generation_model_by_name(scenario, names):
         raise Exception('Invalid Scenario ......')
 
 
-def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None):
+def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None, **sim_kwargs):
     """
     function that create a set of user simulators by using given user profiles and scenario name
     :param simulator_class: the class of the user simulator
     :param user_profiles: list contain user profiles
     :param saved_filed_path: Saved file path
+    :param sim_kwargs: optional kwargs passed to the simulator constructor (e.g., model_type, llm_pipeline)
     :return: a list of instances of simulators
     """
     # create a set of simulators
@@ -1377,7 +1390,7 @@ def create_user_simulators(simulator_class, user_profiles, saved_filed_path=None
 
     # create a set of simulator based on sampled dev user profiles
     for profile in tqdm(user_profiles):
-        simulator = simulator_class(profile)
+        simulator = simulator_class(profile, **sim_kwargs)
         user_simulators.append(simulator)
 
     # save the user simulators to file

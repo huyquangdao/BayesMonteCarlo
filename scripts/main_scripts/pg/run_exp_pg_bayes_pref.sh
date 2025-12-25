@@ -5,14 +5,16 @@
 
 EXPNAME="P4G_BAYES_PREF"
 
-for seed in 1
+for seed in 42
 do
 # NCCL_IB_DISABLE="1"
 # NCCL_P2P_DISABLE="1"
 # NCCL_ASYNC_ERROR_HANDLING=1
-# RANK=0 WORLD_SIZE=1
-#if train phase is needed, add --is_train
-CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 8081 --gpu_ids 3 --num_processes 1 run.py \
+
+#if analysis_bayes_monte_carlo phase is needed, add --analysis_bayes_monte_carlo
+# ONLY add --is_utterance_based_action at evaluation stage
+# CUDA_VISIBLE_DEVICES=7 
+  accelerate launch --main_process_port 8081 --gpu_ids 5 --num_processes 1 run.py \
   --exp_name "${EXPNAME}" \
   --project_name ProactiveLLM \
   --seed "${seed}" \
@@ -23,9 +25,9 @@ CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 8081 --gpu_ids 3 --
   --models bayes_adaptive_llm \
   --gen_models llama3 \
   --model_type llama3 \
-  --is_so_game \
   --use_persona \
   --is_utterance_based_action \
+  --is_so_game \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 

@@ -23,7 +23,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
     def load_pretrained_model(self, model_dir, is_rl: bool = False) -> None:
         if model_dir is None:
-            pass  # use the initialized model
+            print("Load base model")
+            return  # use the initialized model
 
         print(f"[LOAD] >>> Requested to load pretrained model from: {model_dir}")
         print(f"[LOAD] >>> is_rl = {is_rl}")
@@ -58,7 +59,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
-            self.load_pretrained_model(is_rl=False)
+            model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
+            self.load_pretrained_model(model_dir=model_dir, is_rl=False)
             logger.info("Generating preference pairs with MCTS loop ...")
             preference_pairs = self.generate_preference_data()
 
@@ -80,6 +82,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         if getattr(self.model_config, "run_online_eval", False):
             logger.info("Online evaluation ...")
+            model_dir=None
             if getattr(self.model_config, "eval_by_sft", False):
                 model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
             elif getattr(self.model_config, "eval_by_dpo", False):
@@ -131,6 +134,17 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
 
+        # use a single persona duplicated across all test cases for simulator analysis
+        # debug
+        # print("\n[TEST SIMULATORS INFO]")
+        # for i, simulator in enumerate(test_simulators):
+        #     print(f"Simulator {i}: {simulator}")
+        #     persona_desc = getattr(simulator, "user_profile_description", "")
+        #     print(f"Persona: {persona_desc}")
+        
+        # print("Length test_cases: ", len(test_cases))
+
+
         # test_target_items = test_target_items
         # construct the goal, topic mapping
         action_mapping = self.dataset.construct_action_mapping(
@@ -143,6 +157,19 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         # please manage the randon seed carefully.
         if len(test_simulators) > len(test_cases):
             test_simulators = random.sample(test_simulators, len(test_cases))
+
+        if getattr(self.model_config, "run_simulator_analysis", False) and len(test_simulators) > 0:
+            single_simulator = random.choice(test_simulators)
+            test_simulators = [single_simulator for _ in range(len(test_cases))]
+
+        # debug
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+        
+        print("Length test_cases: ", len(test_cases))
 
         # make sure there is no gradient-relevant computation
         with torch.no_grad():
@@ -173,13 +200,25 @@ class BayesAdaptiveLLMPipeline(Pipeline):
                                     )
 
         # split the simulators to train and dev simulators
-        train_simulators, dev_simulators = train_test_split(self.dev_simulators,
-                                                            test_size=dev_ratio,
-                                                            random_state=self.game_config.seed
-                                                            )
+        if getattr(self.model_config, "run_simulator_analysis", False):
+            dev_simulators = self.dev_simulators
+        else:
+            train_simulators, dev_simulators = train_test_split(self.dev_simulators,
+                                                                test_size=dev_ratio,
+                                                                random_state=self.game_config.seed
+                                                                )
 
         action_mapping = self.dataset.construct_action_mapping(combine=self.model_config.combined_action)
 
+        # print all info of dev_simulators for debug
+        print("\n[DEV SIMULATORS INFO]")
+        for i, simulator in enumerate(dev_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+
+
+        
 
         preference_pairs = self.trainer.generate_preference_pairs_with_mcts(
                                                                             train_cases,

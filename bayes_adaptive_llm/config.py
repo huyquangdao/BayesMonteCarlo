@@ -22,60 +22,60 @@ class BayesAdaptiveConfig(ModelConfig):
     dropout = 0.1
 
     # training flow toggles
-    run_sft = True
-    run_preference_search = False  # generate preference pairs via MCTS loop
-    run_dpo = False
-    run_offline_eval = False
-    run_online_eval = False
+    # run_sft = True
+    # run_preference_search = False  # generate preference pairs via MCTS loop
+    # run_dpo = False
+    # run_offline_eval = False
+    # run_online_eval = False
 
-    # preference data
-    preference_pairs_path = None
+    # # preference data
+    # preference_pairs_path = None
 
-    # optimisation
-    batch_size = 4
-    gradient_accumulation = 1
-    learning_rate = 5e-5
-    warmup_ratio = 0.05
-    weight_decay = 0.01
-    num_train_epochs = 3
-    logging_steps = 10
-    save_total_limit = 2
-    max_grad_norm = 1.0
-    optim = "adamw_torch"
-    fp16 = False
-    bf16 = True
-    save_hf_checkpoint = True
-    hf_checkpoint_subdir = "hf_checkpoint"
+    # # optimisation
+    # batch_size = 4
+    # gradient_accumulation = 1
+    # learning_rate = 5e-5
+    # warmup_ratio = 0.05
+    # weight_decay = 0.01
+    # num_train_epochs = 3
+    # logging_steps = 10
+    # save_total_limit = 2
+    # max_grad_norm = 1.0
+    # optim = "adamw_torch"
+    # fp16 = False
+    # bf16 = True
+    # save_hf_checkpoint = True
+    # hf_checkpoint_subdir = "hf_checkpoint"
 
-    # inference / prompting
-    temperature = 0.7
-    max_gen_tokens = 256
-    max_sequence_length = 1024
+    # # inference / prompting
+    # temperature = 0.7
+    # max_gen_tokens = 256
+    # max_sequence_length = 1024
 
-    # DPO-related knobs
-    dpo_beta = 0.1
-    dpo_model_path = "roberta-large"
-    dpo_use_sft_checkpoint = True
-    dpo_adapter_path = None
-    dpo_epochs = 3
-    dpo_batch_size = 2
-    dpo_learning_rate = 1e-5
-    dpo_max_length = 512
-    dpo_use_wandb = False
-    dpo_weight_decay = 0.01
-    dpo_warmup_ratio = 0.1
-    dpo_fp16 = False
-    dpo_bf16 = False
-    dpo_optim = "adamw_torch"   
-    dpo_gradient_accumulation = 4
-    max_length = None
-    max_prompt_length = None
-    gradient_checkpointing = False
-    reference_model = None
-    output_dir = None
+    # # DPO-related knobs
+    # dpo_beta = 0.1
+    # dpo_model_path = "roberta-large"
+    # dpo_use_sft_checkpoint = True
+    # dpo_adapter_path = None
+    # dpo_epochs = 3
+    # dpo_batch_size = 2
+    # dpo_learning_rate = 1e-5
+    # dpo_max_length = 512
+    # dpo_use_wandb = False
+    # dpo_weight_decay = 0.01
+    # dpo_warmup_ratio = 0.1
+    # dpo_fp16 = False
+    # dpo_bf16 = False
+    # dpo_optim = "adamw_torch"   
+    # dpo_gradient_accumulation = 4
+    # max_length = None
+    # max_prompt_length = None
+    # gradient_checkpointing = False
+    # reference_model = None
+    # output_dir = None
 
 
-    top_k_preferences = 1  
+    # top_k_preferences = 1  
 
     def __init__(self, params):
         super().__init__()
@@ -92,10 +92,21 @@ class BayesAdaptiveConfigForRecommendation(BayesAdaptiveConfig):
 
 
 class BayesAdaptiveConfigForNegotiation(BayesAdaptiveConfig):
-    combined_action = True
-    special_tokens_dict = neg_special_tokens_dict
-    n_goals = 14
+    epsilon = 1.0
+    num_mcts_sims = 20
+    max_realizations = 3
+    max_turns = 12
     n_topics = 5
+    combined_action = False
+    prompt = """
+    You are an expert in price bargain.
+    Now give you a conversation history between a buyer and a seller, you need to infer the mental states
+    and future actions of the seller.
+    """
+    cot_prompt = """
+    The following is the conversation history: {}
+    Question: What are the mental states and future actions of the seller.? Answer:
+    """
 
 
 class BayesAdaptiveConfigForEmotionalSupport(BayesAdaptiveConfig):
@@ -112,45 +123,14 @@ class BayesAdaptiveConfigForPersuation(BayesAdaptiveConfig):
     max_realizations = 3
     max_turns = 12
     combined_action = False
-    special_tokens_dict = pg_special_tokens_dict
-    temperature = 0.5
-    # prompt for user-aware strategic planning for persuation
+
     prompt = """
-    Context:
-    - Save the Children is a global charity that provides safety, nutrition, education, and emergency relief for vulnerable children.
-    - Donations of any size (as little as $1 or $2) can meaningfully improve children’s lives in developing regions and crisis zones.
-
-    Role:
-    - You are the Persuadee. The Persuader is trying to convince you to donate to Save the Children.
-
-    Guidelines:
-    1. Evaluate each request objectively and ask for clarification when details are unclear.
-    2. Think about how the Persuader’s message resonates with your values and priorities before deciding what feels right for you.
-    3. Respond politely, using complete sentences that add substance to the conversation (never empty or meaningless).
-    4. Always respond in the format `[dialog_act] utterance`, where `dialog_act` is one of the allowed persuadee acts.
-    5. Choose the dialog act that best reflects your genuine reaction; take action `[donate]` only when sufficiently convinced.
+    You are an expert in charity donation persuation.
+    Now give you a conversation history between a persuader and a persuadee, you need to infer the mental states
+    and future actions of the persuadee.
     """
     cot_prompt = """
     The following is the conversation history: {}
     Question: What are the mental states and future actions of the persuadee.? Answer:
-    """
-    
-    # chain of thought prompting
-    rewrite_prompt = """
-    Assume you are the expert analyst. Given the conversation history and a naive action instruction, 
-    in order to convince the persuadee to donate for charity, please revise the following naive action instruction appropriately.
-    Do not modify the action instruction entirely.
-    You answer should be in the following format: "Answer: X"
-    """
-    rewrite_prompt_cot = """
-    {}
-    Do not modify the action instruction entirely.
-    The following is the conversation history: {}
-    Here is the naive action instruction: {}
-    Question: What are the rewritten action instruction ? Answer:
-    """
-        
-    """
-    class TRIP configuration for emotional support scenario
     """
     pass

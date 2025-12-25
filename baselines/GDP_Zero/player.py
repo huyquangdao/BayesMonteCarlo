@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import time
 
 from typing import List, Tuple
 import re
@@ -173,6 +174,74 @@ class LLMPlayer(DialogPlanner):
         """
         return np.array([1 for _ in self.goal2id.keys()])
 
+    def compute_reward(self, state):
+        """
+        method that compute the reward for each step in a negotiation scenario
+        :param state: the current state of the conversation
+        :param action: the predicted goal at the current turn
+        :param system_response: the generated system response
+        :param profile_description: the user profile description
+        :param eps:
+        :return:
+        """
+        # if isinstance(action, tuple):
+        #     action = action[0]
+
+        # goal = action
+        done = 0
+        
+        # compute the llm-basd assessment
+        t = time.time()
+        responses = get_llm_based_assessment_for_negotiation(simulated_conversation=state['dialogue_context'],
+                                                             n=self.game_config.n,
+                                                             temperature=1.1,
+                                                             model_type=self.model_type,
+                                                             max_tokens=15,
+                                                             llm_pipeline = self.game_config.llm_pipeline, 
+                                                             terminators = self.game_config.terminators
+                                                             )
+
+        # logger.debug("SingleNeg assessment latency={:.3f}s responses={}", time.time() - t, responses)
+
+        deals = []
+        rewards = []
+
+        for output in responses:
+            if 'have not' in output.lower():
+                deals.append(-1)
+            elif 'have reached' in output.lower():
+                deals.append(1)
+            
+            prices = re.findall(r"[-+]?\d*\.?\d+", output.replace(",",""))
+            if len(prices) > 0:
+                deal_price = float(prices[0])
+                reward = (deal_price - state['task_background']['seller_price']) / (state['task_background']['buyer_price'] - state['task_background']['seller_price'])
+                rewards.append(reward)
+                
+        # post processing the reward
+        if -1 in deals:
+            reward = -0.1
+        else:     
+            if len(rewards) == 0:
+                reward = 0
+            else:
+                reward = max(set(rewards), key = rewards.count)
+    
+        if reward >= self.game_config.epsilon:
+            # logger.info('--> Goal completed !')
+            done = 1
+        else:
+            if len(state['dialogue_context']) == self.game_config.max_horizon:
+                logger.info('Maximum number of turns reached !')
+                # failed case
+                # done = -1
+            else:
+                # logger.info('The conversation is on-going !')
+                pass
+            
+        # logger.debug("SingleNeg reward: {:.4f}", reward)
+        return reward
+
     def heuristics(self, state):
         """
         return the value of the given state
@@ -186,97 +255,100 @@ class LLMPlayer(DialogPlanner):
             return 0.0
 
         if self.game_name == NEGOTIATION:
-            responses = get_llm_based_assessment_for_negotiation(simulated_conversation=simulated_conversation,
-                                                                 n=5,
-                                                                 temperature=1.1,
-                                                                 max_tokens=20,
-                                                                 model_type=self.model_type
-                                                                 )
-
-            deals = []
-            rewards = []
-            
-            # compute fairness score
-            # fairness score should be defined as
-            for response in responses:
-                # compute the neg_sr
-                if 'have not' in response.lower():
-                    # no deal
-                    deals.append(0)
-                elif 'have reached' in response.lower():
-                    # there is a deal
-                    deals.append(1)
-
-                # collect the dealed price
-                # and now we compute the fairness score
-                prices = re.findall(r"[-+]?\d*\.?\d+", response.replace(",", ""))
-                if len(prices) > 0:
-                    deal_price = float(prices[0])
-                    # compute the sale list ratio
-                    reward = (deal_price - state['task_background']['seller_price']) / (
-                            state['task_background']['buyer_price'] - state['task_background']['seller_price'])
-                    rewards.append(reward)
-
-            neg_sr = sum(deals) / len(deals)
-            system_response = simulated_conversation[-2]['content']
-            action = state['pre_goals'][-1]
-
-            system_prices = re.findall(r"[-+]?\d*\.?\d+", system_response.replace(",", ""))
-            # extracting the price proposed by the system
-            
-            if len(system_prices) > 0 and action != "inform":
-                system_price = max(system_prices)
+            if self.game_config.is_so_game:
+               return self.compute_reward(state)
             else:
-                system_price = state['task_background']['seller_price']
+                responses = get_llm_based_assessment_for_negotiation(simulated_conversation=simulated_conversation,
+                                                                    n=5,
+                                                                    temperature=1.1,
+                                                                    max_tokens=20,
+                                                                    model_type=self.model_type
+                                                                    )
 
-            system_price = float(system_price)
-            # encourage the system to gain more benefit
-            # this reward is to encourage the model to propose beneficial price for its self.
-            
-            sl_ratio = (system_price - state['task_background']['seller_price']) / (
-                    state['task_background']['buyer_price'] - state['task_background']['seller_price'])
-
-            # clipping the values
-            # if the ratio is larger than 1 then it is equivalent to 1
-            # otherwise it equals to 0
-            if sl_ratio >= 1.0:
-                sl_ratio = 1.0
+                deals = []
+                rewards = []
                 
-            elif sl_ratio < -1.0:
-                sl_ratio = -1.0
+                # compute fairness score
+                # fairness score should be defined as
+                for response in responses:
+                    # compute the neg_sr
+                    if 'have not' in response.lower():
+                        # no deal
+                        deals.append(0)
+                    elif 'have reached' in response.lower():
+                        # there is a deal
+                        deals.append(1)
 
-            # fairness
-            # we compute the fairness score, which will be larger if the proposed price is close to the middle price
-            # this should be conflicting to the sl_ratio price.
-            mid_price = (state['task_background']['seller_price'] + state['task_background']['buyer_price']) / 2
+                    # collect the dealed price
+                    # and now we compute the fairness score
+                    prices = re.findall(r"[-+]?\d*\.?\d+", response.replace(",", ""))
+                    if len(prices) > 0:
+                        deal_price = float(prices[0])
+                        # compute the sale list ratio
+                        reward = (deal_price - state['task_background']['seller_price']) / (
+                                state['task_background']['buyer_price'] - state['task_background']['seller_price'])
+                        rewards.append(reward)
 
-            # if the system price is equivalent to the mid price
-            # we give the system a high fairness reward
-            fairness = 0.5 - abs(system_price - mid_price) / (
-                    state['task_background']['seller_price'] - state['task_background']['buyer_price'])
+                neg_sr = sum(deals) / len(deals)
+                system_response = simulated_conversation[-2]['content']
+                action = state['pre_goals'][-1]
 
-            # clipping the values
-            # if the fairness is larger than 0.5 then it is equivalent to 0.5
-            # otherwise it equals to 0
-            if fairness >= 0.5:
-                fairness = 0.5
-            elif fairness < -0.5:
-                fairness = -0.5
-            
-            # heuristics value            
-            # scalarization
-            heuristic = 0
-            if SL_RATIO in self.game_config.objectives:
-                heuristic += self.model_config.objective_weight[0] * sl_ratio 
-            # fairness
-            if FAIRNESS in self.game_config.objectives:
-                heuristic += self.model_config.objective_weight[1] * fairness 
-            # SR
-            if SUCCESS_RATE in self.game_config.objectives:
-                heuristic += self.model_config.objective_weight[-1] * neg_sr
+                system_prices = re.findall(r"[-+]?\d*\.?\d+", system_response.replace(",", ""))
+                # extracting the price proposed by the system
                 
-            print(heuristic)
-            return heuristic
+                if len(system_prices) > 0 and action != "inform":
+                    system_price = max(system_prices)
+                else:
+                    system_price = state['task_background']['seller_price']
+
+                system_price = float(system_price)
+                # encourage the system to gain more benefit
+                # this reward is to encourage the model to propose beneficial price for its self.
+                
+                sl_ratio = (system_price - state['task_background']['seller_price']) / (
+                        state['task_background']['buyer_price'] - state['task_background']['seller_price'])
+
+                # clipping the values
+                # if the ratio is larger than 1 then it is equivalent to 1
+                # otherwise it equals to 0
+                if sl_ratio >= 1.0:
+                    sl_ratio = 1.0
+                    
+                elif sl_ratio < -1.0:
+                    sl_ratio = -1.0
+
+                # fairness
+                # we compute the fairness score, which will be larger if the proposed price is close to the middle price
+                # this should be conflicting to the sl_ratio price.
+                mid_price = (state['task_background']['seller_price'] + state['task_background']['buyer_price']) / 2
+
+                # if the system price is equivalent to the mid price
+                # we give the system a high fairness reward
+                fairness = 0.5 - abs(system_price - mid_price) / (
+                        state['task_background']['seller_price'] - state['task_background']['buyer_price'])
+
+                # clipping the values
+                # if the fairness is larger than 0.5 then it is equivalent to 0.5
+                # otherwise it equals to 0
+                if fairness >= 0.5:
+                    fairness = 0.5
+                elif fairness < -0.5:
+                    fairness = -0.5
+                
+                # heuristics value            
+                # scalarization
+                heuristic = 0
+                if SL_RATIO in self.game_config.objectives:
+                    heuristic += self.model_config.objective_weight[0] * sl_ratio 
+                # fairness
+                if FAIRNESS in self.game_config.objectives:
+                    heuristic += self.model_config.objective_weight[1] * fairness 
+                # SR
+                if SUCCESS_RATE in self.game_config.objectives:
+                    heuristic += self.model_config.objective_weight[-1] * neg_sr
+                    
+                print(heuristic)
+                return heuristic
         
         # NOTE: the heuristics for recommendation
         elif self.game_name == RECOMMENDATION:

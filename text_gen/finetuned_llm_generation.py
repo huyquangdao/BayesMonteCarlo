@@ -28,7 +28,7 @@ from base.trainer import Trainer
 from base.torch_dataset import BaseTorchDataset
 from base.data_processor import DataProcessorForGeneration
 
-from config.constants import RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT
+from config.constants import RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, PERSUATION
 from base.model import Model
 
 from loguru import logger as loguru_logger

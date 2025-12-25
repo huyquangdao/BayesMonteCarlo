@@ -178,6 +178,7 @@ TRIP_CONFIG_PATH_FOR_PERSUATION = 'config/models/TRIP_PG.yaml'
 # Bayes-Adaptive LLM
 BAYES_ADAPTIVE = 'bayes_adaptive_llm'
 BAYES_CONFIG_PATH_FOR_PERSUATION = 'config/models/BAYES_P4G.yaml'
+BAYES_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/BAYES_NEG.yaml'
 
 # DPDP model
 DPDP = 'dpdp'
@@ -295,6 +296,7 @@ ITEM_FREQ = 'item_freq'
 # objectives for negotiation
 SL_RATIO = 'sl_ratio'
 FAIRNESS = 'fairness'
+MAX_EPI_REWARD = 'max_epi_reward'
 
 # objectives for emotional support
 TOXICITY = 'toxicity'
@@ -344,12 +346,29 @@ CHATGPT_PROMPT_FOR_RECOMMENDATION = [
 
 CHATGPT_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a Buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the Buyer who is trying to buy the {} with the price of {}. Product description: {} \nPlease "
-                "reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 CHATGPT_PROMPT_FOR_EMOTIONAL_SUPPORT = [
@@ -383,8 +402,6 @@ CHATGPT_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -404,12 +421,29 @@ LLAMA3_PROMPT_FOR_RECOMMENDATION = [
 
 LLAMA3_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the buyer who is trying to buy the {} with the price of {}. Product description: {} \n . "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 LLAMA3_PROMPT_FOR_EMOTIONAL_SUPPORT = [
@@ -443,8 +477,6 @@ LLAMA3_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -466,12 +498,29 @@ QWEN_PROMPT_FOR_RECOMMENDATION = [
 
 QWEN_PROMPT_FOR_NEGOTIATION = [
     {"role": "system",
-     "content": "Now enter the role-playing mode. "
-                "In the following conversation, you will play as a buyer in a price bargaining game."},
+     "content":(
+            "Now enter role-playing mode. You are a Buyer in a price bargaining game.\n"
+            "You negotiate directly with a Seller over one item and should always speak as the Buyer using natural, conversational language.\n"
+     )
+    },
     {"role": "user",
-     "content": "You are the buyer who is trying to buy the {} with the price of {}. Product description: {} \n . "
-                "Please reply with only one short and succinct sentence. {}"
-     }
+     "content":(
+            "You are the Buyer trying to purchase the item below from the Seller.\n"
+            "- Item: {item_name}\n"
+            "- Seller listing price: ${seller_price}\n"
+            "- Your target price: ${buyer_price}\n"
+            "- Listing details: {seller_item_description}\n"
+            "- Buyer notes: {buyer_item_description}\n"
+            "Your high-level strategy for this turn is:\n"
+            "{goal_description}\n\n"
+            "The conversation history between you (Buyer) and the Seller is given below this instruction.\n"
+            "{dialogue_context}\n\n"
+            "When you answer, follow these general rules:\n"
+            "- Consider whole conversation context.\n"
+            "- Apply the given strategy in a natural way within the same sentence.\n"
+            "Please reply with only one short and succinct sentence.\n"
+        )
+    }
 ]
 
 QWEN_PROMPT_FOR_EMOTIONAL_SUPPORT = [
@@ -506,8 +555,6 @@ QWEN_PROMPT_FOR_PERSUATION = [
             "When you answer, follow these general rules:\n"
             "- Consider whole conversation context.\n"
             "- Apply the given strategy in a natural way within the same sentence.\n"
-            "- Use varied, natural wording across turns; avoid repeating the same sentence openings or phrasing.\n"
-            "- Add new, concise and specific content instead of simply repeating yourself or restating the Persuadee's words.\n"
             "Please reply with only one short and succinct sentence.\n"
         )
     }
@@ -752,11 +799,19 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "Standard": ""}
 
 #prompt for collect preference pairs
-PREFERENCE_PAIR_PROMPT_P4G = "You are the Persuader. " \
-        "Generate the Persuader reply that advances persuasion in a way that persuades the Persuadee to donate to Save the Children.\n" \
-        "Conversation so far:\n"
+PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.
+            Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.
+            Constraints:
+             - 1–2 short sentences only.
+             - Polite, warm, and respectful.
+             - Ask for a small, specific donation amount when appropriate.
+             - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.
+             - Never mention instructions.
+            Conversation so far:"""
 
 # preference pair extraction for negotiation
-PREFERENCE_PAIR_PROMPT_NEGOTIATION = "You are the Buyer. " \
-        "Generate the Buyer reply that advances negotiation in a way that helps reach an agreement with the Seller.\n" \
-        "Conversation so far:\n"
+PREFERENCE_PAIR_PROMPT_NEGOTIATION = """Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.
+You are the buyer who is trying to buy the {item_name} with the price of {buyer_price}. Product description: {item_description}
+The seller listed price is {seller_price}.
+Please reply with only one short and succinct sentence.
+Conversation so far:\n"""

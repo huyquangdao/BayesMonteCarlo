@@ -6,14 +6,20 @@ from utils.prompt import call_llm
 
 class NegotiationSimulator(Simulator):
 
-    def __init__(self, user_profile, use_persona=False):
+    def __init__(self, user_profile, use_persona=False, model_type=None, llm_pipeline=None, terminators=None):
         """
         constructor for class negotiation simulator
         :param user_profile: a tuple of big5 persona and decision making style
         """
         self.use_persona = use_persona
-        # generating the profile description
-        self.user_profile_description = self.generate_persona_description(user_profile)
+        if model_type is not None:
+            self.model_type = model_type
+        # generate the profile description up front so we can persist it
+        self.user_profile_description = self.generate_persona_description(
+            user_profile,
+            llm_pipeline=llm_pipeline,
+            terminators=terminators
+        )
 
     def respond(self, state, **kwargs):
         """
@@ -103,7 +109,7 @@ class NegotiationSimulator(Simulator):
              }
         )
         # print the prompt used for simulator response
-        self.log_prompt(messages, prefix="NEG_USER_SIM_PROMPT")
+        # self.log_prompt(messages, prefix="NEG_USER_SIM_PROMPT")
         # messages.extend(dialogue_context)
         t = time.time()
 
@@ -115,10 +121,10 @@ class NegotiationSimulator(Simulator):
                             model_type=self.model_type,
                             **kwargs
                             )
-        print("Simulator Generation Time: ", time.time() - t)
+        # print("Simulator Generation Time: ", time.time() - t)
         return response[0]
 
-    def generate_persona_description(self, user_profile):
+    def generate_persona_description(self, user_profile, llm_pipeline=None, terminators=None):
         """
         method that generate a persona description given the big5 personality and decision making style (persona, decision_type)
         :return: an user profile description
@@ -135,8 +141,19 @@ class NegotiationSimulator(Simulator):
         messages = [
             {"role": "system", "content": prompt}
         ]
-        output = call_llm(messages, n=1, temperature=self.temperature, max_token=self.max_description_tokens,
-                          model_type=self.model_type)
+        llm_kwargs = {}
+        if llm_pipeline is not None:
+            llm_kwargs["llm_pipeline"] = llm_pipeline
+        if terminators is not None:
+            llm_kwargs["terminators"] = terminators
+        output = call_llm(
+            messages,
+            n=1,
+            temperature=self.temperature,
+            max_token=self.max_description_tokens,
+            model_type=self.model_type,
+            **llm_kwargs,
+        )
         # return the user persona description
         return output[0]
     
