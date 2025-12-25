@@ -13,5 +13,6 @@ CUDA_VISIBLE_DEVICES=0 accelerate launch --main_process_port 70 --gpu_ids 0 --nu
         --gen_models llama3 \
         --is_so_game \
         --model_type llama3 \
+        --use_persona \
         --metrics acc,prf1,sr,total_reward,avg_turn,bleu_n,rouge_n,dist_n        
 done

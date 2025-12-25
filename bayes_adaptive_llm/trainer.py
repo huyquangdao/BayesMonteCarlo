@@ -41,6 +41,7 @@ from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
 from peft import LoraConfig, get_peft_model, PeftModel
 
+from trl import DPOConfig, DPOTrainer, SFTConfig, SFTTrainer
 
 try:
     # Some TRL installs can raise RuntimeError if optional deps (e.g., openai) are missing.
