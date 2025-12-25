@@ -59,8 +59,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             self.trainer.train_sft(self.dataset, self.device)
 
         if getattr(self.model_config, "run_preference_search", False):
-            model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
-            self.load_pretrained_model(model_dir=model_dir, is_rl=False)
+            # model_dir = os.path.join(self.model_config.saved_dir, self.model_config.sft_adapter_folder)
+            # self.load_pretrained_model(model_dir=model_dir, is_rl=False)
             logger.info("Generating preference pairs with MCTS loop ...")
             preference_pairs = self.generate_preference_data()
 
