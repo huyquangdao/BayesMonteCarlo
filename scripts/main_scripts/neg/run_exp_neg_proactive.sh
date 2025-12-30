@@ -1,7 +1,7 @@
 EXPNAME="Main"
-for i in 1 2 3
+for i in 42
 do
-CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 3030 --gpu_ids 3 --num_processes 1 run.py  \
+CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 2020 --gpu_ids 2 --num_processes 1 run.py  \
         --exp_name $EXPNAME \
         --project_name ProactiveLLM \
         --seed $i \
@@ -10,9 +10,9 @@ CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 3030 --gpu_ids 3 --
         --loggers terminal,file,wandb \
         --datasets craigslist_bargain \
         --models proactive \
-        --gen_models qwen \
+        --gen_models llama3 \
         --is_so_game \
-        --rewrite_action \
-        --model_type qwen \
+        --use_persona \
+        --model_type llama3 \
         --metrics acc,prf1,sr,sl_ratio,avg_turn,bleu_n,rouge_n,dist_n        
 done

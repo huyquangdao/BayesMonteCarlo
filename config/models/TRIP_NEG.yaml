@@ -15,7 +15,7 @@ max_grad_norm: 5
 run_sft: true
 run_rlt: true
 run_online_eval: true
-run_offline_eval: false
+run_offline_eval: true
 num_train_rl_epochs: 10
 sampled_times: 100
 rl_learning_rate: 0.000001

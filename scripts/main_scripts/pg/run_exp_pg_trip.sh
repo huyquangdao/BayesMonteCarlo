@@ -1,7 +1,7 @@
 EXPNAME="Main"
 for i in 1 2 3
 do
-CUDA_VISIBLE_DEVICES=1 accelerate launch --main_process_port 8080 --gpu_ids 1 --num_processes 1 run.py  \
+CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 76 --gpu_ids 3 --num_processes 1 run.py  \
         --exp_name $EXPNAME \
         --project_name ProactiveLLM \
         --seed $i \
@@ -12,7 +12,8 @@ CUDA_VISIBLE_DEVICES=1 accelerate launch --main_process_port 8080 --gpu_ids 1 --
         --models trip \
         --gen_models llama3 \
         --is_so_game \
-        --num_train_rl_epochs 10 \
+        --use_persona \
+        --num_train_rl_epochs 5 \
         --model_type llama3 \
         --metrics acc,prf1,sr,total_reward,avg_turn
 done
