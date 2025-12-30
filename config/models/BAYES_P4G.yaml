@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter_1k5
+dpo_adapter_folder: dpo_adapter_2k
 sft_adapter_folder: sft_adapter  
 
 # dpo_adapter_folder: dpo_adapter_basemodel
@@ -91,7 +91,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_1k5.jsonl"
+preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_2k.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_basemodel.jsonl"
