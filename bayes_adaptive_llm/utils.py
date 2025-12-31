@@ -197,6 +197,15 @@ def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional
         log.warning("Failed to load persona tokenizer {}: {}", base_model_name, exc)
         return None, None
 
+    target_device_override = getattr(model_config, "persona_sft_device", None)
+    if target_device_override:
+        try:
+            device = torch.device(target_device_override)
+        except Exception:
+            log.warning("Invalid persona_sft_device '{}', fallback to {}", target_device_override, device)
+
+    target_device_map = getattr(model_config, "persona_sft_device_map", None)
+
     def _base_load_kwargs(target_device, force_cpu: bool = False):
         # When forcing CPU, avoid bfloat16 to reduce friction; prefer full precision on CPU.
         kwargs = {
@@ -207,6 +216,10 @@ def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional
             kwargs["device_map"] = {"": "cpu"}
             kwargs["torch_dtype"] = None
         else:
+            if target_device_map:
+                kwargs["device_map"] = target_device_map
+            else:
+                kwargs["device_map"] = {"": target_device} if hasattr(target_device, "type") else target_device
             kwargs["torch_dtype"] = dtype
         return kwargs
 
@@ -231,7 +244,7 @@ def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional
                 **_base_load_kwargs(target_device),
             )
         # Move to target device if not already placed via device_map
-        if hasattr(target_device, "type") and target_device.type != "cpu":
+        if hasattr(target_device, "type") and target_device.type != "cpu" and not target_device_map:
             model_loaded.to(target_device)
         return model_loaded
 
