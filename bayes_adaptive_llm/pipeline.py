@@ -60,6 +60,10 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             logger.info("Running preprocessing step ...")
             self.run_preprocessing()
 
+        if getattr(self.model_config, "run_persona_sft", False):
+            logger.info("Running persona SFT ...")
+            self.run_persona_sft()
+
         if getattr(self.model_config, "run_sft", False):
             logger.info("Running supervised fine-tuning ...")
             self.trainer.train_sft(self.dataset, self.device)
@@ -110,6 +114,12 @@ class BayesAdaptiveLLMPipeline(Pipeline):
 
         output_path = getattr(self.model_config, "preprocessing_output_path", None)
         model_type = getattr(self.game_config, "model_type", "chatgpt")
+
+        # if output already exists and is non-empty, skip work
+        if output_path and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.info("Preprocessing output already exists at {}; skipping.", output_path)
+            return
+
         logger.info("Preprocessing personas from {} -> {}", input_path, output_path or "[auto]")
         processed_path = process_persona_file(
             input_path=input_path,
@@ -119,6 +129,50 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             model_type=model_type,
         )
         logger.info("Preprocessing completed. Output saved to {}", processed_path)
+
+    def run_persona_sft(self):
+        """
+        Run persona inference SFT: preprocess (if needed) and fine-tune on persona labels.
+        """
+        # Determine source for persona preprocessing
+        persona_sft_path = getattr(self.model_config, "persona_sft_input_path", None)
+
+        # If a ready SFT dataset is provided and non-empty, skip all prep
+        if persona_sft_path and os.path.exists(persona_sft_path) and os.path.getsize(persona_sft_path) > 0:
+            logger.info("Found existing persona SFT data at {}; skipping preprocessing/build.", persona_sft_path)
+        else:
+            persona_sft_path = None
+
+        if persona_sft_path is None:
+            preprocess_input = getattr(self.model_config, "persona_preprocessing_input_path", None) or getattr(
+                self.model_config, "preprocessing_input_path", None
+            ) or getattr(self.model_config, "preference_pairs_path", None)
+            if preprocess_input is None:
+                raise ValueError("No persona_preprocessing_input_path/preprocessing_input_path/preference_pairs_path provided for persona SFT.")
+
+            preprocess_output = getattr(self.model_config, "persona_preprocessing_output_path", None)
+            if preprocess_output and os.path.exists(preprocess_output) and os.path.getsize(preprocess_output) > 0:
+                logger.info("Persona preprocessing output already exists at {}; reusing.", preprocess_output)
+                persona_file = preprocess_output
+            else:
+                persona_file = self.trainer.preprocess_persona_file(
+                    input_path=preprocess_input,
+                    output_path=preprocess_output,
+                    model_type=getattr(self.game_config, "model_type", "chatgpt"),
+                )
+
+        persona_sft_output = getattr(self.model_config, "persona_sft_output_path", None)
+        persona_sft_path = self.trainer.build_personality_sft_data(
+            input_path=persona_file,
+            output_path=persona_sft_output,
+            prompt_template=getattr(self.model_config, "persona_prompt_template", None),
+            use_prompt_template=getattr(self.model_config, "persona_sft_use_prompt_template", True),
+            include_text=getattr(self.model_config, "persona_sft_include_text", True),
+            target_key=getattr(self.model_config, "persona_label_key", "personality"),
+        )
+
+        logger.info("Persona SFT using data at {}", persona_sft_path)
+        self.trainer.train_persona_sft(persona_sft_path)
 
     def run_offline_test(self):
         """

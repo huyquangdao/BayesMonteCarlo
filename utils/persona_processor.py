@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from tqdm import tqdm
 
-from config.constants import BIG5_PERSONALITY, DECISION_MAKING_STYLE
+from config.constants import BIG5_PERSONALITY, DECISION_MAKING_STYLE, INFER_PERSONA_PROMPT
 from utils.prompt import call_llm
 
 
@@ -161,5 +161,68 @@ def process_persona_file(
                 fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
             except Exception as e:
                 print(f"[persona_processor] Skipping line {idx} due to error: {e}")
+
+    return str(out_path)
+
+
+def build_personality_sft_data(
+    input_path: str,
+    output_path: Optional[str] = None,
+    prompt_template: str = INFER_PERSONA_PROMPT,
+    target_key: str = "personality",
+    use_prompt_template: bool = True,
+    include_text: bool = True,
+) -> str:
+    """
+    Convert a persona jsonl file (e.g., the output of process_persona_file) into
+    SFT-ready chat records. Supports switching between prompt-based construction
+    and using pre-existing messages to avoid duplication.
+
+    Each output row contains:
+      - messages: chat-style list ready for tokenizer.apply_chat_template
+      - text (optional): plain text concatenation for training without chat templates
+    """
+    in_path = Path(input_path)
+    if output_path is None:
+        output_path = in_path.with_suffix(".sft.jsonl")
+    out_path = Path(output_path)
+
+    # Pre-compute a lightweight system prompt so we do not repeat the template in the user turn.
+    sys_prompt = prompt_template.split("{dialogue_history}", 1)[0].strip() or "You are a personality inference classifier."
+
+    with in_path.open("r", encoding="utf-8") as fin, out_path.open("w", encoding="utf-8") as fout:
+        for idx, line in enumerate(fin):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except Exception:
+                continue
+
+            history = (record.get("hist_dialog") or record.get("dialogue") or record.get("context") or "").strip()
+            label = (record.get(target_key) or "").strip()
+            if not history or not label:
+                continue
+
+            # If we already have messages and the caller disables prompt templating, reuse them.
+            messages = record.get("messages") if not use_prompt_template else None
+            if not messages:
+                messages = [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": history},
+                    {"role": "assistant", "content": label},
+                ]
+            else:
+                # ensure we end with the target label
+                if not (messages and messages[-1].get("role") == "assistant"):
+                    messages = list(messages) + [{"role": "assistant", "content": label}]
+
+            out_record = {"messages": messages}
+
+            if include_text:
+                text = "\n".join(f"{m.get('role', '')}: {m.get('content', '')}" for m in messages)
+                out_record["text"] = text
+
+            fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
 
     return str(out_path)
