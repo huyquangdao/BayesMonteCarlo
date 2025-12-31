@@ -817,6 +817,7 @@ BIG5_PERSONALITY_DES = {
     "openness": "User is a character who is extremely high in curiosity, creativity, imagination, artistic appreciation, aesthetic sensitivity, reflectiveness, emotional awareness, spontaneity, intelligence, analytical ability, sophistication, and social progressiveness"
 }
 
-INFER_PERSONA_PROMPT = "Given the following dialogue history (context), infer the speaker’s dominant Big Five trait " \
-"(choose exactly ONE label from {openness, conscientiousness, extraversion, agreeableness, neuroticism}); " \
-"output only the label in lowercase, based strictly on evidence in the dialogue: {dialogue_history}"
+INFER_PERSONA_PROMPT = "You are a personality inference classifier. Given the following dialogue history (context), infer the user’s dominant Big Five trait." \
+"Choose exactly ONE label in 5 personality: openness, conscientiousness, extraversion, agreeableness, neuroticism " \
+"Output only the label in lowercase, based strictly on evidence in the dialogue: \n " \
+"{dialogue_history}"
