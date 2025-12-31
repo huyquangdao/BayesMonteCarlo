@@ -24,7 +24,7 @@ do
   --datasets p4g \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type llama3 \
+  --model_type train \
   --is_so_game \
   --use_persona \
   --is_utterance_based_action \
