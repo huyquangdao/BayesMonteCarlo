@@ -40,7 +40,7 @@ def _infer_persona_from_description(
         responses = call_llm(
             prompt,
             n=1,
-            temperature=0.0,
+            temperature=0.2,
             max_token=128,
             model_type=model_type,
             llm_pipeline=llm_pipeline,
