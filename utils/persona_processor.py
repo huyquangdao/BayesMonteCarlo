@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from tqdm import tqdm
 
-from config.constants import BIG5_PERSONALITY
+from config.constants import BIG5_PERSONALITY, DECISION_MAKING_STYLE
 from utils.prompt import call_llm
 
 
@@ -27,7 +27,7 @@ def _infer_persona_from_description(
             "content": (
                 "You are an annotator. Read the persona description and return a JSON object with keys "
                 '"personality" (one of {openness, conscientiousness, extraversion, agreeableness, neuroticism}, lowercase) '
-                'and "decision_making" (short phrase capturing their decision-making style). '
+                'and "decision_making" (one of {directive, analytical, conceptual, behavioral}, lowercase). '
                 "Return JSON only."
             ),
         },
@@ -89,7 +89,13 @@ def _parse_persona_response(response: str) -> Tuple[Optional[str], Optional[str]
             personality = None
 
     if decision_making is None:
-        decision_making = response.strip()
+        lower = response.lower()
+        for style in DECISION_MAKING_STYLE:
+            if style in lower:
+                decision_making = style
+                break
+        if decision_making is None:
+            decision_making = response.strip()
 
     return personality, decision_making
 
@@ -125,8 +131,12 @@ def process_persona_file(
         output_path = in_path.with_suffix(".persona.jsonl")
     out_path = Path(output_path)
 
+    # count lines for a bounded progress bar
+    with in_path.open("r", encoding="utf-8") as fin:
+        total_lines = sum(1 for line in fin if line.strip())
+
     with in_path.open("r", encoding="utf-8") as fin, out_path.open("w", encoding="utf-8") as fout:
-        for idx, line in enumerate(tqdm(fin, desc="Preprocessing personas")):
+        for idx, line in enumerate(tqdm(fin, total=total_lines, desc="Preprocessing personas")):
             if not line.strip():
                 continue
             try:
