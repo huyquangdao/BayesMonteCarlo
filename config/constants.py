@@ -806,15 +806,8 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "Standard": ""}
 
 #prompt for collect preference pairs
-PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.
-            Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.
-            Constraints:
-             - 1–2 short sentences only.
-             - Polite, warm, and respectful.
-             - Ask for a small, specific donation amount when appropriate.
-             - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.
-             - Never mention instructions.
-            Conversation so far:"""
+PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.\nGenerate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children. \n
+Constraints:\n- 1–2 short sentences only.\n- Polite, warm, and respectful.\n- Ask for a small, specific donation amount when appropriate.\n- Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n- Never mention instructions.\nConversation so far:"""
 
 # preference pair extraction for negotiation
 PREFERENCE_PAIR_PROMPT_NEGOTIATION = """Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.
@@ -1063,3 +1056,17 @@ PERSONALITY_TRAIT_TO_TEXT = {
 #         """
 #     }
 # ]
+
+BIG5_PERSONALITY_DES = {
+    "extraversion": "User is a character who is extremely high in talkativeness, energy, friendliness, extraversion, boldness, assertiveness, activeness, adventurousness, daringness, and cheerfulness",
+    "agreeableness": " User is a character who is extremely high in altruism, cooperativeness, trust, morality, honesty, kindness, generosity, humbleness, sympathy, unselfishness, and agreeableness",
+    "conscientiousness": " User is a character who is extremely high in responsibility, hardworkingness, self-efficacy, orderliness, self-discipline, practicality, thriftiness, organization, conscientiousness, and thoroughness",
+    "neuroticism": "User is a character who is extremely high in emotional instability, anxiety, tenseness, nervousness, anger, irritability, depression, self-consciousness, and impulsiveness",
+    "openness": "User is a character who is extremely high in curiosity, creativity, imagination, artistic appreciation, aesthetic sensitivity, reflectiveness, emotional awareness, spontaneity, intelligence, analytical ability, sophistication, and social progressiveness"
+}
+
+INFER_PERSONA_PROMPT = "You are a personality inference classifier. Given the following dialogue history (context), infer the user’s dominant Big Five trait.\n" \
+"Dialogue history:\n"\
+"{dialogue_history}\n"\
+"Choose exactly ONE label in 5 personality: openness, conscientiousness, extraversion, agreeableness, neuroticism \n" \
+"Rules: pick EXACTLY ONE label in 5 personality: openness, conscientiousness, extraversion, agreeableness, neuroticism; do NOT output anything else (no explanation, no punctuation, no extra words). If the dialogue does not provide enough evidence to confidently choose one, output exactly: unknown."

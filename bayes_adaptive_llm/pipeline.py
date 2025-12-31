@@ -9,6 +9,7 @@ import random
 from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
+from utils.persona_processor import process_persona_file
 
 from bayes_adaptive_llm.utils import load_legacy_checkpoint, has_meta_checkpoint, load_from_meta_checkpoint
 import torch
@@ -42,6 +43,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         print(f"[LOAD] Final self.model.plm type   = {type(plm_obj)}")
         print(f"[LOAD] Device of plm (if any)      = {getattr(plm_obj, 'device', 'unknown')}")
 
+        # Optionally load persona inference model independently (non-blocking)
+        try:
+            if getattr(self.model_config, "is_infer_persona", False):
+                self.trainer.load_persona_infer_model()
+        except Exception as exc:  # pragma: no cover
+            print(f"[LOAD] Skipping persona inference model load due to error: {exc}")
+
 
 
     def execute(self):
@@ -51,8 +59,17 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         2) optional preference generation via MCTS
         3) optional DPO training on generated pairs
         4) optional offline/online evaluation
+        5) optional preprocessing (e.g., persona extraction) on input files
         """
         offline_eval_results, online_eval_results, preference_pairs = None, None, None
+
+        if getattr(self.model_config, "run_preprocessing", False):
+            logger.info("Running preprocessing step ...")
+            self.run_preprocessing()
+
+        if getattr(self.model_config, "run_persona_sft", False):
+            logger.info("Running persona SFT ...")
+            self.run_persona_sft()
 
         if getattr(self.model_config, "run_sft", False):
             logger.info("Running supervised fine-tuning ...")
@@ -91,6 +108,73 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             online_eval_results = self.run_online_test()
 
         return offline_eval_results, online_eval_results, preference_pairs
+
+    def run_preprocessing(self):
+        """
+        Run preprocessing on preference pair files (e.g., persona extraction).
+        """
+        input_path = getattr(self.model_config, "preprocessing_input_path", None) or getattr(
+            self.model_config, "preference_pairs_path", None
+        )
+        if input_path is None:
+            raise ValueError("No preprocessing_input_path or preference_pairs_path provided for preprocessing.")
+
+        output_path = getattr(self.model_config, "preprocessing_output_path", None)
+        model_type = getattr(self.game_config, "model_type", "chatgpt")
+
+        # if output already exists and is non-empty, skip work
+        if output_path and os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logger.info("Preprocessing output already exists at {}; skipping.", output_path)
+            return
+
+        logger.info("Preprocessing personas from {} -> {}", input_path, output_path or "[auto]")
+        processed_path = process_persona_file(
+            input_path=input_path,
+            output_path=output_path,
+            llm_pipeline=getattr(self.game_config, "llm_pipeline", None),
+            terminators=getattr(self.game_config, "terminators", None),
+            model_type=model_type,
+        )
+        logger.info("Preprocessing completed. Output saved to {}", processed_path)
+
+    def run_persona_sft(self):
+        """
+        Run persona inference SFT: preprocess (if needed) and fine-tune on persona labels.
+        """
+        # Determine source for persona preprocessing
+        persona_sft_path = getattr(self.model_config, "preprocessing_output_path", None)
+
+        # If a ready SFT dataset is provided and non-empty, skip all prep
+
+        preprocess_input = getattr(self.model_config, "persona_preprocessing_input_path", None) or getattr(
+            self.model_config, "preprocessing_input_path", None
+        ) or getattr(self.model_config, "preference_pairs_path", None)
+        if preprocess_input is None:
+            raise ValueError("No persona_preprocessing_input_path/preprocessing_input_path/preference_pairs_path provided for persona SFT.")
+
+        preprocess_output = getattr(self.model_config, "preprocessing_output_path", None)
+        if preprocess_output and os.path.exists(preprocess_output) and os.path.getsize(preprocess_output) > 0:
+            logger.info("Persona preprocessing output already exists at {}; reusing.", preprocess_output)
+            persona_file = preprocess_output
+        else:
+            persona_file = self.trainer.preprocess_persona_file(
+                input_path=preprocess_input,
+                output_path=preprocess_output,
+                model_type=getattr(self.game_config, "model_type", "chatgpt"),
+            )
+
+        persona_sft_output = getattr(self.model_config, "persona_sft_output_path", None)
+        persona_sft_path = self.trainer.build_personality_sft_data(
+            input_path=persona_file,
+            output_path=persona_sft_output,
+            prompt_template=getattr(self.model_config, "persona_prompt_template", None),
+            use_prompt_template=getattr(self.model_config, "persona_sft_use_prompt_template", True),
+            include_text=getattr(self.model_config, "persona_sft_include_text", True),
+            target_key=getattr(self.model_config, "persona_label_key", "personality"),
+        )
+
+        logger.info("Persona SFT using data at {}", persona_sft_path)
+        self.trainer.train_persona_sft(persona_sft_path)
 
     def run_offline_test(self):
         """
@@ -185,7 +269,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             results = self.trainer.online_test(test_cases,
                                                device=self.device,
                                                simulators=test_simulators,
-                                               action_mapping=action_mapping)
+                                               action_mapping=action_mapping,
+                                               is_infer_persona=getattr(self.model_config, "is_infer_persona", False))
 
             return results
         

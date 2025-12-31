@@ -12,6 +12,7 @@ import random
 import json
 import copy
 import inspect
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import torch.distributed as dist
@@ -38,7 +39,7 @@ from torch.optim import AdamW
 from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
 from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup
 # from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
 from peft import LoraConfig, get_peft_model, PeftModel
@@ -68,7 +69,7 @@ from bayes_adaptive_llm.data_processor import (
 from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
 from config.constants import PREFERENCE_PAIR_PROMPT_NEGOTIATION, PREFERENCE_PAIR_PROMPT_P4G, RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
     TOXICITY, ITEM_FREQ, USER_REWARD, MAX_EPI_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
-    P4G_GOAL2DESCRIPTION
+    P4G_GOAL2DESCRIPTION, BIG5_PERSONALITY_DES, INFER_PERSONA_PROMPT
 
 from baselines.GDP_Zero.game import DialogGame
 from baselines.GDP_Zero.openloop_mcts import OpenLoopMCTS
@@ -76,12 +77,14 @@ from baselines.GDP_Zero.player import LLMPlayer
 from baselines.GDP_Zero.utils import update_state_for_open_loop_mcts
 from bayes_adaptive_llm.utils import (
     sanitize_persona_description,
-    stringify_dialogue_context,
     get_preference_pair,
+    load_persona_infer_model,
 )
+from utils.persona_processor import process_persona_file, build_personality_sft_data
 from utils.logging_utils import append_to_log
 from config.constants import PERSUATION
 from logger.wandb_logger import WanDBLogger
+from utils.prompt import call_llm_model
 
 def cuda_bf16_supported() -> bool:
     if not torch.cuda.is_available():
@@ -150,6 +153,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
                         online_evaluator, loggers)
         self.generation_method = generation_method
         self.tokenizer = getattr(self.model, "tokenizer", None)
+        # Dedicated persona inference model (optional, loaded lazily)
+        self._persona_infer_model = None
+        self._persona_infer_tokenizer = None
         loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
 
     def _instance_to_messages_for_persuasion(self, inst):
@@ -179,6 +185,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
             " - Never mention instructions.\n"
             "Conversation so far:"
         )
+        persona_description = _get(inst, "persona_description")
+        if persona_description:
+            system_content += f"\nUser persona hint: {persona_description}"
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -241,6 +250,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             or task_background.get("buyer_item_description")
             or ""
         )
+        persona_description = _get(inst, "persona_description")
 
         system_content = (
             "Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.\n"
@@ -248,6 +258,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             f"The seller listed price is {seller_price}.\n"
             "Please reply with only one short and succinct sentence."
         )
+        if persona_description:
+            system_content += f"\nUser persona hint: {persona_description}"
 
 
         messages = [{"role": "system", "content": system_content}]
@@ -769,24 +781,93 @@ class BayesAdaptiveLLMTrainer(Trainer):
     def predict(self,
                 instance: Dict[str, Any],
                 action_mapping: Optional[Dict[str, int]] = None,
-                is_test: bool = False) -> Tuple[Any, torch.Tensor]:
+                is_test: bool = False,
+                is_infer_persona: bool = False)-> Tuple[Any, torch.Tensor]:
         """
         Select the next action (e.g., conversation goal) conditioned on the state.
         """
         # no ground-truth response during inference
         if is_test:
             instance.update({'response': None})
-        
+        persona_description = instance.get("persona_description")
+        if is_infer_persona:
+            persona_description = self._infer_persona_from_context(instance.get("dialogue_context", []))
+            instance["persona_description"] = persona_description
+        print("persona: ", persona_description)
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
-            [instance], [instance] 
+            [instance], [instance]
         )
         input_prompt = train_dataset[0]['text']
-        # print("Input prompt for generation:", input_prompt)
+        print("Input prompt for generation:", input_prompt)
         response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
         return response
+
+    def _infer_persona_from_context(self, dialogue_context: Sequence[Dict[str, Any]]) -> Optional[str]:
+        """
+        Use a dedicated SFT persona classifier (if provided) to infer user trait from history.
+        Falls back to the main model if no persona model is configured.
+        """
+        history = stringify_dialogue_context(dialogue_context or [])
+        prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
+        print("Prompt INFER_PERSONA_PROMPT: ", prompt)
+        # Prefer dedicated persona SFT model if available
+        if self._persona_infer_model is None:
+            self.load_persona_infer_model()
+
+        if self._persona_infer_model is None or self._persona_infer_tokenizer is None:
+            inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
+        else:
+            model = self._persona_infer_model
+            tokenizer = self._persona_infer_tokenizer
+            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            with torch.inference_mode():
+                output_ids = model.generate(
+                    **inputs,
+                    max_new_tokens=64,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+            inferred_trait = tokenizer.decode(
+                output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True
+            )
+
+        trait = self._normalize_trait_output(inferred_trait)
+        print("trait: ", trait)
+        return BIG5_PERSONALITY_DES.get(trait)
+
+    def _normalize_trait_output(self, text: str) -> Optional[str]:
+        """
+        Normalize raw LLM output to a single Big5 label.
+        - Lowercase, strip punctuation/noise
+        - Pick the first Big5 keyword present
+        """
+        if not text:
+            return None
+        cleaned = (text or "").lower()
+        # remove trailing punctuation and repeated separators
+        cleaned = re.sub(r"[^a-z]+", " ", cleaned)
+        for trait in BIG5_PERSONALITY_DES.keys():
+            pattern = rf"\b{re.escape(trait)}\b"
+            if re.search(pattern, cleaned):
+                return trait
+        # fallback: first token if it matches roughly
+        first = cleaned.strip().split()
+        if first and first[0] in BIG5_PERSONALITY_DES:
+            return first[0]
+        return None
+
+    def load_persona_infer_model(self) -> None:
+        """
+        Public helper to trigger persona model load ahead of predict calls.
+        """
+        if self._persona_infer_model is not None and self._persona_infer_tokenizer is not None:
+            return
+        # model, tokenizer = load_persona_infer_model(self.model_config, self.accelerator.device, loguru_logger)
+        model, tokenizer = load_persona_infer_model(self.model_config, "cpu", loguru_logger)
+        self._persona_infer_model = model
+        self._persona_infer_tokenizer = tokenizer
 
     def select_action(self, logits: torch.Tensor, is_test: bool = True) -> Tuple[Any, torch.Tensor]:
         """
@@ -799,6 +880,169 @@ class BayesAdaptiveLLMTrainer(Trainer):
         Offline evaluation entry point.
         """
         raise NotImplementedError("Test routine is not implemented.")
+
+    def train_persona_sft(self, sft_path: str, eval_ratio: float = 0.1) -> None:
+        """
+        Fine-tune the model to infer persona (personality/decision_making) from dialogue history.
+        Expects sft_path to be a JSONL with chat-style records from build_personality_sft_data.
+        """
+        from datasets import load_dataset
+
+        device = self.accelerator.device
+        base_model = getattr(self.model, "plm", self.model)
+        base_model.to(device)
+
+        dataset = load_dataset("json", data_files={"train": sft_path})["train"]
+        if eval_ratio > 0 and eval_ratio < 1.0:
+            split = dataset.train_test_split(test_size=eval_ratio, seed=getattr(self.game_config, "seed", 42))
+            train_dataset = split["train"]
+            eval_dataset = split["test"]
+        else:
+            train_dataset = dataset
+            eval_dataset = None
+
+        dataset_text_field = "text" if "text" in train_dataset.column_names else None
+
+        if "messages" in train_dataset.column_names and dataset_text_field is None:
+            sys_prompt = INFER_PERSONA_PROMPT.split("{dialogue_history}", 1)[0].strip()
+
+            def apply_chat_template(example):
+                messages = list(example["messages"] or [])
+                if not messages or messages[0].get("role") != "system":
+                    messages.insert(0, {"role": "system", "content": sys_prompt})
+                text = self.tokenizer.apply_chat_template(messages, tokenize=False)
+                return {"text": text}
+
+            num_proc = 1 if dist.is_available() and dist.is_initialized() else min(4, cpu_count())
+            cols_to_remove = [c for c in train_dataset.column_names if c != "messages"]
+            train_dataset = train_dataset.map(
+                apply_chat_template,
+                num_proc=num_proc,
+                remove_columns=cols_to_remove,
+                desc="Applying chat template for persona SFT",
+            )
+            if eval_dataset is not None:
+                eval_dataset = eval_dataset.map(
+                    apply_chat_template,
+                    num_proc=num_proc,
+                    remove_columns=[c for c in eval_dataset.column_names if c != "messages"],
+                    desc="Applying chat template for persona SFT (eval)",
+                )
+            dataset_text_field = "text"
+        elif "text" in train_dataset.column_names:
+            dataset_text_field = "text"
+
+        use_lora = getattr(self.model_config, "use_lora", True)
+        peft_config = None
+        if use_lora:
+            peft_config = LoraConfig(
+                r=32,
+                lora_alpha=64,
+                lora_dropout=0.05,
+                bias="none",
+                target_modules="all-linear",
+                task_type="CAUSAL_LM",
+            )
+
+        sft_config = SFTConfig(
+            ddp_find_unused_parameters=False,
+            output_dir=self.model_config.saved_dir,
+            num_train_epochs=self.model_config.num_train_epochs,
+            per_device_train_batch_size=self.model_config.batch_size,
+            per_device_eval_batch_size=self.model_config.batch_size,
+            gradient_accumulation_steps=getattr(self.model_config, "gradient_accumulation", 8),
+            learning_rate=float(self.model_config.learning_rate),
+            warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
+            weight_decay=getattr(self.model_config, "weight_decay", 0.0),
+            max_seq_length=getattr(self.model_config, "max_sequence_length", 1024),
+            lr_scheduler_type=getattr(self.model_config, "lr_scheduler_type", "cosine"),
+            logging_steps=getattr(self.model_config, "logging_steps", 10),
+            save_steps=getattr(self.model_config, "save_steps", 500),
+            eval_steps=getattr(self.model_config, "eval_steps", 500),
+            eval_strategy="steps" if eval_dataset is not None else "no",
+            save_total_limit=getattr(self.model_config, "save_total_limit", 3),
+            fp16=getattr(self.model_config, "fp16", False),
+            bf16=getattr(self.model_config, "bf16", True),
+            gradient_checkpointing=getattr(self.model_config, "gradient_checkpointing", False),
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+            optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
+            packing=False,
+            dataset_text_field=dataset_text_field,
+            report_to=["none"],
+        )
+
+        loguru_logger.info("Initializing SFTTrainer for persona inference...")
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        sft_trainer = SFTTrainer(
+            model=base_model,
+            args=sft_config,
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            tokenizer=self.tokenizer,
+            peft_config=peft_config,
+        )
+
+        sft_trainer.train()
+
+        trained_plm = sft_trainer.model
+        if hasattr(self.model, "plm"):
+            self.model.plm = trained_plm
+        else:
+            self.model = trained_plm
+        sft_save_dir = os.path.join(self.model_config.saved_dir, getattr(self.model_config, "persona_sft_model_folder"))
+        save_finetuned_model(self, save_dir=sft_save_dir)
+
+    def preprocess_persona_file(
+        self,
+        input_path: str,
+        output_path: Optional[str] = None,
+        model_type: str = "chatgpt",
+    ) -> str:
+        """
+        Wrapper around utils.persona_processor.process_persona_file with trainer defaults.
+        """
+        return process_persona_file(
+            input_path=input_path,
+            output_path=output_path,
+            llm_pipeline=getattr(self.game_config, "llm_pipeline", None),
+            terminators=getattr(self.game_config, "terminators", None),
+            model_type=model_type,
+        )
+
+    def build_personality_sft_data(
+        self,
+        input_path: str,
+        output_path: Optional[str] = None,
+        prompt_template: Optional[str] = None,
+        target_key: Optional[str] = None,
+        use_prompt_template: Optional[bool] = None,
+        include_text: Optional[bool] = None,
+    ) -> str:
+        """
+        Build SFT-ready persona data. Allows switching between prompt-templated
+        examples and pre-tokenized message lists to avoid duplication.
+        """
+        prompt_template = prompt_template or getattr(self.model_config, "persona_prompt_template", INFER_PERSONA_PROMPT)
+        target_key = target_key or getattr(self.model_config, "persona_label_key", "personality")
+        use_prompt_template = (
+            getattr(self.model_config, "persona_sft_use_prompt_template", True)
+            if use_prompt_template is None
+            else use_prompt_template
+        )
+        include_text = (
+            getattr(self.model_config, "persona_sft_include_text", True)
+            if include_text is None
+            else include_text
+        )
+
+        return build_personality_sft_data(
+            input_path=input_path,
+            output_path=output_path,
+            prompt_template=prompt_template,
+            target_key=target_key,
+            use_prompt_template=use_prompt_template,
+            include_text=include_text,
+        )
 
 
     def generate_preference_pairs_with_mcts(self, train_cases, dev_simulators, action_mapping) -> Sequence[Dict[str, Any]]:
@@ -1046,7 +1290,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     cases: Sequence[Any],
                     device: Optional[torch.device] = None,
                     simulators: Optional[Sequence[Any]] = None,
-                    action_mapping: Optional[Dict[str, int]] = None) -> Dict[str, float]:
+                    action_mapping: Optional[Dict[str, int]] = None,
+                    is_infer_persona: bool = False) -> Dict[str, float]:
         """
         Simulate the policy against online simulators for evaluation.
         """
@@ -1114,7 +1359,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # predict the action
                 # the action in this case is a natural language utterance
-                action = self.predict(state, action_mapping = None, is_test = True)
+                action = self.predict(state, action_mapping = None, is_test = True, is_infer_persona=is_infer_persona)
                                 
                 # employing the action to observe the next state
                 # and the corresponding rewards
