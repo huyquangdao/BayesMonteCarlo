@@ -135,31 +135,26 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         Run persona inference SFT: preprocess (if needed) and fine-tune on persona labels.
         """
         # Determine source for persona preprocessing
-        persona_sft_path = getattr(self.model_config, "persona_sft_input_path", None)
+        persona_sft_path = getattr(self.model_config, "preprocessing_output_path", None)
 
         # If a ready SFT dataset is provided and non-empty, skip all prep
-        if persona_sft_path and os.path.exists(persona_sft_path) and os.path.getsize(persona_sft_path) > 0:
-            logger.info("Found existing persona SFT data at {}; skipping preprocessing/build.", persona_sft_path)
+
+        preprocess_input = getattr(self.model_config, "persona_preprocessing_input_path", None) or getattr(
+            self.model_config, "preprocessing_input_path", None
+        ) or getattr(self.model_config, "preference_pairs_path", None)
+        if preprocess_input is None:
+            raise ValueError("No persona_preprocessing_input_path/preprocessing_input_path/preference_pairs_path provided for persona SFT.")
+
+        preprocess_output = getattr(self.model_config, "preprocessing_output_path", None)
+        if preprocess_output and os.path.exists(preprocess_output) and os.path.getsize(preprocess_output) > 0:
+            logger.info("Persona preprocessing output already exists at {}; reusing.", preprocess_output)
+            persona_file = preprocess_output
         else:
-            persona_sft_path = None
-
-        if persona_sft_path is None:
-            preprocess_input = getattr(self.model_config, "persona_preprocessing_input_path", None) or getattr(
-                self.model_config, "preprocessing_input_path", None
-            ) or getattr(self.model_config, "preference_pairs_path", None)
-            if preprocess_input is None:
-                raise ValueError("No persona_preprocessing_input_path/preprocessing_input_path/preference_pairs_path provided for persona SFT.")
-
-            preprocess_output = getattr(self.model_config, "persona_preprocessing_output_path", None)
-            if preprocess_output and os.path.exists(preprocess_output) and os.path.getsize(preprocess_output) > 0:
-                logger.info("Persona preprocessing output already exists at {}; reusing.", preprocess_output)
-                persona_file = preprocess_output
-            else:
-                persona_file = self.trainer.preprocess_persona_file(
-                    input_path=preprocess_input,
-                    output_path=preprocess_output,
-                    model_type=getattr(self.game_config, "model_type", "chatgpt"),
-                )
+            persona_file = self.trainer.preprocess_persona_file(
+                input_path=preprocess_input,
+                output_path=preprocess_output,
+                model_type=getattr(self.game_config, "model_type", "chatgpt"),
+            )
 
         persona_sft_output = getattr(self.model_config, "persona_sft_output_path", None)
         persona_sft_path = self.trainer.build_personality_sft_data(

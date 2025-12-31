@@ -111,3 +111,4 @@ preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_2k.jsonl"
 #PreProcessing
 preprocessing_input_path: "data/pg_data/preference_pairs_llama3.1.jsonl"
 preprocessing_output_path: "data/pg_data/preference_pairs_llama3.1_extract-persona.jsonl"  
+persona_sft_output_path: "data/pg_data/persona_sft_output.jsonl"
