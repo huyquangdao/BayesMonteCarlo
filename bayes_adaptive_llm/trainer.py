@@ -12,6 +12,7 @@ import random
 import json
 import copy
 import inspect
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import torch.distributed as dist
@@ -831,9 +832,30 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True
             )
 
-        trait = (inferred_trait or "").strip().lower()
+        trait = self._normalize_trait_output(inferred_trait)
         print("trait: ", trait)
         return BIG5_PERSONALITY_DES.get(trait)
+
+    def _normalize_trait_output(self, text: str) -> Optional[str]:
+        """
+        Normalize raw LLM output to a single Big5 label.
+        - Lowercase, strip punctuation/noise
+        - Pick the first Big5 keyword present
+        """
+        if not text:
+            return None
+        cleaned = (text or "").lower()
+        # remove trailing punctuation and repeated separators
+        cleaned = re.sub(r"[^a-z]+", " ", cleaned)
+        for trait in BIG5_PERSONALITY_DES.keys():
+            pattern = rf"\b{re.escape(trait)}\b"
+            if re.search(pattern, cleaned):
+                return trait
+        # fallback: first token if it matches roughly
+        first = cleaned.strip().split()
+        if first and first[0] in BIG5_PERSONALITY_DES:
+            return first[0]
+        return None
 
     def load_persona_infer_model(self) -> None:
         """
