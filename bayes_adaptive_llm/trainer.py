@@ -825,7 +825,6 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 output_ids = model.generate(
                     **inputs,
                     max_new_tokens=64,
-                    do_sample=False,
                     eos_token_id=tokenizer.eos_token_id,
                 )
             inferred_trait = tokenizer.decode(
