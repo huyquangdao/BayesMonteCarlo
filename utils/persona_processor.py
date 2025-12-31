@@ -36,6 +36,7 @@ def _infer_persona_from_description(
     ]
 
     try:
+        print("Prompt processing: ", prompt)
         response = call_llm(
             prompt,
             n=1,
@@ -46,6 +47,7 @@ def _infer_persona_from_description(
             terminators=terminators,
         )[0]
     except Exception:
+        print("Something Errors!!")
         return None, None
 
     try:
