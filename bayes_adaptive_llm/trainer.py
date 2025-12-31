@@ -792,6 +792,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 instance["persona_description"] = persona_description
             else:
                 instance["persona_description"] = None
+        print("persona: ", persona_description)
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
             [instance], [instance] 
