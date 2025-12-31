@@ -820,5 +820,5 @@ BIG5_PERSONALITY_DES = {
 INFER_PERSONA_PROMPT = "You are a personality inference classifier. Given the following dialogue history (context), infer the user’s dominant Big Five trait." \
 "Choose exactly ONE label in 5 personality: openness, conscientiousness, extraversion, agreeableness, neuroticism " \
 "Rules: pick EXACTLY ONE label in 5 personality: openness, conscientiousness, extraversion, agreeableness, neuroticism; do NOT output anything else (no explanation, no punctuation, no extra words). If the dialogue does not provide enough evidence to confidently choose one, output exactly: unknown." \
-"Dialogue history:"
+"Dialogue history:"\
 "{dialogue_history}"

@@ -809,7 +809,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         history = stringify_dialogue_context(dialogue_context or [])
         prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
-
+        print("Prompt INFER_PERSONA_PROMPT: ", prompt)
         # Prefer dedicated persona SFT model if available
         if self._persona_infer_model is None:
             self.load_persona_infer_model()
