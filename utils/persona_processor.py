@@ -35,9 +35,9 @@ def _infer_persona_from_description(
         },
     ]
 
+    response = ""
     try:
-        print("Prompt processing: ", prompt)
-        response = call_llm(
+        responses = call_llm(
             prompt,
             n=1,
             temperature=0.0,
@@ -45,22 +45,50 @@ def _infer_persona_from_description(
             model_type=model_type,
             llm_pipeline=llm_pipeline,
             terminators=terminators,
-        )[0]
-    except Exception:
-        print("Something Errors!!")
+        )
+        response = responses[0] if responses else ""
+    except Exception as e:
+        print(f"[persona_processor] LLM call failed: {e}")
         return None, None
 
+    # Parse structured JSON first; fall back to heuristic extraction
+    personality, decision_making = _parse_persona_response(response)
+    return personality, decision_making
+
+
+def _parse_persona_response(response: str) -> Tuple[Optional[str], Optional[str]]:
+    """Parse LLM response into (personality, decision_making) with fallbacks."""
+    if not response:
+        return None, None
+
+    # Try JSON first
     try:
         parsed = json.loads(response)
     except Exception:
-        return None, None
+        parsed = None
 
-    personality = (parsed.get("personality") or "").strip().lower()
+    personality = None
+    decision_making = None
+
+    if isinstance(parsed, dict):
+        personality = (parsed.get("personality") or "").strip().lower()
+        decision_making = parsed.get("decision_making") or parsed.get("decision-making")
+        if decision_making is not None:
+            decision_making = str(decision_making).strip()
+
+    # Heuristic fallback: search for big5 keywords in raw text
     if personality not in BIG5_PERSONALITY:
-        personality = None
-    decision_making = parsed.get("decision_making") or parsed.get("decision-making")
-    if decision_making is not None:
-        decision_making = str(decision_making).strip()
+        lower = response.lower()
+        for trait in BIG5_PERSONALITY:
+            if trait in lower:
+                personality = trait
+                break
+        else:
+            personality = None
+
+    if decision_making is None:
+        decision_making = response.strip()
+
     return personality, decision_making
 
 
@@ -96,27 +124,30 @@ def process_persona_file(
     out_path = Path(output_path)
 
     with in_path.open("r", encoding="utf-8") as fin, out_path.open("w", encoding="utf-8") as fout:
-        for line in fin:
+        for idx, line in enumerate(fin):
             if not line.strip():
                 continue
-            record = json.loads(line)
-            history = _extract_history(record)
-            description = (record.get("persona_hint") or {}).get("description", "")
-            personality, decision_making = _infer_persona_from_description(
-                description,
-                llm_pipeline=llm_pipeline,
-                terminators=terminators,
-                model_type=model_type,
-            )
+            try:
+                record = json.loads(line)
+                history = _extract_history(record)
+                description = (record.get("persona_hint") or {}).get("description", "")
+                personality, decision_making = _infer_persona_from_description(
+                    description,
+                    llm_pipeline=llm_pipeline,
+                    terminators=terminators,
+                    model_type=model_type,
+                )
 
-            out_record = {
-                "dialog_index": record.get("dialog_index"),
-                "turn": record.get("turn"),
-                "action": record.get("action"),
-                "hist_dialog": history,
-                "personality": personality,
-                "decision_making": decision_making,
-            }
-            fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
+                out_record = {
+                    "dialog_index": record.get("dialog_index"),
+                    "turn": record.get("turn"),
+                    "action": record.get("action"),
+                    "hist_dialog": history,
+                    "personality": personality,
+                    "decision_making": decision_making,
+                }
+                fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
+            except Exception as e:
+                print(f"[persona_processor] Skipping line {idx} due to error: {e}")
 
     return str(out_path)
