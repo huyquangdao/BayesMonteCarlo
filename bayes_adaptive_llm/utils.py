@@ -177,7 +177,7 @@ def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional
     Returns (model, tokenizer) or (None, None) on failure.
     """
     model_dir = os.path.join(getattr(model_config, "saved_dir", ""), getattr(model_config, "persona_sft_model_folder"))
-
+    print(f"[LOAD] >>> Requested to load infer persona model from: {model_dir}")
     if not model_dir or not os.path.exists(model_dir):
         log.warning("Persona SFT model dir not found ({}); using main model for persona inference.", model_dir)
         return None, None
