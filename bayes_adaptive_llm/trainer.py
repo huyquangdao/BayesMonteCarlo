@@ -787,6 +787,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             inferpersona_prompt = INFER_PERSONA_PROMPT.format(dialogue_history=dialogue_history)
             inferred_trait = self.model.generate_text(inferpersona_prompt, max_new_tokens=64)
             trait = (inferred_trait or "").strip().lower()
+            print("trait: ", trait)
             persona_description = BIG5_PERSONALITY_DES.get(trait)
             if persona_description:
                 instance["persona_description"] = persona_description
