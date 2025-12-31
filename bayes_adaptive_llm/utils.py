@@ -171,7 +171,6 @@ def get_preference_pair(
     # Fallback: cross-action using top-2 actions.
     return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves_list, realizations_vs, preferred_action=target_idx)
 
-
 def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional[torch.nn.Module], Optional[AutoTokenizer]]:
     """
     Load persona inference model/tokenizer from a saved SFT checkpoint.
@@ -197,82 +196,37 @@ def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional
         log.warning("Failed to load persona tokenizer {}: {}", base_model_name, exc)
         return None, None
 
-    target_device_override = getattr(model_config, "persona_sft_device", None)
-    if target_device_override:
-        try:
-            device = torch.device(target_device_override)
-        except Exception:
-            log.warning("Invalid persona_sft_device '{}', fallback to {}", target_device_override, device)
-
-    target_device_map = getattr(model_config, "persona_sft_device_map", None)
-
-    def _base_load_kwargs(target_device, force_cpu: bool = False):
-        # When forcing CPU, avoid bfloat16 to reduce friction; prefer full precision on CPU.
-        kwargs = {
-            "cache_dir": getattr(model_config, "cached_dir", None),
-            "low_cpu_mem_usage": True,
-        }
-        if force_cpu or (hasattr(target_device, "type") and target_device.type == "cpu"):
-            kwargs["device_map"] = {"": "cpu"}
-            kwargs["torch_dtype"] = None
-        else:
-            if target_device_map:
-                kwargs["device_map"] = target_device_map
-            else:
-                kwargs["device_map"] = {"": target_device} if hasattr(target_device, "type") else target_device
-            kwargs["torch_dtype"] = dtype
-        return kwargs
-
-    def _load_model(target_device):
+    try:
         if saved_format == "lora_adapter":
             base_model = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                **_base_load_kwargs(target_device),
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
             )
             adapter_dir = os.path.join(model_dir, "lora_adapter")
-            model_loaded = PeftModel.from_pretrained(base_model, adapter_dir)
+            model = PeftModel.from_pretrained(base_model, adapter_dir)
         elif saved_format == "full_state_dict":
-            model_loaded = AutoModelForCausalLM.from_pretrained(
+            model = AutoModelForCausalLM.from_pretrained(
                 base_model_name,
-                **_base_load_kwargs(target_device),
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
             )
             state_dict = torch.load(os.path.join(model_dir, "model.pth"), map_location="cpu")
-            model_loaded.load_state_dict(state_dict)
+            model.load_state_dict(state_dict)
         else:
-            model_loaded = AutoModelForCausalLM.from_pretrained(
+            model = AutoModelForCausalLM.from_pretrained(
                 model_dir,
-                **_base_load_kwargs(target_device),
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
             )
-        # Move to target device if not already placed via device_map
-        if hasattr(target_device, "type") and target_device.type != "cpu" and not target_device_map:
-            model_loaded.to(target_device)
-        return model_loaded
 
-    try:
-        model = _load_model(device)
+        model.to(device)
         log.info("Loaded persona inference model from {}", model_dir)
         return model, tokenizer
-    except RuntimeError as exc:
-        if "out of memory" in str(exc).lower():
-            log.warning("OOM loading persona model on {}; retrying on CPU. Error: {}", device, exc)
-            try:
-                torch.cuda.empty_cache()
-            except Exception:
-                pass
-            try:
-                model = _load_model(torch.device("cpu"))
-                log.info("Loaded persona inference model on CPU from {}", model_dir)
-                return model, tokenizer
-            except Exception as exc2:  # pragma: no cover
-                log.warning("CPU fallback for persona model failed: {}", exc2)
-                return None, None
-        log.warning("Failed to load persona inference model from {}: {}", model_dir, exc)
-        return None, None
     except Exception as exc:  # pragma: no cover
         log.warning("Failed to load persona inference model from {}: {}", model_dir, exc)
         return None, None
-
-
+    
 def coerce_to_float(value, default):
     """
     Convert common numeric representations (int/float/strings) to float, else return default.

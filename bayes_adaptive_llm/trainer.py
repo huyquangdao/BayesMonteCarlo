@@ -841,7 +841,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         if self._persona_infer_model is not None and self._persona_infer_tokenizer is not None:
             return
-        model, tokenizer = load_persona_infer_model(self.model_config, self.accelerator.device, loguru_logger)
+        # model, tokenizer = load_persona_infer_model(self.model_config, self.accelerator.device, loguru_logger)
+        model, tokenizer = load_persona_infer_model(self.model_config, "cpu", loguru_logger)
         self._persona_infer_model = model
         self._persona_infer_tokenizer = tokenizer
 
