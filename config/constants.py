@@ -231,6 +231,13 @@ ENVELOPE_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/ENVELOPE_ES.yaml'
 # PRO_LLM_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/PRO_LLM_NEG.yaml'
 # PRO_LLM_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/PRO_LLM_ES.yaml'
 
+# PADPP
+SO_PADPP = "so_padpp"
+SO_PADPP_CONFIG_PATH_FOR_RECOMMENDATION = 'config/models/SO_PADPP_REC.yaml'
+SO_PADPP_CONFIG_PATH_FOR_NEGOTIATION = 'config/models/SO_PADPP_NEG.yaml'
+SO_PADPP_CONFIG_PATH_FOR_EMOTIONAL_SUPPORT = 'config/models/SO_PADPP_ES.yaml'
+SO_PADPP_CONFIG_PATH_FOR_PERSUATION = 'config/models/SO_PADPP_PG.yaml'
+
 # Prompt Refiner
 PROMPT_REFINER = "prompt_refiner"
 PROMPT_REFINER_CONFIG_PATH_FOR_RECOMMENDATION = 'config/models/PROMPT_REFINER_REC.yaml'
@@ -815,3 +822,244 @@ You are the buyer who is trying to buy the {item_name} with the price of {buyer_
 The seller listed price is {seller_price}.
 Please reply with only one short and succinct sentence.
 Conversation so far:\n"""
+
+
+# prompt for infering personality traits from profile description
+PROFILE_BASED_PERSONALITY_RECOGNITION_PROMPT = [
+        {
+        'role': 'system',
+        'content': """
+        You are a professional personality psychologist specializing in the Big Five personality traits model. 
+        You’ve been invited to analyze the personality traits of a human player in a "Personality Prediction" game. 
+        In this game, you will be given a comprehensive profile description of the human player.
+        Your task to infer the human player's personality traits based on the given profile description.
+
+        ### Task:
+        1. You need to analyze the human player’s personality traits based on the profile description. You will provide a detailed analysis
+        and the personality trait that you think the human player has, including specific examples from the profile description to support your ratings (2-3 sentences only).
+        2. Your response should strictly follow the Response Template.
+
+        ### Big Five Personality Traits Reference Standards:
+        #### Openness:
+        - High Scores: Curious, imaginative, creative, open to trying new things, unconventional thinking
+        - Medium Scores: Maintains balance between tradition and innovation, shows some
+        curiosity while also valuing stability
+        - Low Scores: Predictable, not very imaginative, resistant to change, prefers
+        routine, traditional thinking.
+
+        #### Conscientiousness:
+        - High Scores: Competent, organized, dutiful, achievement-striving, self-disciplined,
+        deliberate
+        - Medium Scores: Shows some planning and responsibility while maintaining some flexibility
+        - Low Scores: Incomplete, disorganized, careless, procrastinates, lacks
+        self-discipline, impulsive.
+
+        #### Extraversion:
+        - High Scores: Sociable, energized by social interaction, excitement-seeking, enjoys
+        being the center of attention, outgoing
+        - Medium Scores: Balances social interaction and solitude, situational social behavior
+        - Low Scores: Prefers solitude, fatigued
+        by excessive social interaction, reflective, dislikes being the center of attention,
+        reserved.
+
+        #### Agreeableness:
+        - High Scores: Trusting (forgiving), straightforward, altruistic (enjoys helping), compliant, modest, sympathetic, empathetic
+        - Medium Scores: Selectively shows friendliness based on situations, balances cooperation and self-interest
+        - Low Scores: Skeptical, demanding, insults
+        and belittles others, stubborn, show-off, unsympathetic, doesn’t care about others’ feelings.
+
+        #### Neuroticism:
+        - High Scores: Anxious, hostile anger (irritable), frequently stressed, self-conscious
+        (shy), vulnerable, experiences dramatic
+        mood shifts
+        - Medium Scores: Moderate emotional fluctuations, relatively stable under pressure
+        - Low Scores: Doesn’t worry much, calm, emotionally stable, confident, resilient,
+        rarely feels sad or depressed.
+        
+        ### Response Template:
+        Your answer should strictly follow the following format:
+        Your Analysis: [ANALYSIS]\n
+        Trait: [TRAIT_NAME]\n.
+        """
+        },
+        {
+        'role': 'user',
+        'content': """
+        Following is the user profile record.
+        ### User Profile Record: {}
+        Question: What is the user's personality trait?
+        Answer: Your Analysis:
+        """
+        }
+]
+
+PERSONALITY_TRAIT_TO_TEXT = {
+    "extraversion": """
+    The user is a character who is extremely high in talkativeness, energy,
+    friendliness, extraversion, boldness, assertiveness, activeness, adventurousness,
+    daringness, and cheerfulness.
+    """,
+    
+    "agreeableness": """
+    The user is a character who is extremely high in altruism, cooperativeness,
+    trust, morality, honesty, kindness, generos ity, humbleness, sympathy, unselfishness,
+    and agreeableness.
+    """,
+    
+    "conscientiousness": """
+    The user is a character who is extremely high in responsibility,
+    hardworkingness, self-efficacy, orderliness,
+    self-discipline, practicality, thriftiness, organization, conscientiousness, and thoroughness.
+    """,
+    
+    "neuroticism": """
+    The user is a character who is
+    extremely high in emotional instability, anxiety, tenseness, nervousness, anger, irritability, depression, self-consciousness, and impulsiveness.
+    """,
+    
+    "openness": """
+    The user is a character who is extremely high in curiosity, creativity, imagination, artistic appreciation, aesthetic sensitivity, reflectiveness, emotional awareness,
+    spontaneity, intelligence, analytical ability, sophistication, and social progressiveness.
+    """,
+}
+
+
+# # prompt for infering personality traits from profile description
+# PROFILE_BASED_PERSONALITY_RECOGNITION_PROMPT = [
+#     {
+#         'role': 'system',
+#         'content': """
+# You are a professional personality psychologist specializing in the Big Five personality traits model. 
+# You’ve been invited to analyze the personality traits of a human player in a "Personality Prediction" game. 
+# In this game, you will be given a comprehensive profile description of the human player.
+# Your task to infer the human player's personality traits based on the given profile description.
+
+# ### Task:
+# 1. You need to analyze the human player’s personality traits based on the profile description. You will provide a detailed analysis
+# of each of the Big Five personality traits, including specific examples from the profile description to support your ratings.
+# 2. Your response should strictly follow the Response Template.
+
+# ### Big Five Personality Traits Reference Standards:
+# #### Openness:
+# - High Scores: Curious, imaginative, creative, open to trying new things, unconventional thinking
+# - Medium Scores: Maintains balance between tradition and innovation, shows some
+# curiosity while also valuing stability
+# - Low Scores: Predictable, not very imaginative, resistant to change, prefers
+# routine, traditional thinking.
+
+# #### Conscientiousness:
+# - High Scores: Competent, organized, dutiful, achievement-striving, self-disciplined,
+# deliberate
+# - Medium Scores: Shows some planning and responsibility while maintaining some flexibility
+# - Low Scores: Incomplete, disorganized, careless, procrastinates, lacks
+# self-discipline, impulsive.
+
+# #### Extraversion:
+# - High Scores: Sociable, energized by social interaction, excitement-seeking, enjoys
+# being the center of attention, outgoing
+# - Medium Scores: Balances social interaction and solitude, situational social behavior
+# - Low Scores: Prefers solitude, fatigued
+# by excessive social interaction, reflective, dislikes being the center of attention,
+# reserved.
+
+# #### Agreeableness:
+# - High Scores: Trusting (forgiving), straightforward, altruistic (enjoys helping), compliant, modest, sympathetic, empathetic
+# - Medium Scores: Selectively shows friendliness based on situations, balances cooperation and self-interest
+# - Low Scores: Skeptical, demanding, insults
+# and belittles others, stubborn, show-off, unsympathetic, doesn’t care about others’ feelings.
+
+# #### Neuroticism:
+# - High Scores: Anxious, hostile anger (irritable), frequently stressed, self-conscious
+# (shy), vulnerable, experiences dramatic
+# mood shifts
+# - Medium Scores: Moderate emotional fluctuations, relatively stable under pressure
+# - Low Scores: Doesn’t worry much, calm, emotionally stable, confident, resilient,
+# rarely feels sad or depressed.
+
+# ### Rating Criteria:
+# 1.0-1.9: Very low - Rarely if ever displays
+# characteristics associated with this trait
+# 2.0-2.7: Low - Occasionally displays characteristics associated with this trait
+# 2.8-3.2: Average - Shows balanced or moderate expression of this trait
+# 3.3-4.0: High - Frequently displays characteristics associated with this trait
+# 4.1-5.0: Very high - Strongly and consistently displays characteristics associated
+# with this trait
+
+# ### Boundary Value Handling:
+# - All intervals are closed intervals, meaning they include the endpoint values
+# - The handling of boundary values 1.0, 1.9, 2.0, 2.7, 2.8, 3.2, 3.3, 4.0, 4.1, and 5.0 is as
+# follows:
+# - 1.0 ≤ score ≤ 1.9: Classified as "Very
+# low"
+# - 2.0 ≤ score ≤ 2.7: Classified as "Low"
+# - 2.8 ≤ score ≤ 3.2: Classified as "Average"
+# - 3.3 ≤ score ≤ 4.0: Classified as "High"
+# - 4.1 ≤ score ≤ 5.0: Classified as "Very
+# high"
+# - Decimal precision explanation (e.g., 2.3,
+# 3.7, 4.5):
+# - Lower decimals within each range (e.g.,
+# 3.3-3.5) indicate emerging or inconsistent
+# expression
+# - Middle decimals (e.g., 3.6-3.7) indicate
+# moderate expression within that range
+# - Higher decimals (e.g., 3.8-4.0) indicate
+# strong expression approaching the next level
+
+# ### Analysis Requirements:
+# 1. Carefully read the entire profile description record.
+# 2. Rate the human player on each dimension of the Big Five personality traits on a scale
+# of 1-5.
+# 3. Base your ratings on specific evidence
+# from the user profile, avoiding subjective assumptions.
+# 4. Quote original text from the user profile as
+# supporting evidence in your analysis.
+# 5. Provide at least 2-3 specific examples as
+# the basis for each dimension’s rating.
+# 6. Think step by step, finding evidence before drawing conclusions.
+# 7. Ensure balanced analysis by considering
+# both positive and negative expressions of
+# the same trait.
+
+# ### Important Format Instructions
+# 1) For each trait, you must start a new line
+# in the format:
+# - Openness: X, reason: ...
+# - Conscientiousness: X, reason: ...
+# - Extraversion: X, reason: ...
+# - Agreeableness: X, reason: ...
+# - Neuroticism: X, reason: ...
+# Where ‘X‘ is a single integer or a float from
+# 1-5 (e.g. 4.0, 3.7, 2.3), and then a comma,
+# then ‘ reason:‘.
+
+# ### Response Template:
+# ### My step by step thought process:
+# Detailed explanation of how you analyzed
+# each dimension, including key behaviors
+# and information you noticed.
+
+# ### Player’s Personality Traits Rating:
+# - Openness: [Rating], reason: {Detailed analysis based on specific profile content,
+# at least 2-3 examples}
+# - Conscientiousness: [Rating], reason: {Detailed analysis based on specific profile
+# content, at least 2-3 examples}
+# - Extraversion: [Rating], reason: {Detailed analysis based on specific profile content,
+# at least 2-3 examples}
+# - Agreeableness: [Rating], reason: {Detailed analysis based on specific profile
+# content, at least 2-3 examples}
+# - Neuroticism: [Rating], reason: {Detailed analysis based on specific profile content,
+# at least 2-3 examples}
+# """
+
+#     },
+#     {
+#         'role': 'user',
+#         'content': """ 
+#         Following is the user profile record.
+#         ### User Profile Record: {}
+#         Question: What is the user's personality trait?
+#         Answer:
+#         """
+#     }
+# ]

@@ -10,7 +10,9 @@ from base.trainer import Trainer
 from logger.wandb_logger import WanDBLogger
 
 from config.constants import RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
-    TOXICITY, USER_REWARD, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, P4G_GOAL2DESCRIPTION, PERSUATION, DURECDIAL_GOAL2DESCRIPTION
+    TOXICITY, USER_REWARD, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, P4G_GOAL2DESCRIPTION, PERSUATION, DURECDIAL_GOAL2DESCRIPTION, PERSONALITY_TRAIT_TO_TEXT
+    
+from utils.prompt import infer_user_personality_trait_from_user_profile
 
 
 class ProactiveTrainer(Trainer):
@@ -159,6 +161,19 @@ class ProactiveTrainer(Trainer):
 
             # randomly sample persona information
             # simulator = np.random.choice(simulators)
+            # personality = infer_user_personality_trait_from_user_profile(profile_description= simulator.user_profile_description,
+            #                                                             temperature=0.1, 
+            #                                                             max_token= 200,
+            #                                                             model_type=self.model_config.model_type,
+            #                                                             llm_pipeline=self.game_config.llm_pipeline,
+            #                                                             terminators=self.game_config.terminators         
+            #                                                             )
+            # print(personality)
+            # description = PERSONALITY_TRAIT_TO_TEXT[personality]
+            # print(description)
+            
+            # assert 1 == 0
+            # print(simulator.user_profile_description)
 
             loguru_logger.info('\n================Item Num:{}===================='.format(idx))
 

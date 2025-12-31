@@ -162,6 +162,12 @@ from baselines.GDP_Zero.trainer import GDPZeroTrainer
 from baselines.GDP_Zero.model import GDPZeroModel
 from baselines.GDP_Zero.pipeline import GDPZeroPipelineForNegotiation, GDPZeroPipelineForEmotionalSupport
 
+
+from baselines.SO_PADPP.config import SOPADPPConfigForNegotiation, SOPADPPConfigForEmotionalSupport, SOPADPPConfigForPersuation, SOPADPPConfigForRecommendation
+from baselines.SO_PADPP.trainer import SOPADPPTrainer
+from baselines.SO_PADPP.model import SOPADPPModel
+from baselines.SO_PADPP.pipeline import SOPADPPPipelineForNegotiation, SOPADPPPipelineForEmotionalSupport, SOPADPPPipelineForPersuation, SOPADPPPipelineForRecommendation
+
 # Proactive LLM
 # from pro_llm.config import ProLLMConfigForRecommendation, ProLLMConfigForNegotiation, ProLLMConfigForEmotionalSupport
 # from pro_llm.trainer import ProLLMTrainer
@@ -700,6 +706,13 @@ def get_model_by_names(scenario, model_names):
                 BayesAdaptiveLLMPipeline,
                 BayesAdaptiveLLMTrainer
             ],
+            SO_PADPP: [
+                SO_PADPP_CONFIG_PATH_FOR_NEGOTIATION,
+                SOPADPPConfigForNegotiation,
+                SOPADPPModel,
+                SOPADPPPipelineForNegotiation,
+                SOPADPPTrainer
+            ]    
         }
 
         # collect model packages
@@ -871,7 +884,14 @@ def get_model_by_names(scenario, model_names):
                 PPDPPModel,
                 PPDPPPipelineForPersuation,
                 PPDPPTrainer                     
-            ]                         
+            ],
+            SO_PADPP: [
+                SO_PADPP_CONFIG_PATH_FOR_PERSUATION,
+                SOPADPPConfigForPersuation,
+                SOPADPPModel,
+                SOPADPPPipelineForPersuation,
+                SOPADPPTrainer
+            ]                                            
         }
         # collect model packages
         models = []

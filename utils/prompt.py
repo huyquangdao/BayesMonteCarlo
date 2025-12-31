@@ -18,7 +18,7 @@ from tenacity import (
     retry_if_exception_type
 )  # for exponential backoff
 
-from config.constants import LLM_MODEL, LLAMA3, CHATGPT, LLAMA3_MODEL, QWEN_MODEL, QWEN
+from config.constants import LLM_MODEL, LLAMA3, CHATGPT, LLAMA3_MODEL, QWEN_MODEL, QWEN, PROFILE_BASED_PERSONALITY_RECOGNITION_PROMPT
 
 load_dotenv()
 
@@ -566,3 +566,20 @@ def get_user_sentiment_for_item_recommendation(generated_user_utterance):
     """
     sentiment = sentiment_analysis(generated_user_utterance)
     return sentiment
+
+
+def infer_user_personality_trait_from_user_profile(profile_description, **kwargs):
+    
+    prompt = copy.deepcopy(PROFILE_BASED_PERSONALITY_RECOGNITION_PROMPT)
+    prompt[-1]['content'] = prompt[-1]['content'].format(profile_description)
+            
+    response = call_llm(prompt, **kwargs)[0]
+    try:
+        # post-processing the response to extract the personality
+        personality = response.strip().split('\n')[-1].split(":")[-1].strip().lower()
+    except:
+        # default case
+        personality = "openness"
+    
+    return personality
+    
