@@ -29,8 +29,10 @@ run_sft: false
 run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: true
+run_online_eval: false
 run_simulator_analysis: false
+run_preprocessing: true
+
 is_infer_persona: true
 
 # Evaluation flags
@@ -105,3 +107,6 @@ preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_2k.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_high-acceptance.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_low-acceptance.jsonl"
 
+#PreProcessing
+preprocessing_input_path: "data/pg_data/preference_pairs_llama3.1.jsonl"
+preprocessing_output_path: "data/pg_data/preference_pairs_llama3.1_persona.jsonl"  

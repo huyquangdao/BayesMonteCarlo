@@ -9,6 +9,7 @@ import random
 from typing import Any, Dict
 from logger.wandb_logger import WanDBLogger
 from utils.game import create_target_set, create_cases
+from utils.persona_processor import process_persona_file
 
 from bayes_adaptive_llm.utils import load_legacy_checkpoint, has_meta_checkpoint, load_from_meta_checkpoint
 import torch
@@ -51,8 +52,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         2) optional preference generation via MCTS
         3) optional DPO training on generated pairs
         4) optional offline/online evaluation
+        5) optional preprocessing (e.g., persona extraction) on input files
         """
         offline_eval_results, online_eval_results, preference_pairs = None, None, None
+
+        if getattr(self.model_config, "run_preprocessing", False):
+            logger.info("Running preprocessing step ...")
+            self.run_preprocessing()
 
         if getattr(self.model_config, "run_sft", False):
             logger.info("Running supervised fine-tuning ...")
@@ -91,6 +97,28 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             online_eval_results = self.run_online_test()
 
         return offline_eval_results, online_eval_results, preference_pairs
+
+    def run_preprocessing(self):
+        """
+        Run preprocessing on preference pair files (e.g., persona extraction).
+        """
+        input_path = getattr(self.model_config, "preprocessing_input_path", None) or getattr(
+            self.model_config, "preference_pairs_path", None
+        )
+        if input_path is None:
+            raise ValueError("No preprocessing_input_path or preference_pairs_path provided for preprocessing.")
+
+        output_path = getattr(self.model_config, "preprocessing_output_path", None)
+        model_type = getattr(self.game_config, "model_type", "chatgpt")
+        logger.info("Preprocessing personas from {} -> {}", input_path, output_path or "[auto]")
+        processed_path = process_persona_file(
+            input_path=input_path,
+            output_path=output_path,
+            llm_pipeline=getattr(self.game_config, "llm_pipeline", None),
+            terminators=getattr(self.game_config, "terminators", None),
+            model_type=model_type,
+        )
+        logger.info("Preprocessing completed. Output saved to {}", processed_path)
 
     def run_offline_test(self):
         """
