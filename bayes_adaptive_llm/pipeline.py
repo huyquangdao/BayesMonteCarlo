@@ -185,7 +185,8 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             results = self.trainer.online_test(test_cases,
                                                device=self.device,
                                                simulators=test_simulators,
-                                               action_mapping=action_mapping)
+                                               action_mapping=action_mapping,
+                                               is_infer_persona=getattr(self.model_config, "is_infer_persona", False))
 
             return results
         

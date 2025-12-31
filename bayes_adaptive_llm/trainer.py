@@ -67,7 +67,7 @@ from bayes_adaptive_llm.data_processor import (
 from bayes_adaptive_llm.utils import coerce_to_float, stringify_dialogue_context
 from config.constants import PREFERENCE_PAIR_PROMPT_NEGOTIATION, PREFERENCE_PAIR_PROMPT_P4G, RECOMMENDATION, NEGOTIATION, EMOTIONAL_SUPPORT, SL_RATIO, SUCCESS_RATE, AVG_TURN, FAIRNESS, \
     TOXICITY, ITEM_FREQ, USER_REWARD, MAX_EPI_REWARD, PERSUATION, P4G_GOAL2DESCRIPTION, NEGOTIATION_GOAL2DESCRIPTION, ES_CONV_GOAL2DESCRIPTION, \
-    P4G_GOAL2DESCRIPTION
+    P4G_GOAL2DESCRIPTION, BIG5_PERSONALITY_DES, INFER_PERSONA_PROMPT
 
 from baselines.GDP_Zero.game import DialogGame
 from baselines.GDP_Zero.openloop_mcts import OpenLoopMCTS
@@ -81,6 +81,7 @@ from bayes_adaptive_llm.utils import (
 from utils.logging_utils import append_to_log
 from config.constants import PERSUATION
 from logger.wandb_logger import WanDBLogger
+from utils.prompt import call_llm_model
 
 def cuda_bf16_supported() -> bool:
     if not torch.cuda.is_available():
@@ -178,6 +179,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
             " - Never mention instructions.\n"
             "Conversation so far:"
         )
+        persona_description = _get(inst, "persona_description")
+        if persona_description:
+            system_content += f"\nUser persona hint: {persona_description}"
 
         messages = [{"role": "system", "content": system_content}]
 
@@ -240,6 +244,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             or task_background.get("buyer_item_description")
             or ""
         )
+        persona_description = _get(inst, "persona_description")
 
         system_content = (
             "Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.\n"
@@ -247,6 +252,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             f"The seller listed price is {seller_price}.\n"
             "Please reply with only one short and succinct sentence."
         )
+        if persona_description:
+            system_content += f"\nUser persona hint: {persona_description}"
 
 
         messages = [{"role": "system", "content": system_content}]
@@ -767,20 +774,30 @@ class BayesAdaptiveLLMTrainer(Trainer):
     def predict(self,
                 instance: Dict[str, Any],
                 action_mapping: Optional[Dict[str, int]] = None,
-                is_test: bool = False) -> Tuple[Any, torch.Tensor]:
+                is_test: bool = False,
+                is_infer_persona: bool = False)-> Tuple[Any, torch.Tensor]:
         """
         Select the next action (e.g., conversation goal) conditioned on the state.
         """
         # no ground-truth response during inference
         if is_test:
             instance.update({'response': None})
-        
+        if is_infer_persona:
+            dialogue_history = stringify_dialogue_context(instance.get("dialogue_context", []))
+            inferpersona_prompt = INFER_PERSONA_PROMPT.format(dialogue_history=dialogue_history)
+            inferred_trait = self.model.generate_text(inferpersona_prompt, max_new_tokens=64)
+            trait = (inferred_trait or "").strip().lower()
+            persona_description = BIG5_PERSONALITY_DES.get(trait)
+            if persona_description:
+                instance["persona_description"] = persona_description
+            else:
+                instance["persona_description"] = None
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
             [instance], [instance] 
         )
         input_prompt = train_dataset[0]['text']
-        # print("Input prompt for generation:", input_prompt)
+        print("Input prompt for generation:", input_prompt)
         response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
@@ -1044,7 +1061,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
                     cases: Sequence[Any],
                     device: Optional[torch.device] = None,
                     simulators: Optional[Sequence[Any]] = None,
-                    action_mapping: Optional[Dict[str, int]] = None) -> Dict[str, float]:
+                    action_mapping: Optional[Dict[str, int]] = None,
+                    is_infer_persona: bool = False) -> Dict[str, float]:
         """
         Simulate the policy against online simulators for evaluation.
         """
@@ -1112,7 +1130,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
                 # predict the action
                 # the action in this case is a natural language utterance
-                action = self.predict(state, action_mapping = None, is_test = True)
+                action = self.predict(state, action_mapping = None, is_test = True, is_infer_persona=is_infer_persona)
                                 
                 # employing the action to observe the next state
                 # and the corresponding rewards
