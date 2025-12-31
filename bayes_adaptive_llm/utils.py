@@ -3,10 +3,10 @@ Utility helpers shared across the Bayes-Adaptive LLM pipeline.
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from loguru import logger
-from transformers import AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import torch.nn as nn
 from peft import PeftModel
@@ -170,6 +170,63 @@ def get_preference_pair(
     logger.info("No single-action pair found for action {}, trying cross-action.", target_idx)
     # Fallback: cross-action using top-2 actions.
     return _pair_top_actions(probabilities, state_rep, dialog_acts, valid_moves_list, realizations_vs, preferred_action=target_idx)
+
+
+def load_persona_infer_model(model_config, device, log=logger) -> Tuple[Optional[torch.nn.Module], Optional[AutoTokenizer]]:
+    """
+    Load persona inference model/tokenizer from a saved SFT checkpoint.
+    Returns (model, tokenizer) or (None, None) on failure.
+    """
+    model_dir = os.path.join(getattr(model_config, "saved_dir", ""), getattr(model_config, "persona_sft_model_folder"))
+
+    if not model_dir or not os.path.exists(model_dir):
+        log.warning("Persona SFT model dir not found ({}); using main model for persona inference.", model_dir)
+        return None, None
+
+    meta_path = os.path.join(model_dir, "meta.pt")
+    meta = torch.load(meta_path, map_location="cpu") if os.path.exists(meta_path) else {}
+    base_model_name = meta.get("base_model_name") or getattr(model_config, "plm", None) or model_dir
+    saved_format = meta.get("saved_format")
+    dtype = torch.bfloat16 if getattr(model_config, "bf16", True) else None
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(base_model_name, cache_dir=getattr(model_config, "cached_dir", None))
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+    except Exception as exc:  # pragma: no cover
+        log.warning("Failed to load persona tokenizer {}: {}", base_model_name, exc)
+        return None, None
+
+    try:
+        if saved_format == "lora_adapter":
+            base_model = AutoModelForCausalLM.from_pretrained(
+                base_model_name,
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
+            )
+            adapter_dir = os.path.join(model_dir, "lora_adapter")
+            model = PeftModel.from_pretrained(base_model, adapter_dir)
+        elif saved_format == "full_state_dict":
+            model = AutoModelForCausalLM.from_pretrained(
+                base_model_name,
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
+            )
+            state_dict = torch.load(os.path.join(model_dir, "model.pth"), map_location="cpu")
+            model.load_state_dict(state_dict)
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_dir,
+                cache_dir=getattr(model_config, "cached_dir", None),
+                torch_dtype=dtype,
+            )
+
+        model.to(device)
+        log.info("Loaded persona inference model from {}", model_dir)
+        return model, tokenizer
+    except Exception as exc:  # pragma: no cover
+        log.warning("Failed to load persona inference model from {}: {}", model_dir, exc)
+        return None, None
 
 
 def coerce_to_float(value, default):
@@ -351,4 +408,3 @@ def save_finetuned_model(self, save_dir=None):
         meta["saved_format"] = "full_state_dict"
         torch.save(meta, os.path.join(save_dir, "meta.pt"))
         print(f"[SAVE] Full model state_dict saved to {ckpt_path}")
-

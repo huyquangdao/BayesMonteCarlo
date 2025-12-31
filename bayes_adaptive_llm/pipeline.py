@@ -43,6 +43,13 @@ class BayesAdaptiveLLMPipeline(Pipeline):
         print(f"[LOAD] Final self.model.plm type   = {type(plm_obj)}")
         print(f"[LOAD] Device of plm (if any)      = {getattr(plm_obj, 'device', 'unknown')}")
 
+        # Optionally load persona inference model independently (non-blocking)
+        try:
+            if getattr(self.model_config, "is_infer_persona", False):
+                self.trainer.load_persona_infer_model()
+        except Exception as exc:  # pragma: no cover
+            print(f"[LOAD] Skipping persona inference model load due to error: {exc}")
+
 
 
     def execute(self):

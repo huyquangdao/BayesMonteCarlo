@@ -38,7 +38,7 @@ from torch.optim import AdamW
 from datasets import Dataset as HFDataset
 from loguru import logger as loguru_logger
 from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import get_linear_schedule_with_warmup
 # from transformers.trainer_utils import IntervalStrategy
 from transformers.trainer import Trainer as HFTrainer
 from peft import LoraConfig, get_peft_model, PeftModel
@@ -75,8 +75,8 @@ from baselines.GDP_Zero.player import LLMPlayer
 from baselines.GDP_Zero.utils import update_state_for_open_loop_mcts
 from bayes_adaptive_llm.utils import (
     sanitize_persona_description,
-    stringify_dialogue_context,
     get_preference_pair,
+    load_persona_infer_model,
 )
 from utils.persona_processor import process_persona_file, build_personality_sft_data
 from utils.logging_utils import append_to_log
@@ -151,6 +151,9 @@ class BayesAdaptiveLLMTrainer(Trainer):
                         online_evaluator, loggers)
         self.generation_method = generation_method
         self.tokenizer = getattr(self.model, "tokenizer", None)
+        # Dedicated persona inference model (optional, loaded lazily)
+        self._persona_infer_model = None
+        self._persona_infer_tokenizer = None
         loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
 
     def _instance_to_messages_for_persuasion(self, inst):
@@ -783,21 +786,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # no ground-truth response during inference
         if is_test:
             instance.update({'response': None})
+        persona_description = instance.get("persona_description")
         if is_infer_persona:
-            dialogue_history = stringify_dialogue_context(instance.get("dialogue_context", []))
-            inferpersona_prompt = INFER_PERSONA_PROMPT.format(dialogue_history=dialogue_history)
-            inferred_trait = self.model.generate_text(inferpersona_prompt, max_new_tokens=64)
-            trait = (inferred_trait or "").strip().lower()
-            print("trait: ", trait)
-            persona_description = BIG5_PERSONALITY_DES.get(trait)
-            if persona_description:
-                instance["persona_description"] = persona_description
-            else:
-                instance["persona_description"] = None
+            persona_description = self._infer_persona_from_context(instance.get("dialogue_context", []))
+            instance["persona_description"] = persona_description
         print("persona: ", persona_description)
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
-            [instance], [instance] 
+            [instance], [instance]
         )
         input_prompt = train_dataset[0]['text']
         print("Input prompt for generation:", input_prompt)
@@ -805,6 +801,49 @@ class BayesAdaptiveLLMTrainer(Trainer):
         assert response is not None
         # print("Generated response:", response)
         return response
+
+    def _infer_persona_from_context(self, dialogue_context: Sequence[Dict[str, Any]]) -> Optional[str]:
+        """
+        Use a dedicated SFT persona classifier (if provided) to infer user trait from history.
+        Falls back to the main model if no persona model is configured.
+        """
+        history = stringify_dialogue_context(dialogue_context or [])
+        prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
+
+        # Prefer dedicated persona SFT model if available
+        if self._persona_infer_model is None:
+            self.load_persona_infer_model()
+
+        if self._persona_infer_model is None or self._persona_infer_tokenizer is None:
+            inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
+        else:
+            model = self._persona_infer_model
+            tokenizer = self._persona_infer_tokenizer
+            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            with torch.inference_mode():
+                output_ids = model.generate(
+                    **inputs,
+                    max_new_tokens=64,
+                    do_sample=False,
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+            inferred_trait = tokenizer.decode(
+                output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True
+            )
+
+        trait = (inferred_trait or "").strip().lower()
+        print("trait: ", trait)
+        return BIG5_PERSONALITY_DES.get(trait)
+
+    def load_persona_infer_model(self) -> None:
+        """
+        Public helper to trigger persona model load ahead of predict calls.
+        """
+        if self._persona_infer_model is not None and self._persona_infer_tokenizer is not None:
+            return
+        model, tokenizer = load_persona_infer_model(self.model_config, self.accelerator.device, loguru_logger)
+        self._persona_infer_model = model
+        self._persona_infer_tokenizer = tokenizer
 
     def select_action(self, logits: torch.Tensor, is_test: bool = True) -> Tuple[Any, torch.Tensor]:
         """
@@ -926,7 +965,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             self.model.plm = trained_plm
         else:
             self.model = trained_plm
-        sft_save_dir = os.path.join(self.model_config.saved_dir, getattr(self.model_config, "persona_sft_folder", "persona_sft"))
+        sft_save_dir = os.path.join(self.model_config.saved_dir, getattr(self.model_config, "persona_sft_model_folder"))
         save_finetuned_model(self, save_dir=sft_save_dir)
 
     def preprocess_persona_file(

@@ -13,6 +13,7 @@ combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel
 dpo_adapter_folder: dpo_adapter
 sft_adapter_folder: sft_adapter  
+persona_sft_model_folder: sft_infer_persona
 
 # dpo_adapter_folder: dpo_adapter_basemodel
 # dpo_adapter_folder: dpo_adapter_nopersona
@@ -29,10 +30,10 @@ run_sft: false
 run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: false
+run_online_eval: true
 run_simulator_analysis: false
 run_preprocessing: false
-run_persona_sft: true
+run_persona_sft: false
 
 is_infer_persona: true
 
