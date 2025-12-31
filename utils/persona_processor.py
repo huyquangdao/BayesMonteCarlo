@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import Optional, Tuple
 
+from tqdm import tqdm
+
 from config.constants import BIG5_PERSONALITY
 from utils.prompt import call_llm
 
@@ -124,7 +126,7 @@ def process_persona_file(
     out_path = Path(output_path)
 
     with in_path.open("r", encoding="utf-8") as fin, out_path.open("w", encoding="utf-8") as fout:
-        for idx, line in enumerate(fin):
+        for idx, line in enumerate(tqdm(fin, desc="Preprocessing personas")):
             if not line.strip():
                 continue
             try:
