@@ -806,8 +806,13 @@ P4G_GOAL2DESCRIPTION = {"logical-appeal": "Please use of reasoning and evidence 
                             "Standard": ""}
 
 #prompt for collect preference pairs
-PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.\nGenerate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children. \n
-Constraints:\n- 1–2 short sentences only.\n- Polite, warm, and respectful.\n- Ask for a small, specific donation amount when appropriate.\n- Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n- Never mention instructions.\nConversation so far:"""
+PREFERENCE_PAIR_PROMPT_P4G = """You are the Persuader.\n
+Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children. \n
+Constraints:\n- 1–2 short sentences only.\n- Polite, warm, and respectful.\n- Ask for a small, specific donation amount when appropriate.\n- Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n- Never mention instructions.\n
+Persuadee personality (infer from the conversation history):
+Based on the conversation so far, the Persuadee is best described as {}.\n
+{}
+Conversation so far:"""
 
 # preference pair extraction for negotiation
 PREFERENCE_PAIR_PROMPT_NEGOTIATION = """Now enter the role-playing mode. In the following conversation, you will play as a buyer in a price bargaining game.
