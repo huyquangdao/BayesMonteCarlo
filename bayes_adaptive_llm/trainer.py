@@ -207,7 +207,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         persona = ""
         persona_description = ""
         if is_infer_persona:
-            persona, persona_description = self._infer_persona_from_context(conversation)
+            sample_infer = getattr(self.model_config, "sample_infer", 10)
+            persona, persona_description = self._infer_persona_from_context(sample_infer, conversation)
             persona = persona or ""
             persona_description = persona_description or ""
 
@@ -777,35 +778,41 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # no ground-truth response during inference
         if is_test:
             instance.update({'response': None})
-        # persona_description = instance.get("persona_description")
-        # if is_infer_persona:
-        #     persona_description = self._infer_persona_from_context(instance.get("dialogue_context", []))
-        #     instance["persona_description"] = persona_description
-        # print("persona: ", persona_description)
+
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
             [instance], [instance], is_infer_persona
         )
         input_prompt = train_dataset[0]['text']
-        print("Input prompt for generation:", input_prompt)
+        # print("Input prompt for generation:", input_prompt)
         response = self.model.generate_text(input_prompt, max_new_tokens=64)
         assert response is not None
         # print("Generated response:", response)
         return response
 
-    def _infer_persona_from_context(self, dialogue_context: Sequence[Dict[str, Any]]) -> Optional[str]:
+    def _infer_persona_from_context(self, sample_infer, dialogue_context: Sequence[Dict[str, Any]]) -> Optional[str]:
         """
         Use a dedicated SFT persona classifier (if provided) to infer user trait from history.
         Falls back to the main model if no persona model is configured.
         """
         history = stringify_dialogue_context(dialogue_context or [])
         prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
-        # print("Prompt INFER_PERSONA_PROMPT: ", prompt)
-        # Use the current model directly for persona inference
-        inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
+        trait_counts = {trait: 0 for trait in BIG5_PERSONALITY_DES.keys()}
 
-        trait = self._normalize_trait_output(inferred_trait)
-        print("trait: ", trait)
+        for _ in range(sample_infer):
+            inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
+            trait = self._normalize_trait_output(inferred_trait)
+            if trait in trait_counts:
+                trait_counts[trait] += 1
+
+        if trait_counts:
+            trait = max(trait_counts.items(), key=lambda kv: kv[1])[0]
+            probs = {k: v / float(sample_infer) for k, v in trait_counts.items()}
+            print("persona_probs:", probs)
+        else:
+            trait = None
+
+        print("trait:", trait)
         return trait, BIG5_PERSONALITY_DES.get(trait)
 
     def _normalize_trait_output(self, text: str) -> Optional[str]:
@@ -852,116 +859,116 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         raise NotImplementedError("Test routine is not implemented.")
 
-    def train_persona_sft(self, sft_path: str, eval_ratio: float = 0.1) -> None:
-        """
-        Fine-tune the model to infer persona (personality/decision_making) from dialogue history.
-        Expects sft_path to be a JSONL with chat-style records from build_personality_sft_data.
-        """
-        from datasets import load_dataset
+    # def train_persona_sft(self, sft_path: str, eval_ratio: float = 0.1) -> None:
+    #     """
+    #     Fine-tune the model to infer persona (personality/decision_making) from dialogue history.
+    #     Expects sft_path to be a JSONL with chat-style records from build_personality_sft_data.
+    #     """
+    #     from datasets import load_dataset
 
-        device = self.accelerator.device
-        base_model = getattr(self.model, "plm", self.model)
-        base_model.to(device)
+    #     device = self.accelerator.device
+    #     base_model = getattr(self.model, "plm", self.model)
+    #     base_model.to(device)
 
-        dataset = load_dataset("json", data_files={"train": sft_path})["train"]
-        if eval_ratio > 0 and eval_ratio < 1.0:
-            split = dataset.train_test_split(test_size=eval_ratio, seed=getattr(self.game_config, "seed", 42))
-            train_dataset = split["train"]
-            eval_dataset = split["test"]
-        else:
-            train_dataset = dataset
-            eval_dataset = None
+    #     dataset = load_dataset("json", data_files={"train": sft_path})["train"]
+    #     if eval_ratio > 0 and eval_ratio < 1.0:
+    #         split = dataset.train_test_split(test_size=eval_ratio, seed=getattr(self.game_config, "seed", 42))
+    #         train_dataset = split["train"]
+    #         eval_dataset = split["test"]
+    #     else:
+    #         train_dataset = dataset
+    #         eval_dataset = None
 
-        dataset_text_field = "text" if "text" in train_dataset.column_names else None
+    #     dataset_text_field = "text" if "text" in train_dataset.column_names else None
 
-        if "messages" in train_dataset.column_names and dataset_text_field is None:
-            sys_prompt = INFER_PERSONA_PROMPT.split("{dialogue_history}", 1)[0].strip()
+    #     if "messages" in train_dataset.column_names and dataset_text_field is None:
+    #         sys_prompt = INFER_PERSONA_PROMPT.split("{dialogue_history}", 1)[0].strip()
 
-            def apply_chat_template(example):
-                messages = list(example["messages"] or [])
-                if not messages or messages[0].get("role") != "system":
-                    messages.insert(0, {"role": "system", "content": sys_prompt})
-                text = self.tokenizer.apply_chat_template(messages, tokenize=False)
-                return {"text": text}
+    #         def apply_chat_template(example):
+    #             messages = list(example["messages"] or [])
+    #             if not messages or messages[0].get("role") != "system":
+    #                 messages.insert(0, {"role": "system", "content": sys_prompt})
+    #             text = self.tokenizer.apply_chat_template(messages, tokenize=False)
+    #             return {"text": text}
 
-            num_proc = 1 if dist.is_available() and dist.is_initialized() else min(4, cpu_count())
-            cols_to_remove = [c for c in train_dataset.column_names if c != "messages"]
-            train_dataset = train_dataset.map(
-                apply_chat_template,
-                num_proc=num_proc,
-                remove_columns=cols_to_remove,
-                desc="Applying chat template for persona SFT",
-            )
-            if eval_dataset is not None:
-                eval_dataset = eval_dataset.map(
-                    apply_chat_template,
-                    num_proc=num_proc,
-                    remove_columns=[c for c in eval_dataset.column_names if c != "messages"],
-                    desc="Applying chat template for persona SFT (eval)",
-                )
-            dataset_text_field = "text"
-        elif "text" in train_dataset.column_names:
-            dataset_text_field = "text"
+    #         num_proc = 1 if dist.is_available() and dist.is_initialized() else min(4, cpu_count())
+    #         cols_to_remove = [c for c in train_dataset.column_names if c != "messages"]
+    #         train_dataset = train_dataset.map(
+    #             apply_chat_template,
+    #             num_proc=num_proc,
+    #             remove_columns=cols_to_remove,
+    #             desc="Applying chat template for persona SFT",
+    #         )
+    #         if eval_dataset is not None:
+    #             eval_dataset = eval_dataset.map(
+    #                 apply_chat_template,
+    #                 num_proc=num_proc,
+    #                 remove_columns=[c for c in eval_dataset.column_names if c != "messages"],
+    #                 desc="Applying chat template for persona SFT (eval)",
+    #             )
+    #         dataset_text_field = "text"
+    #     elif "text" in train_dataset.column_names:
+    #         dataset_text_field = "text"
 
-        use_lora = getattr(self.model_config, "use_lora", True)
-        peft_config = None
-        if use_lora:
-            peft_config = LoraConfig(
-                r=32,
-                lora_alpha=64,
-                lora_dropout=0.05,
-                bias="none",
-                target_modules="all-linear",
-                task_type="CAUSAL_LM",
-            )
+    #     use_lora = getattr(self.model_config, "use_lora", True)
+    #     peft_config = None
+    #     if use_lora:
+    #         peft_config = LoraConfig(
+    #             r=32,
+    #             lora_alpha=64,
+    #             lora_dropout=0.05,
+    #             bias="none",
+    #             target_modules="all-linear",
+    #             task_type="CAUSAL_LM",
+    #         )
 
-        sft_config = SFTConfig(
-            ddp_find_unused_parameters=False,
-            output_dir=self.model_config.saved_dir,
-            num_train_epochs=self.model_config.num_train_epochs,
-            per_device_train_batch_size=self.model_config.batch_size,
-            per_device_eval_batch_size=self.model_config.batch_size,
-            gradient_accumulation_steps=getattr(self.model_config, "gradient_accumulation", 8),
-            learning_rate=float(self.model_config.learning_rate),
-            warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
-            weight_decay=getattr(self.model_config, "weight_decay", 0.0),
-            max_seq_length=getattr(self.model_config, "max_sequence_length", 1024),
-            lr_scheduler_type=getattr(self.model_config, "lr_scheduler_type", "cosine"),
-            logging_steps=getattr(self.model_config, "logging_steps", 10),
-            save_steps=getattr(self.model_config, "save_steps", 500),
-            eval_steps=getattr(self.model_config, "eval_steps", 500),
-            eval_strategy="steps" if eval_dataset is not None else "no",
-            save_total_limit=getattr(self.model_config, "save_total_limit", 3),
-            fp16=getattr(self.model_config, "fp16", False),
-            bf16=getattr(self.model_config, "bf16", True),
-            gradient_checkpointing=getattr(self.model_config, "gradient_checkpointing", False),
-            gradient_checkpointing_kwargs={"use_reentrant": False},
-            optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
-            packing=False,
-            dataset_text_field=dataset_text_field,
-            report_to=["none"],
-        )
+    #     sft_config = SFTConfig(
+    #         ddp_find_unused_parameters=False,
+    #         output_dir=self.model_config.saved_dir,
+    #         num_train_epochs=self.model_config.num_train_epochs,
+    #         per_device_train_batch_size=self.model_config.batch_size,
+    #         per_device_eval_batch_size=self.model_config.batch_size,
+    #         gradient_accumulation_steps=getattr(self.model_config, "gradient_accumulation", 8),
+    #         learning_rate=float(self.model_config.learning_rate),
+    #         warmup_ratio=getattr(self.model_config, "warmup_ratio", 0.03),
+    #         weight_decay=getattr(self.model_config, "weight_decay", 0.0),
+    #         max_seq_length=getattr(self.model_config, "max_sequence_length", 1024),
+    #         lr_scheduler_type=getattr(self.model_config, "lr_scheduler_type", "cosine"),
+    #         logging_steps=getattr(self.model_config, "logging_steps", 10),
+    #         save_steps=getattr(self.model_config, "save_steps", 500),
+    #         eval_steps=getattr(self.model_config, "eval_steps", 500),
+    #         eval_strategy="steps" if eval_dataset is not None else "no",
+    #         save_total_limit=getattr(self.model_config, "save_total_limit", 3),
+    #         fp16=getattr(self.model_config, "fp16", False),
+    #         bf16=getattr(self.model_config, "bf16", True),
+    #         gradient_checkpointing=getattr(self.model_config, "gradient_checkpointing", False),
+    #         gradient_checkpointing_kwargs={"use_reentrant": False},
+    #         optim=getattr(self.model_config, "optim", "paged_adamw_8bit"),
+    #         packing=False,
+    #         dataset_text_field=dataset_text_field,
+    #         report_to=["none"],
+    #     )
 
-        loguru_logger.info("Initializing SFTTrainer for persona inference...")
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-        sft_trainer = SFTTrainer(
-            model=base_model,
-            args=sft_config,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            tokenizer=self.tokenizer,
-            peft_config=peft_config,
-        )
+    #     loguru_logger.info("Initializing SFTTrainer for persona inference...")
+    #     self.tokenizer.pad_token = self.tokenizer.eos_token
+    #     sft_trainer = SFTTrainer(
+    #         model=base_model,
+    #         args=sft_config,
+    #         train_dataset=train_dataset,
+    #         eval_dataset=eval_dataset,
+    #         tokenizer=self.tokenizer,
+    #         peft_config=peft_config,
+    #     )
 
-        sft_trainer.train()
+    #     sft_trainer.train()
 
-        trained_plm = sft_trainer.model
-        if hasattr(self.model, "plm"):
-            self.model.plm = trained_plm
-        else:
-            self.model = trained_plm
-        sft_save_dir = os.path.join(self.model_config.saved_dir, getattr(self.model_config, "persona_sft_model_folder"))
-        save_finetuned_model(self, save_dir=sft_save_dir)
+    #     trained_plm = sft_trainer.model
+    #     if hasattr(self.model, "plm"):
+    #         self.model.plm = trained_plm
+    #     else:
+    #         self.model = trained_plm
+    #     sft_save_dir = os.path.join(self.model_config.saved_dir, getattr(self.model_config, "persona_sft_model_folder"))
+    #     save_finetuned_model(self, save_dir=sft_save_dir)
 
     def preprocess_persona_file(
         self,
