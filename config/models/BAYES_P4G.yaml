@@ -79,7 +79,7 @@ max_prompt_length: 768        # max_prompt_length
 
 dpo_train_batch_size: 1             # per_device_train_batch_size / eval_batch_size
 dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
-dpo_epochs: 5                 # epochs
+dpo_epochs: 3                 # epochs
 
 dpo_learning_rate: 2e-5       # learning_rate
 dpo_beta: 0.1                 # beta

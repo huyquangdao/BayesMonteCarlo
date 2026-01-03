@@ -158,7 +158,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         self._persona_infer_tokenizer = None
         loguru_logger.debug("Initialized BayesAdaptiveLLMTrainer skeleton.")
 
-    def _instance_to_messages_for_persuasion(self, inst):
+    def _instance_to_messages_for_persuasion(self, inst, is_infer_persona: bool = False):
         """
         Convert a persuasion instance to chat messages for SFT.
         Support:
@@ -170,66 +170,54 @@ class BayesAdaptiveLLMTrainer(Trainer):
                 return obj.get(key, default)
             return getattr(obj, key, default)
 
-        # persona
-        # persona = _get(inst, "persona") or _get(inst, "user_profile_description")
-
-        # ===== ROLE/ GOAL / STYLE =====
-        system_content = (
-            "You are the Persuader.\n"
-            "Generate the Persuader reply that advances persuasion and encourages the Persuadee to donate to Save the Children.\n"
-            "Constraints:\n"
-            " - 1–2 short sentences only.\n"
-            " - Polite, warm, and respectful.\n"
-            " - Ask for a small, specific donation amount when appropriate.\n"
-            " - Briefly mention a concrete impact of donating (e.g., meals, school supplies, emergency aid) when possible.\n"
-            " - Never mention instructions.\n"
-            "Conversation so far:"
-        )
-        persona_description = _get(inst, "persona_description")
-        if persona_description:
-            system_content += f"\nUser persona hint: {persona_description}"
-
-        messages = [{"role": "system", "content": system_content}]
-
-            # ===== DIALOGUE CONTEXT =====
         dialog = _get(inst, "dialog")
+        dialogue_context = _get(inst, "dialogue_context")
+        target_resp = _get(inst, "response")
+        maybe_msgs = _get(inst, "messages")
+
+        conversation = []
         if dialog is not None:
             for turn in dialog:
-                # er = persuader → assistant
                 for utt in turn.get("er", []):
                     utt = (utt or "").strip()
                     if utt:
-                        messages.append({"role": "assistant", "content": utt})
-                # ee = persuadee → user
+                        conversation.append({"role": "assistant", "content": utt})
                 for utt in turn.get("ee", []):
                     utt = (utt or "").strip()
                     if utt:
-                        messages.append({"role": "user", "content": utt})
-            return {"messages": messages}
-
-        dialogue_context = _get(inst, "dialogue_context")
-        target_resp = _get(inst, "response")
-        if dialogue_context:
+                        conversation.append({"role": "user", "content": utt})
+        elif dialogue_context:
             for utt in dialogue_context:
                 content = (utt.get("content") or "").strip()
                 if not content:
                     continue
                 role = "assistant" if utt.get("role", "user") == "assistant" else "user"
-                messages.append({"role": role, "content": content})
-            if target_resp:
-                messages.append({"role": "assistant", "content": target_resp})
-            return {"messages": messages}
-
-        maybe_msgs = _get(inst, "messages")
-        if maybe_msgs is not None:
+                conversation.append({"role": role, "content": content})
+            resp = (target_resp or "").strip()
+            if resp:
+                conversation.append({"role": "assistant", "content": resp})
+        elif maybe_msgs is not None:
             return {"messages": maybe_msgs}
+        else:
+            raise ValueError(
+                "Cannot infer conversation structure from instance. "
+                "Please adapt _instance_to_messages_for_persuasion."
+            )
 
-        raise ValueError(
-            "Cannot infer conversation structure from instance. "
-            "Please adapt _instance_to_messages_for_persuasion."
-        )
+        persona = ""
+        persona_description = ""
+        if is_infer_persona:
+            persona, persona_description = self._infer_persona_from_context(conversation)
+            persona = persona or ""
+            persona_description = persona_description or ""
 
-    
+        system_template = globals().get("PREFERENCE_PAIR_PROMPT_P4G", "")
+        system_content = (system_template or "").format(persona, persona_description)
+
+        messages = [{"role": "system", "content": system_content}]
+        messages.extend(conversation)
+        return {"messages": messages}
+
     def _instance_to_messages_for_negotiation(self, inst):
         """
         Convert a negotiation instance to chat messages for SFT.
@@ -286,18 +274,18 @@ class BayesAdaptiveLLMTrainer(Trainer):
             "Please adapt _instance_to_messages_for_negotiation."
         )
 
-    def _build_sft_datasets_from_instances(self, train_instances, dev_instances):
+    def _build_sft_datasets_from_instances(self, train_instances, dev_instances, is_infer_persona):
         if self.tokenizer is None:
             raise ValueError("self.model.tokenizer is None; cannot run SFT.")
 
         tokenizer = self.tokenizer
         if self.game_config.name == PERSUATION:
             train_records = [
-                self._instance_to_messages_for_persuasion(inst)
+                self._instance_to_messages_for_persuasion(inst, is_infer_persona)
                 for inst in train_instances
             ]
             dev_records = [
-                self._instance_to_messages_for_persuasion(inst)
+                self._instance_to_messages_for_persuasion(inst, is_infer_persona)
                 for inst in dev_instances
             ]
         elif self.game_config.name == NEGOTIATION:
@@ -789,14 +777,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # no ground-truth response during inference
         if is_test:
             instance.update({'response': None})
-        persona_description = instance.get("persona_description")
-        if is_infer_persona:
-            persona_description = self._infer_persona_from_context(instance.get("dialogue_context", []))
-            instance["persona_description"] = persona_description
-        print("persona: ", persona_description)
+        # persona_description = instance.get("persona_description")
+        # if is_infer_persona:
+        #     persona_description = self._infer_persona_from_context(instance.get("dialogue_context", []))
+        #     instance["persona_description"] = persona_description
+        # print("persona: ", persona_description)
         # create input example for response generation
         train_dataset, _ = self._build_sft_datasets_from_instances(
-            [instance], [instance]
+            [instance], [instance], is_infer_persona
         )
         input_prompt = train_dataset[0]['text']
         print("Input prompt for generation:", input_prompt)
@@ -818,7 +806,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         trait = self._normalize_trait_output(inferred_trait)
         print("trait: ", trait)
-        return BIG5_PERSONALITY_DES.get(trait)
+        return trait, BIG5_PERSONALITY_DES.get(trait)
 
     def _normalize_trait_output(self, text: str) -> Optional[str]:
         """
