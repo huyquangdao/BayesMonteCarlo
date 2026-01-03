@@ -26,6 +26,9 @@ class BayesAdaptiveLLMModel(Model):
             self.model_config.tokenizer,
             cache_dir=self.model_config.cached_dir,
         )
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
         self.plm = AutoModelForCausalLM.from_pretrained(
             self.model_config.plm,
             cache_dir=self.model_config.cached_dir,
@@ -34,6 +37,8 @@ class BayesAdaptiveLLMModel(Model):
             device_map="cuda" if torch.cuda.is_available() else None,
         )
         self.plm.config.use_cache = False
+        if self.plm.config.pad_token_id is None:
+            self.plm.config.pad_token_id = self.tokenizer.pad_token_id
 
         # extend vocabulary with task-specific tokens
         # if not self.model_config.run_online_eval:
@@ -83,6 +88,7 @@ class BayesAdaptiveLLMModel(Model):
             temperature=gen_kwargs.get("temperature", 0.7),
             top_p=gen_kwargs.get("top_p", 0.9),
             eos_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
         )
         response = self.tokenizer.decode(output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True)
         return self.post_processing_response(response)
