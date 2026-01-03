@@ -800,7 +800,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         """
         history = stringify_dialogue_context(dialogue_context or [])
         prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
-        print("Prompt INFER_PERSONA_PROMPT: ", prompt)
+        # print("Prompt INFER_PERSONA_PROMPT: ", prompt)
         # Use the current model directly for persona inference
         inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
 
