@@ -813,25 +813,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
         history = stringify_dialogue_context(dialogue_context or [])
         prompt = INFER_PERSONA_PROMPT.format(dialogue_history=history)
         print("Prompt INFER_PERSONA_PROMPT: ", prompt)
-        # Prefer dedicated persona SFT model if available
-        if self._persona_infer_model is None:
-            self.load_persona_infer_model()
-
-        if self._persona_infer_model is None or self._persona_infer_tokenizer is None:
-            inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
-        else:
-            model = self._persona_infer_model
-            tokenizer = self._persona_infer_tokenizer
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-            with torch.inference_mode():
-                output_ids = model.generate(
-                    **inputs,
-                    max_new_tokens=64,
-                    eos_token_id=tokenizer.eos_token_id,
-                )
-            inferred_trait = tokenizer.decode(
-                output_ids[0][len(inputs.input_ids[0]):], skip_special_tokens=True
-            )
+        # Use the current model directly for persona inference
+        inferred_trait = self.model.generate_text(prompt, max_new_tokens=64)
 
         trait = self._normalize_trait_output(inferred_trait)
         print("trait: ", trait)
