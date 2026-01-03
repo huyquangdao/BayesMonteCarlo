@@ -153,7 +153,7 @@ def process_persona_file(
 
                 # Preserve original preference pair structure and enrich with persona fields
                 persona_label = personality or persona_hint_raw.get("personality")
-                persona_description = description or (BIG5_PERSONALITY_DES.get(personality) if personality else "")
+                persona_description = BIG5_PERSONALITY_DES.get(personality) if personality else ""
 
                 prompt_body = history
                 prompt = PREFERENCE_PAIR_PROMPT_P4G.format(persona_label or "unknown", persona_description or "").rstrip()
