@@ -30,9 +30,9 @@ run_sft: false
 run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: true
+run_online_eval: false
 run_simulator_analysis: false
-run_preprocessing: false
+run_preprocessing: true
 run_persona_sft: false
 
 is_infer_persona: true

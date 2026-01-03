@@ -150,14 +150,34 @@ def process_persona_file(
                     model_type=model_type,
                 )
 
-                out_record = {
+                # Preserve original preference pair structure and enrich with persona fields
+                base_record = {
+                    "prompt": record.get("prompt"),
+                    "chosen": record.get("chosen"),
+                    "rejected": record.get("rejected"),
                     "dialog_index": record.get("dialog_index"),
                     "turn": record.get("turn"),
                     "action": record.get("action"),
-                    "hist_dialog": history,
-                    "personality": personality,
-                    "decision_making": decision_making,
+                    "system_utterance": record.get("system_utterance"),
+                    "user_utterance": record.get("user_utterance"),
                 }
+
+                out_record = {
+                    **base_record,
+                    "hist_dialog": history,
+                    # "personality": personality,
+                    # "decision_making": decision_making,
+                }
+
+                # preserve/enrich persona hint
+                persona_hint = record.get("persona_hint") or {}
+                if description:
+                    persona_hint["description"] = description
+                if personality is not None:
+                    persona_hint["personality"] = personality
+                if decision_making is not None:
+                    persona_hint["decision_making"] = decision_making
+                out_record["persona_hint"] = persona_hint
                 fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
             except Exception as e:
                 print(f"[persona_processor] Skipping line {idx} due to error: {e}")
