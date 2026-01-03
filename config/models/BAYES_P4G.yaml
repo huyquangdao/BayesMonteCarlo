@@ -27,7 +27,7 @@ persona_sft_model_folder: sft_infer_persona
 
 # Training toggles
 run_sft: false
-run_dpo: true
+run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: true
