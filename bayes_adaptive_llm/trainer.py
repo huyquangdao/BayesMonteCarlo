@@ -13,6 +13,7 @@ import json
 import copy
 import inspect
 import re
+from bayes_adaptive_llm.utils.logger import FileLogger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import torch.distributed as dist
