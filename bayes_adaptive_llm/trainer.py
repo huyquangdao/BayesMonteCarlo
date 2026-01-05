@@ -1569,11 +1569,26 @@ class BayesAdaptiveLLMTrainer(Trainer):
 
         # save conversation for human evaluation
         if True:
-            for logger in self.loggers:
+            file_log_dir = None
+            for logger in (self.loggers or []):
                 if isinstance(logger, FileLogger):
-                    save_conv_path = os.path.join(logger.log_dir, f"conversations.txt")
-                    print("Saving conversations for human evaluation to ", save_conv_path)
-                    save_conversations_to_json_file(human_eval_convs, save_conv_path)
+                    file_log_dir = Path(logger.log_dir)
+                    break
+
+            if file_log_dir is None:
+                dataset_config = getattr(self.game, "dataset_config", None)
+                dataset_name = getattr(dataset_config, "dataset_name", "dataset")
+                model_name = self.model.__class__.__name__
+                file_log_dir = Path(self.game_config.log_dir) / dataset_name / model_name
+                file_log_dir.mkdir(parents=True, exist_ok=True)
+                loguru_logger.warning(
+                    "FileLogger not configured; saving conversations under {}",
+                    file_log_dir,
+                )
+
+            save_conv_path = str(file_log_dir / "conversations.txt")
+            print("Saving conversations for human evaluation to ", save_conv_path)
+            save_conversations_to_json_file(human_eval_convs, save_conv_path)
 
         # return the results of the online evaluation
         print(results)
