@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter_extract-persona
+dpo_adapter_folder: dpo_adapter_500_random
 sft_adapter_folder: sft_adapter  
 persona_sft_model_folder: sft_infer_persona
 
@@ -27,20 +27,20 @@ persona_sft_model_folder: sft_infer_persona
 
 # Training toggles
 run_sft: false
-run_dpo: false
+run_dpo: true
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: true
+run_online_eval: false
 run_simulator_analysis: false
 run_preprocessing: false
 run_persona_sft: false
 
-is_infer_persona: true
+is_infer_persona: false
 persona_sft_device_map: "auto"
 
 # Evaluation flags
-eval_by_sft: false
-eval_by_dpo: true
+# eval_by_sft: false
+# eval_by_dpo: true
 
 # eval_by_sft: true
 # eval_by_dpo: false
@@ -98,7 +98,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_extract-persona.jsonl"
+preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_500.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_basemodel.jsonl"
