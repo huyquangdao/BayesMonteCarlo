@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 
 from tqdm import tqdm
 
-from config.constants import BIG5_PERSONALITY, DECISION_MAKING_STYLE, INFER_PERSONA_PROMPT
+from config.constants import BIG5_PERSONALITY, DECISION_MAKING_STYLE, INFER_PERSONA_PROMPT, PREFERENCE_PAIR_PROMPT_P4G, BIG5_PERSONALITY_DES
 from utils.prompt import call_llm
 
 
@@ -142,7 +142,8 @@ def process_persona_file(
             try:
                 record = json.loads(line)
                 history = _extract_history(record)
-                description = (record.get("persona_hint") or {}).get("description", "")
+                persona_hint_raw = record.get("persona_hint") or {}
+                description = persona_hint_raw.get("description", "")
                 personality, decision_making = _infer_persona_from_description(
                     description,
                     llm_pipeline=llm_pipeline,
@@ -150,14 +151,40 @@ def process_persona_file(
                     model_type=model_type,
                 )
 
-                out_record = {
+                # Preserve original preference pair structure and enrich with persona fields
+                persona_label = personality or persona_hint_raw.get("personality")
+                persona_description = BIG5_PERSONALITY_DES.get(personality) if personality else ""
+
+                prompt_body = history
+                prompt = PREFERENCE_PAIR_PROMPT_P4G.format(persona_label or "unknown", persona_description or "").rstrip()
+                if prompt_body:
+                    prompt += "\n" + prompt_body
+
+                base_record = {
+                    "prompt": prompt,
+                    "chosen": record.get("chosen"),
+                    "rejected": record.get("rejected"),
                     "dialog_index": record.get("dialog_index"),
                     "turn": record.get("turn"),
                     "action": record.get("action"),
-                    "hist_dialog": history,
-                    "personality": personality,
-                    "decision_making": decision_making,
+                    "system_utterance": record.get("system_utterance"),
+                    "user_utterance": record.get("user_utterance"),
                 }
+
+                out_record = {
+                    **base_record,
+                    "hist_dialog": history,
+                }
+
+                # preserve/enrich persona hint
+                persona_hint = record.get("persona_hint") or {}
+                if description:
+                    persona_hint["description"] = description
+                if personality is not None:
+                    persona_hint["personality"] = personality
+                if decision_making is not None:
+                    persona_hint["decision_making"] = decision_making
+                out_record["persona_hint"] = persona_hint
                 fout.write(json.dumps(out_record, ensure_ascii=False) + "\n")
             except Exception as e:
                 print(f"[persona_processor] Skipping line {idx} due to error: {e}")

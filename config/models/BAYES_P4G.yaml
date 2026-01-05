@@ -11,7 +11,7 @@ cached_dir: "cache/BAYES/"
 dropout: 0.1
 combined_action: false
 saved_dir: checkpoints/persuation/p4g/BayesAdaptiveLLMModel
-dpo_adapter_folder: dpo_adapter
+dpo_adapter_folder: dpo_adapter_500_random
 sft_adapter_folder: sft_adapter  
 persona_sft_model_folder: sft_infer_persona
 
@@ -52,6 +52,7 @@ max_gen_tokens: 256
 
 #Collect Preference pairs hyperparameters
 skip_to_dialog_idx: 30
+sample_infer: 10
 
 
 # SFT hyperparameters (memory-friendly)
@@ -79,7 +80,7 @@ max_prompt_length: 768        # max_prompt_length
 
 dpo_train_batch_size: 1             # per_device_train_batch_size / eval_batch_size
 dpo_eval_batch_size: 1              # per_device_eval_batch_size / eval_batch_size
-dpo_epochs: 5                 # epochs
+dpo_epochs: 3                 # epochs
 
 dpo_learning_rate: 2e-5       # learning_rate
 dpo_beta: 0.1                 # beta
@@ -97,7 +98,7 @@ dpo_loss_type: sigmoid
 
 
 # Path to preference pairs (jsonl) used for DPO; each row should include
-preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_2k.jsonl"
+preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_500.jsonl"
 
 #Collect fixed persona
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_basemodel.jsonl"
@@ -109,6 +110,7 @@ preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_2k.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_neuroticism.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_high-acceptance.jsonl"
 # preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_low-acceptance.jsonl"
+# preference_pairs_path: "data/pg_data/preference_pairs_llama3.1_extract-persona.jsonl"
 
 #PreProcessing
 preprocessing_input_path: "data/pg_data/preference_pairs_llama3.1.jsonl"
