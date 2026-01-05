@@ -24,9 +24,10 @@ do
   --datasets p4g \
   --models bayes_adaptive_llm \
   --gen_models llama3 \
-  --model_type train \
+  --model_type llama3 \
   --is_so_game \
   --use_persona \
+  --is_utterance_based_action \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 
