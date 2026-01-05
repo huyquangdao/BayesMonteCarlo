@@ -163,3 +163,7 @@ def save_conversation_for_human_evaluation(conv_path, conv):
         f.write("Deal Achievement: " + "\n")
         f.write("Negotiation Equity: " + "\n")
         f.write("Buyer's Benifit: " + "\n")
+
+def save_conversations_to_json_file(list_of_convs, file_path):
+    with open(file_path, "w") as f:
+        json.dump(list_of_convs, f)

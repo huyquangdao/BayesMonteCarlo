@@ -85,6 +85,7 @@ from utils.logging_utils import append_to_log
 from config.constants import PERSUATION
 from logger.wandb_logger import WanDBLogger
 from utils.prompt import call_llm_model
+from utils.game import save_conversations_to_json_file
 
 def cuda_bf16_supported() -> bool:
     if not torch.cuda.is_available():
@@ -1286,6 +1287,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         # and promote items to this simulator
         # simulator = simulators[0]
         convs = []
+        human_eval_convs = []
         
         # loop over the item set
         # make sure each item is associated with one user profile
@@ -1379,6 +1381,8 @@ class BayesAdaptiveLLMTrainer(Trainer):
             convs.append(state)
             # compute the loss function, e.g a proxy of the policy gradient
             # newloss = self.compute_rl_policy_loss(rewards, log_probs)
+            
+            human_eval_convs.append(state)
 
             # log the results
             # if newloss is not None:
@@ -1561,6 +1565,13 @@ class BayesAdaptiveLLMTrainer(Trainer):
             #     for idx, conv in enumerate(convs):
             #         save_conv_path = os.path.join(logger.log_dir, f"conversation_{idx}.txt")
             #         save_conversation_for_human_evaluation(save_conv_path, conv)    
+
+        # save conversation for human evaluation
+        if True:
+            for logger in self.loggers:
+                if isinstance(logger, FileLogger):
+                    save_conv_path = os.path.join(logger.log_dir, f"conversations.txt")
+                    save_conversations_to_json_file(human_eval_convs, save_conv_path)
 
         # return the results of the online evaluation
         print(results)
