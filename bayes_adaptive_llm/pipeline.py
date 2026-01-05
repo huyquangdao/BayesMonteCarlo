@@ -210,7 +210,7 @@ class BayesAdaptiveLLMPipeline(Pipeline):
             # creating the target item set
             test_cases = create_cases(test_instances=self.dataset.test_instances,
                                       num_cases=self.dataset_config.num_test_cases)
-
+            test_cases = test_cases[:20]  # debug limit to 20 cases
             # get the simulators from the test set
             test_simulators = self.test_simulators
 
