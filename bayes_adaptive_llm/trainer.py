@@ -1572,6 +1572,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
             for logger in self.loggers:
                 if isinstance(logger, FileLogger):
                     save_conv_path = os.path.join(logger.log_dir, f"conversations.txt")
+                    print("Saving conversations for human evaluation to ", save_conv_path)
                     save_conversations_to_json_file(human_eval_convs, save_conv_path)
 
         # return the results of the online evaluation
