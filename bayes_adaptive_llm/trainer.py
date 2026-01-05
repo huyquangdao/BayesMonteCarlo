@@ -13,7 +13,6 @@ import json
 import copy
 import inspect
 import re
-from bayes_adaptive_llm.utils.logger import FileLogger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
 import torch.distributed as dist
@@ -85,6 +84,7 @@ from utils.persona_processor import process_persona_file, build_personality_sft_
 from utils.logging_utils import append_to_log
 from config.constants import PERSUATION
 from logger.wandb_logger import WanDBLogger
+from logger.file_logger import FileLogger
 from utils.prompt import call_llm_model
 from utils.game import save_conversations_to_json_file
 
