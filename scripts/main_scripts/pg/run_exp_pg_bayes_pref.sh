@@ -28,6 +28,7 @@ do
   --is_so_game \
   --use_persona \
   --is_utterance_based_action \
+  --analysis_bayes_monte_carlo \
   --num_train_rl_epochs 10 \
   --metrics acc,prf1,sr,total_reward,avg_turn
 
