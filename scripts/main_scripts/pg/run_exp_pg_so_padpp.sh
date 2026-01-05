@@ -11,7 +11,7 @@ CUDA_VISIBLE_DEVICES=6 accelerate launch --main_process_port 69 --gpu_ids 7 --nu
         --datasets p4g \
         --models so_padpp \
         --gen_models llama3 \
-        --num_train_rl_epochs 10 \
+        --num_train_rl_epochs 5 \
         --is_so_game \
         --use_persona \
         --model_type llama3 \
