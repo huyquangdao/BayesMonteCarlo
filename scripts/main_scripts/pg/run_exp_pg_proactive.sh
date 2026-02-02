@@ -13,7 +13,6 @@ CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 71 --gpu_ids 2 --nu
         --gen_models llama3 \
         --is_so_game \
         --model_type llama3 \
-        --is_utterance_based_action \
         --use_persona \
         --metrics acc,prf1,sr,total_reward,avg_turn,bleu_n,rouge_n,dist_n        
 done

@@ -123,14 +123,7 @@ class ProactivePipelineForNegotiation(ProactivePipeline):
             # sample to make sure the number of test simulators equal to the number of test items
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
-        # debug
-        print("\n[TEST SIMULATORS INFO]")
-        for i, simulator in enumerate(test_simulators):
-            print(f"Simulator {i}: {simulator}")
-            persona_desc = getattr(simulator, "user_profile_description", "")
-            print(f"Persona: {persona_desc}")
-        
-        print("Length test_cases: ", len(test_cases))
+
         # make sure the number of simulator equal to the number of target item
         # this make the performance comparison fair.
         # please manage the randon seed carefully.
@@ -237,7 +230,14 @@ class ProactivePipelineForPersuation(ProactivePipeline):
             # sample to make sure the number of test simulators equal to the number of test items
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
-
+        # debug
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+        
+        print("Length test_cases: ", len(test_cases))
         # make sure the number of simulator equal to the number of target item
         # this make the performance comparison fair.
         # please manage the randon seed carefully.
