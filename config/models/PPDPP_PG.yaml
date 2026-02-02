@@ -19,3 +19,5 @@ run_offline_eval: true
 num_train_rl_epochs: 10
 sampled_times: 100
 rl_learning_rate: 0.000001
+
+run_simulator_analysis: true

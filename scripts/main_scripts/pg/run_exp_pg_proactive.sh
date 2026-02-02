@@ -12,7 +12,7 @@ CUDA_VISIBLE_DEVICES=2 accelerate launch --main_process_port 71 --gpu_ids 5 --nu
         --models proactive \
         --gen_models llama3 \
         --model_type llama3 \
-        --analysis_bayes_monte_carlo \
+        # --analysis_bayes_monte_carlo \
         --is_so_game \
         --use_persona \
         --metrics acc,prf1,sr,total_reward,avg_turn,bleu_n,rouge_n,dist_n        
