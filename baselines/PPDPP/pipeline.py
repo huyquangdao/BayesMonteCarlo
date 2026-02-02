@@ -493,7 +493,7 @@ class PPDPPPipelineForPersuation(PPDPPPipeline):
 
         # make sure we have a set of simulators for training the rl agent.
         assert self.dev_simulators is not None
-
+        print("Number of dev simulators: ", len(self.dev_simulators))
         # compute split length
         # i.e 0.8 for train
         # 0.2 for testing
