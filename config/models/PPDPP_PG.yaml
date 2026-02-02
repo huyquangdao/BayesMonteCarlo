@@ -14,7 +14,7 @@ dropout: 0.1
 max_grad_norm: 5
 run_sft: false
 run_rlt: true
-run_online_eval: true
+run_online_eval: false
 run_offline_eval: false
 num_train_rl_epochs: 10
 sampled_times: 100
