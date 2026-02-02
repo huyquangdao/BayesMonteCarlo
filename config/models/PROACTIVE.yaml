@@ -1,3 +1,5 @@
 run_online_eval: true
 temperature: 0.0
 max_gen_tokens: 50
+
+run_simulator_analysis: true
