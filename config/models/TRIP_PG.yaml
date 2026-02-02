@@ -22,4 +22,4 @@ rl_learning_rate: 0.000001
 uniform_weights: false
 max_gen_tokens: 50
 
-# run_simulator_analysis: true
+run_simulator_analysis: true
