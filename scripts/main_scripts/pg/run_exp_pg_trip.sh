@@ -15,6 +15,5 @@ CUDA_VISIBLE_DEVICES=3 accelerate launch --main_process_port 76 --gpu_ids 3 --nu
         --use_persona \
         --num_train_rl_epochs 5 \
         --model_type llama3 \
-        --analysis_bayes_monte_carlo \
         --metrics acc,prf1,sr,total_reward,avg_turn
 done
