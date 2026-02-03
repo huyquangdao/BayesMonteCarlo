@@ -1,7 +1,7 @@
 EXPNAME="Main"
 for i in 1
 do
-CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 69 --gpu_ids 4 --num_processes 1 run.py  \
+CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 69 --gpu_ids 5 --num_processes 1 run.py  \
         --exp_name $EXPNAME \
         --project_name ProactiveLLM \
         --seed $i \
