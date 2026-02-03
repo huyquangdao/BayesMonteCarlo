@@ -26,16 +26,16 @@ persona_sft_model_folder: sft_infer_persona
 # dpo_adapter_folder: dpo_adapter_low-acceptance
 
 # Training toggles
-run_sft: true
-run_dpo: true
+run_sft: false
+run_dpo: false
 run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
-run_online_eval: false
+run_online_eval: true
 run_simulator_analysis: false
 run_preprocessing: false
 run_persona_sft: false
 
-is_infer_persona: false
+is_infer_persona: true
 persona_sft_device_map: "auto"
 
 # Evaluation flags
