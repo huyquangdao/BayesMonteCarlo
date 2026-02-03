@@ -570,7 +570,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         train_instances, dev_instances, _ = self.process_dataset(dataset)
 
         train_dataset, eval_dataset = self._build_sft_datasets_from_instances(
-            train_instances, dev_instances,
+            train_instances, dev_instances, is_infer_persona=getattr(self.model_config, "is_infer_persona", False)
         )
 
         base_model = getattr(self.model, "plm", self.model)
