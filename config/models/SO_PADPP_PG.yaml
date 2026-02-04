@@ -16,7 +16,7 @@ run_sft: true
 run_rlt: true
 run_online_eval: false
 run_offline_eval: false
-num_train_rl_epochs: 10
+num_train_rl_epochs: 3
 num_train_ppo_epochs: 4
 sampled_times: 100
 rl_learning_rate: 0.000001
