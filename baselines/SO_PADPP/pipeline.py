@@ -549,15 +549,15 @@ class SOPADPPPipelineForPersuation(SOPADPPPipeline):
             # sample to make sure the number of test simulators equal to the number of test items
             # please carefully managae the random seed for fair performance comparison
             # test_simulators = random.sample(test_simulators, len(test_target_items))
-        # if getattr(self.model_config, "run_simulator_analysis", False) and len(test_simulators) > 0:
-        #     single_simulator = random.choice(test_simulators)
-        #     test_simulators = [single_simulator for _ in range(len(test_cases))]
-        # print("\n[TEST SIMULATORS INFO]")
-        # for i, simulator in enumerate(test_simulators):
-        #     print(f"Simulator {i}: {simulator}")
-        #     persona_desc = getattr(simulator, "user_profile_description", "")
-        #     print(f"Persona: {persona_desc}")
-        # print("Length test_cases: ", len(test_cases))
+        if getattr(self.model_config, "run_simulator_analysis", False) and len(test_simulators) > 0:
+            single_simulator = random.choice(test_simulators)
+            test_simulators = [single_simulator for _ in range(len(test_cases))]
+        print("\n[TEST SIMULATORS INFO]")
+        for i, simulator in enumerate(test_simulators):
+            print(f"Simulator {i}: {simulator}")
+            persona_desc = getattr(simulator, "user_profile_description", "")
+            print(f"Persona: {persona_desc}")
+        print("Length test_cases: ", len(test_cases))
         # test_target_items = test_target_items
         # construct the goal, topic mapping
         action_mapping = self.dataset.construct_action_mapping(combine=self.model_config.combined_action)
