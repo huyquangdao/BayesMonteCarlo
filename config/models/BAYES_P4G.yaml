@@ -39,8 +39,8 @@ is_infer_persona: true
 persona_sft_device_map: "auto"
 
 # Evaluation flags
-# eval_by_sft: false
-# eval_by_dpo: true
+eval_by_sft: false
+eval_by_dpo: true
 
 # eval_by_sft: true
 # eval_by_dpo: false
