@@ -1,5 +1,5 @@
 EXPNAME="Main"
-for i in 1
+for i in 2
 do
 CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 69 --gpu_ids 2 --num_processes 1 run.py  \
         --exp_name $EXPNAME \
