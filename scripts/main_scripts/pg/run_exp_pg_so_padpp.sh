@@ -15,6 +15,5 @@ CUDA_VISIBLE_DEVICES=4 accelerate launch --main_process_port 69 --gpu_ids 1 --nu
         --is_so_game \
         --use_persona \
         --model_type llama3 \
-        --analysis_bayes_monte_carlo \
         --metrics acc,prf1,sr,total_reward,avg_turn
 done

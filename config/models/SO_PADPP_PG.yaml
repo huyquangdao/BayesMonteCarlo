@@ -23,4 +23,4 @@ rl_learning_rate: 0.000001
 uniform_weights: false
 eval_interval: 1
 
-run_simulator_analysis: true
+# run_simulator_analysis: true
