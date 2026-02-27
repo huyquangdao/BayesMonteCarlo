@@ -5,7 +5,7 @@
 
 EXPNAME="P4G_BAYES_PREF"
 
-for seed in 2
+for seed in 42
 do
 # NCCL_IB_DISABLE="1"
 # NCCL_P2P_DISABLE="1"
