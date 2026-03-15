@@ -221,7 +221,7 @@ class BayesAdaptiveLLMTrainer(Trainer):
         messages.extend(conversation)
         return {"messages": messages}
 
-    def _instance_to_messages_for_negotiation(self, inst):
+    def _instance_to_messages_for_negotiation(self, inst, is_infer_persona: bool = False):
         """
         Convert a negotiation instance to chat messages for SFT.
         Support:
@@ -253,6 +253,14 @@ class BayesAdaptiveLLMTrainer(Trainer):
             system_content += f"\nUser persona hint: {persona_description}"
 
 
+        if is_infer_persona:
+            sample_infer = getattr(self.model_config, "sample_infer", 10)
+            inferred_persona, inferred_description = self._infer_persona_from_context(sample_infer, [])
+            inferred_persona = inferred_persona or ""
+            inferred_description = inferred_description or ""
+            system_content += f"\n\n[Additional Persona Inference]\nInferred user persona: {inferred_persona}\nInferred persona description: {inferred_description}"
+
+        
         messages = [{"role": "system", "content": system_content}]
 
         dialogue_context = _get(inst, "dialogue_context")
