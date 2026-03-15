@@ -301,11 +301,11 @@ class BayesAdaptiveLLMTrainer(Trainer):
             ]
         elif self.game_config.name == NEGOTIATION:
             train_records = [
-                self._instance_to_messages_for_negotiation(inst)
+                self._instance_to_messages_for_negotiation(inst, is_infer_persona)
                 for inst in train_instances
             ]
             dev_records = [
-                self._instance_to_messages_for_negotiation(inst)
+                self._instance_to_messages_for_negotiation(inst, is_infer_persona)
                 for inst in dev_instances
             ]
         else:
