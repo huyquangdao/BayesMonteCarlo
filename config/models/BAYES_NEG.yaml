@@ -27,6 +27,7 @@ run_preference_search: false   # MCTS preference search handled separately
 run_offline_eval: false
 run_online_eval: true
 run_simulator_analysis: false
+is_infer_persona: true
 
 # Evaluation flags
 eval_by_sft: false
