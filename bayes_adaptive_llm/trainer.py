@@ -1298,10 +1298,15 @@ class BayesAdaptiveLLMTrainer(Trainer):
         convs = []
         human_eval_convs = []
         
+        #skip to idx
+        skip_to_idx = getattr(self.model_config, "skip_to_dialog_idx", 0)
+
         # loop over the item set
         # make sure each item is associated with one user profile
         for idx, (case, simulator) in tqdm(enumerate(list(zip(cases, simulators)))):
 
+            if idx < skip_to_idx:
+                continue
             # randomly sample persona information
             # simulator = np.random.choice(simulators)
 
