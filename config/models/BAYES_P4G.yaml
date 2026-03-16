@@ -51,7 +51,7 @@ max_gen_tokens: 256
 
 
 #Collect Preference pairs hyperparameters
-skip_to_dialog_idx: 58
+skip_to_dialog_idx: 0
 sample_infer: 10
 
 
