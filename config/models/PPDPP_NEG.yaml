@@ -12,11 +12,11 @@ gradient_accumulation_steps: 1
 num_train_epochs: 1
 dropout: 0.1
 max_grad_norm: 5
-run_sft: true
+run_sft: false
 run_rlt: true
 run_online_eval: true
-run_offline_eval: true
-num_train_rl_epochs: 10
+run_offline_eval: false
+num_train_rl_epochs: 5
 sampled_times: 100
 rl_learning_rate: 0.000001
 uniform_weights: false
